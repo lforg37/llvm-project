@@ -1493,4 +1493,16 @@ def ConvertVectorToXeGPU : Pass<"convert-vector-to-xegpu"> {
   ];
 }
 
+//===----------------------------------------------------------------------===//
+// WasmToStandard
+//===----------------------------------------------------------------------===//
+
+def ConvertWasmToStandard : Pass<"convert-wasm-to-standard"> {
+  let summary = "Lower Wasm dialect to standard generic dialects";
+  let dependentDialects = [
+    "func::FuncDialect", "arith::ArithDialect",
+    "vector::VectorDialect", "wasm::WasmDialect"
+  ];
+}
+
 #endif // MLIR_CONVERSION_PASSES
