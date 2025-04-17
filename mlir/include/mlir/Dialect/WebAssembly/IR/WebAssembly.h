@@ -21,8 +21,26 @@
 
 
 //===----------------------------------------------------------------------===//
+// WebAssembly Dialect Types
+//===----------------------------------------------------------------------===//
+
+#define GET_TYPEDEF_CLASSES
+#include "mlir/Dialect/WebAssembly/IR/WebAssemblyOpsTypes.h.inc"
+
+//===----------------------------------------------------------------------===//
 // WebAssembly Dialect Operations
 //===----------------------------------------------------------------------===//
+
+
+//===----------------------------------------------------------------------===//
+// WebAssembly Constraints
+//===----------------------------------------------------------------------===//
+
+namespace mlir{
+namespace wasm {
+#include "mlir/Dialect/WebAssembly/IR/WebAssemblyTypeConstraints.h.inc"
+}
+}// namespace mlir
 
 #define GET_OP_CLASSES
 #include "mlir/Dialect/WebAssembly/IR/WebAssemblyOps.h.inc"
