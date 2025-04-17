@@ -18,6 +18,7 @@ def Wasm_Dialect : Dialect {
   let description = [{
     The wasm dialect is intended to represent WebAssembly modules.
   }];
+  let useDefaultTypePrinterParser = true;
 }
 
 #endif //WEBASSEMBLY_BASE
