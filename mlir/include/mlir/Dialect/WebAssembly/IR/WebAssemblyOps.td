@@ -11,11 +11,7 @@
 
 
 include "mlir/Dialect/WebAssembly/IR/WebAssemblyBase.td"
-
-include "mlir/IR/BuiltinTypes.td"
-include "mlir/IR/CommonAttrConstraints.td"
-include "mlir/IR/CommonTypeConstraints.td"
-
+include "mlir/Dialect/WebAssembly/IR/WebAssemblyTypes.td"
 
 class Wasm_Op<string mnemonic, list<Trait> traits = []> :
     Op<Wasm_Dialect, mnemonic, traits>;
