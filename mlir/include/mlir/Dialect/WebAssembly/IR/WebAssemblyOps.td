@@ -83,6 +83,13 @@ def Wasm_MemImportOp : Wasm_Op<"import_mem", [Symbol]> {
   }];
 }
 
+def Wasm_TableOp : Wasm_Op<"table", [Symbol]> {
+  let summary= "WebAssembly table value";
+  let arguments = (ins SymbolNameAttr: $sym_name,
+                     Wasm_TableTypeAttr: $type,
+                     UnitAttr: $isExported);
+}
+
 def Wasm_TableImportOp : Wasm_Op<"import_table", [Symbol]> {
   let summary = "Importing a table";
   let arguments = (ins SymbolNameAttr: $sym_name,
