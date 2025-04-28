@@ -14,10 +14,17 @@ include "mlir/Dialect/WebAssembly/IR/WebAssemblyBase.td"
 include "mlir/Dialect/WebAssembly/IR/WebAssemblyTypes.td"
 
 include "mlir/Interfaces/FunctionInterfaces.td"
+include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 
 class Wasm_Op<string mnemonic, list<Trait> traits = []> :
     Op<Wasm_Dialect, mnemonic, traits>;
+
+def Wasm_EmptyStackOp : Wasm_Op<"empty_stack", [DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
+  let summary = "Operation for initializing an empty stack";
+  let results = (outs Wasm_StackType:$result);
+  let assemblyFormat = "attr-dict";
+}
 
 def Wasm_FuncOp : Wasm_Op<"func", [
   AffineScope, AutomaticAllocationScope,
@@ -122,6 +129,13 @@ def Wasm_TableImportOp : Wasm_Op<"import_table", [Symbol]> {
   let extraClassDeclaration = [{
     bool isDeclaration() const { return true; }
   }];
+}
+
+def Wasm_PopOp : Wasm_Op<"pop", [Terminator]> {
+  let summary = "Pop a value from the stack";
+  let arguments = (ins Wasm_StackType:$stack);
+  let results = (outs Wasm_ValType:$result);
+  let assemblyFormat = "type($result) `from` $stack attr-dict";
 }
 
 #endif // WEBASSEMBLY_OPS
