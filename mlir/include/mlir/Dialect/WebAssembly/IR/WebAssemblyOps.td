@@ -34,8 +34,10 @@ def Wasm_EmptyStackOp : Wasm_Op<"empty_stack", [DeclareOpInterfaceMethods<InferT
 }
 
 def Wasm_FuncOp : Wasm_Op<"func", [
-  AffineScope, AutomaticAllocationScope,
-  DeclareOpInterfaceMethods<FunctionOpInterface>, IsolatedFromAbove]> {
+    AffineScope, AutomaticAllocationScope,
+    DeclareOpInterfaceMethods<FunctionOpInterface>,
+    IsolatedFromAbove,
+    SymbolTable]> {
   let arguments = (ins SymbolNameAttr: $sym_name,
                      Wasm_FuncTypeAttr: $functionType,
                      OptionalAttr<StrAttr>:$sym_visibility,
@@ -105,6 +107,12 @@ def Wasm_GlobalImportOp : Wasm_Op<"import_global", [Symbol]> {
   let assemblyFormat = "$importName `from` $moduleName `as` $sym_name attr-dict";
 }
 
+def Wasm_LocalOp : Wasm_Op<"local"> {
+  let summary = "Declaration of local variable";
+  let results = (outs Wasm_ValType: $result);
+  let assemblyFormat = "type($result) attr-dict";
+}
+
 def Wasm_MemOp : Wasm_Op<"memory", [Symbol]> {
   let summary= "WebAssembly memory definition";
   let arguments = (ins SymbolNameAttr: $sym_name,
@@ -148,6 +156,11 @@ def Wasm_PopOp : Wasm_Op<"pop", [Terminator]> {
   let arguments = (ins Wasm_StackType:$stack);
   let results = (outs Wasm_ValType:$result);
   let assemblyFormat = "type($result) `from` $stack attr-dict";
+}
+
+def Wasm_ReturnOp : Wasm_Op<"return", [Terminator]> {
+  let summary = "Return from the current function frame";
+  let assemblyFormat = "attr-dict";
 }
 
 #endif // WEBASSEMBLY_OPS
