@@ -18,6 +18,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/LEB128.h"
 #include "llvm/Support/LogicalResult.h"
+
 #include <variant>
 
 using namespace mlir;
@@ -73,6 +74,12 @@ constexpr bool sectionShouldBeUnique(WasmSectionType secType) {
 }
 
 struct WasmEncodings {
+  // Numerical constants
+  static constexpr uint8_t constI32{0x41};
+  static constexpr uint8_t constI64{0x42};
+  static constexpr uint8_t constFP32{0x43};
+  static constexpr uint8_t constFP64{0x44};
+
   /// Byte encodings of types in wasm binaries
   /// These are defined in the wasm binary spec
   /// https://webassembly.github.io/spec/core/binary/types.html
@@ -317,6 +324,21 @@ private:
            << static_cast<int>(opCode);
   }
 
+  template <typename IntT>
+  parsed_inst_t
+  parseIntConstInst(OpBuilder &builder, Value operand,
+                    std::enable_if_t<std::is_integral_v<IntT>> * = nullptr) {
+    constexpr size_t typeWidth = sizeof(IntT) * 8;
+    auto parsedConstant = parseLiteral<IntT>();
+    if (failed(parsedConstant))
+      return failure();
+    auto constOp = builder.create<ConstOp>(
+        getLocation(), operand,
+        builder.getIntegerAttr(builder.getIntegerType(typeWidth),
+                               *parsedConstant));
+    return constOp.getResult();
+  }
+
   /// This function generates a dispatch tree to associate an opcode with a
   /// parser. Parsers are registered by specialising the
   /// `parseSpecificInstruction` function for the op code to handle.
@@ -384,6 +406,27 @@ private:
   unsigned anchorOffset{0};
   unsigned offset{0};
 };
+
+template <>
+llvm::FailureOr<float> ParserHead::parseLiteral<float>() {
+  auto bytes = consumeNBytes(4);
+  if (failed(bytes))
+    return failure();
+  float result;
+  std::memcpy(&result, bytes->bytes_begin(), 4);
+  return result;
+}
+
+template <>
+llvm::FailureOr<double> ParserHead::parseLiteral<double>() {
+  auto bytes = consumeNBytes(8);
+  if (failed(bytes))
+    return failure();
+  double result;
+  std::memcpy(&result, bytes->bytes_begin(), 8);
+  return result;
+}
+
 template <>
 llvm::FailureOr<uint32_t> ParserHead::parseLiteral<uint32_t>() {
   char const *error = nullptr;
@@ -402,12 +445,82 @@ llvm::FailureOr<uint32_t> ParserHead::parseLiteral<uint32_t>() {
   offset += encodingSize;
   return res;
 }
+
+template <>
+llvm::FailureOr<int32_t> ParserHead::parseLiteral<int32_t>() {
+  char const *error = nullptr;
+  int32_t res{0};
+  unsigned encodingSize{0};
+  auto src = curHead();
+  auto decoded = llvm::decodeSLEB128(src.bytes_begin(), &encodingSize,
+                                     src.bytes_end(), &error);
+  if (error)
+    return emitError(getLocation(), error);
+  if (std::isgreater(decoded, std::numeric_limits<int32_t>::max()) ||
+      std::isgreater(std::numeric_limits<int32_t>::min(), decoded))
+    return emitError(getLocation()) << "literal does not fit on 32 bits";
+
+  res = static_cast<int32_t>(decoded);
+  offset += encodingSize;
+  return res;
+}
+
+template <>
+llvm::FailureOr<int64_t> ParserHead::parseLiteral<int64_t>() {
+  char const *error = nullptr;
+  unsigned encodingSize{0};
+  auto src = curHead();
+  auto res = llvm::decodeSLEB128(src.bytes_begin(), &encodingSize,
+                                 src.bytes_end(), &error);
+  if (error)
+    return emitError(getLocation(), error);
+
+  offset += encodingSize;
+  return res;
+}
+
 llvm::FailureOr<uint32_t> ParserHead::parseVectorSize() {
   return parseLiteral<uint32_t>();
 }
 
 inline llvm::FailureOr<uint32_t> ParserHead::parseUI32() {
   return parseLiteral<uint32_t>();
+}
+
+template <>
+inline parsed_inst_t ParserHead::parseSpecificInstruction<WasmEncodings::constI32>(
+    OpBuilder &builder, Value operand) {
+  return parseIntConstInst<int32_t>(builder, operand);
+}
+
+template <>
+inline parsed_inst_t ParserHead::parseSpecificInstruction<WasmEncodings::constI64>(
+    OpBuilder &builder, Value operand) {
+  return parseIntConstInst<int64_t>(builder, operand);
+}
+
+template <>
+inline parsed_inst_t ParserHead::parseSpecificInstruction<WasmEncodings::constFP32>(
+    OpBuilder &builder, Value operand) {
+  auto opLoc = getLocation();
+  auto constVal = parseLiteral<float>();
+  if (failed(constVal))
+    return failure();
+  auto constOp = builder.create<ConstOp>(opLoc, operand,
+                                         builder.getF32FloatAttr(*constVal));
+  return constOp.getResult();
+}
+
+template <>
+inline parsed_inst_t ParserHead::parseSpecificInstruction<WasmEncodings::constFP64>(
+    OpBuilder &builder, Value operand) {
+  auto opLoc = getLocation();
+  auto constVal = parseLiteral<double>();
+  if (failed(constVal))
+    return failure();
+  auto constOp = builder.create<ConstOp>(opLoc, operand,
+                                         builder.getF64FloatAttr(*constVal));
+  return constOp.getResult();
 }
 
 class WasmBinaryParser {
