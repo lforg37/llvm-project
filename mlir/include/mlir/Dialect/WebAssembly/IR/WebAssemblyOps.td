@@ -20,6 +20,13 @@ include "mlir/IR/SymbolInterfaces.td"
 class Wasm_Op<string mnemonic, list<Trait> traits = []> :
     Op<Wasm_Dialect, mnemonic, traits>;
 
+def Wasm_ConstOp : Wasm_Op<"const", [DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
+  let summary = "Push a constant to the stack";
+  let arguments = (ins Wasm_StackType: $stack, Wasm_NumericAttr: $value);
+  let results = (outs Wasm_StackType: $result);
+  let assemblyFormat = "$value `on` $stack attr-dict";
+}
+
 def Wasm_EmptyStackOp : Wasm_Op<"empty_stack", [DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
   let summary = "Operation for initializing an empty stack";
   let results = (outs Wasm_StackType:$result);
