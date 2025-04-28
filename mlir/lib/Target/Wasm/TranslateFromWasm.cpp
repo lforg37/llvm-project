@@ -16,21 +16,71 @@
 
 using namespace mlir;
 namespace {
+using section_id_t = uint8_t;
+enum struct WasmSectionType : section_id_t {
+  CUSTOM = 0,
+  TYPE = 1,
+  IMPORT = 2,
+  FUNCTION = 3,
+  TABLE = 4,
+  MEMORY = 5,
+  GLOBAL = 6,
+  EXPORT = 7,
+  START = 8,
+  ELEMENT = 9,
+  CODE = 10,
+  DATA = 11,
+  DATACOUNT = 12
+};
+
+constexpr section_id_t highestWasmSectionID{
+  static_cast<section_id_t>(WasmSectionType::DATACOUNT)};
+
+#define APPLY_WASM_SEC_TRANSFORM                                               \
+  WASM_SEC_TRANSFORM(CUSTOM)                                                   \
+  WASM_SEC_TRANSFORM(TYPE)                                                     \
+  WASM_SEC_TRANSFORM(IMPORT)                                                   \
+  WASM_SEC_TRANSFORM(FUNCTION)                                                 \
+  WASM_SEC_TRANSFORM(TABLE)                                                    \
+  WASM_SEC_TRANSFORM(MEMORY)                                                   \
+  WASM_SEC_TRANSFORM(GLOBAL)                                                   \
+  WASM_SEC_TRANSFORM(EXPORT)                                                   \
+  WASM_SEC_TRANSFORM(START)                                                    \
+  WASM_SEC_TRANSFORM(ELEMENT)                                                  \
+  WASM_SEC_TRANSFORM(CODE)                                                     \
+  WASM_SEC_TRANSFORM(DATA)                                                     \
+  WASM_SEC_TRANSFORM(DATACOUNT)
+
+template <WasmSectionType>
+constexpr const char *wasmSectionName = "";
+
+#define WASM_SEC_TRANSFORM(section)                                            \
+  template <>                                                                  \
+  constexpr const char *wasmSectionName<WasmSectionType::section> = #section;
+APPLY_WASM_SEC_TRANSFORM
+#undef WASM_SEC_TRANSFORM
+
+constexpr bool sectionShouldBeUnique(WasmSectionType secType) {
+  return secType != WasmSectionType::CUSTOM;
+}
 class ParserHead {
 public:
   ParserHead(llvm::StringRef src, StringAttr name) : head{src}, locName{name} {}
-  ParserHead(ParserHead const &other) = delete;
-  ParserHead(ParserHead &&) = delete;
+  ParserHead(ParserHead &&) = default;
+private:
+  ParserHead(ParserHead const &other) = default;
+
+public:
 
   auto getLocation() const {
     return FileLineColLoc::get(locName, 0, anchorOffset + offset);
   }
 
   llvm::FailureOr<llvm::StringRef> consumeNBytes(size_t nBytes) {
-    if (nBytes > size()) {
+    if (nBytes > size())
       return emitError(getLocation(), "trying to extract ")
              << nBytes << "bytes when only " << size() << "are avilables";
-    }
+
     auto res = head.slice(offset, offset + nBytes);
     offset += nBytes;
     return res;
@@ -57,14 +107,27 @@ private:
 public:
   llvm::FailureOr<llvm::StringRef> parseName() {
     auto size = parseVectorSize();
-    if (failed(size)) {
+    if (failed(size))
       return failure();
-    }
+
     return consumeNBytes(*size);
   }
 
+  llvm::FailureOr<WasmSectionType> parseWasmSectionType() {
+    auto id = consumeByte();
+    if (failed(id))
+      return failure();
+    if (*id > highestWasmSectionID)
+      return emitError(getLocation(), "Invalid section ID: ")
+             << static_cast<int>(*id);
+    return static_cast<WasmSectionType>(*id);
+  }
 
   bool end() const { return curHead().empty(); }
+
+  ParserHead copy() const {
+    return *this;
+  }
 
 private:
   llvm::StringRef curHead() const { return head.drop_front(offset); }
@@ -103,6 +166,73 @@ inline llvm::FailureOr<uint32_t> ParserHead::parseUI32() {
 
 class WasmBinaryParser {
 private:
+  struct SectionRegistry {
+    using section_location_t = llvm::StringRef;
+
+    std::array<llvm::SmallVector<section_location_t>, highestWasmSectionID+1> registry;
+
+    template <WasmSectionType SecType>
+    std::conditional_t<sectionShouldBeUnique(SecType),
+                       std::optional<section_location_t>,
+                       llvm::ArrayRef<section_location_t>>
+    getContentForSection() const {
+      constexpr auto idx = static_cast<size_t>(SecType);
+      if constexpr (sectionShouldBeUnique(SecType)) {
+        return registry[idx].empty() ? std::nullopt
+                                     : std::make_optional(registry[idx][0]);
+      } else {
+        return registry[idx];
+      }
+    }
+
+    bool hasSection(WasmSectionType secType) const {
+      return !registry[static_cast<size_t>(secType)].empty();
+    }
+
+    ///
+    /// @returns success if registration valid, failure in case registration
+    /// can't be done (if another section of same type already exist and this
+    /// section type should only be present once)
+    ///
+    LogicalResult registerSection(WasmSectionType secType,
+                                  section_location_t location, Location loc) {
+      if (sectionShouldBeUnique(secType) && hasSection(secType)) {
+        return emitError(loc,
+                         "Trying to add a second instance of unique section");
+      }
+      registry[static_cast<size_t>(secType)].push_back(location);
+      emitRemark(loc, "Adding section with section ID ")
+          << static_cast<uint8_t>(secType);
+      return success();
+    }
+
+    LogicalResult populateFromBody(ParserHead ph) {
+      while (!ph.end()) {
+        auto sectionLoc = ph.getLocation();
+        auto secType = ph.parseWasmSectionType();
+        if (failed(secType))
+          return failure();
+
+        auto secSizeParsed = ph.parseLiteral<uint32_t>();
+        if (failed(secSizeParsed))
+          return failure();
+
+        auto secSize = *secSizeParsed;
+        auto sectionContent = ph.consumeNBytes(secSize);
+        if (failed(sectionContent))
+          return failure();
+
+        auto registration =
+            registerSection(*secType, *sectionContent, sectionLoc);
+
+        if (failed(registration))
+          return failure();
+
+      }
+      return success();
+    }
+  };
+
   auto getLocation(int offset = 0) const {
     return FileLineColLoc::get(srcName, 0, offset);
   }
@@ -139,6 +269,9 @@ public:
                 "Unsupported Wasm version. Only version 1 is supported.");
       return;
     }
+    auto fillRegistry = registry.populateFromBody(parser.copy());
+    if (failed(fillRegistry))
+      return;
   }
 
   ModuleOp getModule() { return mOp; }
@@ -148,6 +281,7 @@ private:
   OpBuilder builder;
   MLIRContext *ctx;
   ModuleOp mOp;
+  SectionRegistry registry;
 };
 } // namespace
 
