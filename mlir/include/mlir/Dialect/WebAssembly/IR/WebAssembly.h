@@ -30,6 +30,8 @@
 //===----------------------------------------------------------------------===//
 // WebAssembly Dialect Operations
 //===----------------------------------------------------------------------===//
+#include "mlir/Interfaces/CallInterfaces.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/IR/SymbolTable.h"
 
 
