@@ -5,12 +5,14 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+#include "mlir/Dialect/WebAssembly/IR/WebAssembly.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/OwningOpRef.h"
 #include "mlir/Target/Wasm/WasmImporter.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/LEB128.h"
 #include "llvm/Support/LogicalResult.h"
 
@@ -63,6 +65,22 @@ APPLY_WASM_SEC_TRANSFORM
 constexpr bool sectionShouldBeUnique(WasmSectionType secType) {
   return secType != WasmSectionType::CUSTOM;
 }
+struct WasmEncodings {
+  /// Byte encodings of types in wasm binaries
+  /// These are defined in the wasm binary spec
+  /// https://webassembly.github.io/spec/core/binary/types.html
+  struct TypeEncoding {
+    static constexpr uint8_t i32{0x7F};
+    static constexpr uint8_t i64{0x7E};
+    static constexpr uint8_t f32{0x7D};
+    static constexpr uint8_t f64{0x7C};
+    static constexpr uint8_t v128{0x7B};
+    static constexpr uint8_t funcRef{0x70};
+    static constexpr uint8_t externRef{0x6F};
+    static constexpr uint8_t funcType{0x60};
+  };
+};
+
 class ParserHead {
 public:
   ParserHead(llvm::StringRef src, StringAttr name) : head{src}, locName{name} {}
@@ -122,6 +140,66 @@ public:
              << static_cast<int>(*id);
     return static_cast<WasmSectionType>(*id);
   }
+  llvm::FailureOr<Type> parseValueType(MLIRContext *ctx) {
+    auto typeLoc = getLocation();
+    auto typeEncoding = consumeByte();
+    if (failed(typeEncoding))
+      return failure();
+    switch (*typeEncoding) {
+    case WasmEncodings::TypeEncoding::i32:
+      return IntegerType::get(ctx, 32);
+    case WasmEncodings::TypeEncoding::i64:
+      return IntegerType::get(ctx, 64);
+    case WasmEncodings::TypeEncoding::f32:
+      return Float32Type::get(ctx);
+    case WasmEncodings::TypeEncoding::f64:
+      return Float64Type::get(ctx);
+    case WasmEncodings::TypeEncoding::v128:
+      return IntegerType::get(ctx, 128);
+    case WasmEncodings::TypeEncoding::funcRef:
+      return wasm::FuncRefType::get(ctx);
+    case WasmEncodings::TypeEncoding::externRef:
+      return wasm::ExternRefType::get(ctx);
+    default:
+      return emitError(typeLoc, "Invalid value type encoding: ")
+             << static_cast<int>(*typeEncoding);
+    }
+  }
+  llvm::FailureOr<TupleType> parseResultType(MLIRContext *ctx) {
+    auto nParamsParsed = parseVectorSize();
+    if (failed(nParamsParsed))
+      return failure();
+    auto nParams = *nParamsParsed;
+    llvm::SmallVector<Type> res{};
+    res.reserve(nParams);
+    for (size_t i = 0; i < nParams; ++i) {
+      auto parsedType = parseValueType(ctx);
+      if (failed(parsedType))
+        return failure();
+      res.push_back(*parsedType);
+    }
+    return TupleType::get(ctx, res);
+  }
+
+  llvm::FailureOr<FunctionType> parseFunctionType(MLIRContext *ctx) {
+    auto typeLoc = getLocation();
+    auto funcTypeHeader = consumeByte();
+    if (failed(funcTypeHeader))
+      return failure();
+    if (*funcTypeHeader != WasmEncodings::TypeEncoding::funcType)
+      return emitError(typeLoc, "Invalid function type header byte. Expecting ")
+             << WasmEncodings::TypeEncoding::funcType << " got "
+             << static_cast<int>(*funcTypeHeader);
+    auto inputTypes = parseResultType(ctx);
+    if (failed(inputTypes))
+      return failure();
+
+    auto resTypes = parseResultType(ctx);
+    if (failed(resTypes))
+      return failure();
+
+    return FunctionType::get(ctx, inputTypes->getTypes(), resTypes->getTypes());
+  }
 
   bool end() const { return curHead().empty(); }
 
@@ -150,9 +228,9 @@ llvm::FailureOr<uint32_t> ParserHead::parseLiteral<uint32_t>() {
   if (error)
     return emitError(getLocation(), error);
 
-  if (std::isgreater(decoded, std::numeric_limits<uint32_t>::max())) {
+  if (std::isgreater(decoded, std::numeric_limits<uint32_t>::max()))
     return emitError(getLocation()) << "literal does not fit on 32 bits";
-  }
+
   res = static_cast<uint32_t>(decoded);
   offset += encodingSize;
   return res;
@@ -196,10 +274,10 @@ private:
     ///
     LogicalResult registerSection(WasmSectionType secType,
                                   section_location_t location, Location loc) {
-      if (sectionShouldBeUnique(secType) && hasSection(secType)) {
+      if (sectionShouldBeUnique(secType) && hasSection(secType))
         return emitError(loc,
                          "Trying to add a second instance of unique section");
-      }
+
       registry[static_cast<size_t>(secType)].push_back(location);
       emitRemark(loc, "Adding section with section ID ")
           << static_cast<uint8_t>(secType);
@@ -237,6 +315,43 @@ private:
     return FileLineColLoc::get(srcName, 0, offset);
   }
 
+  template <WasmSectionType>
+  LogicalResult parseSectionItem(ParserHead &);
+
+  template <WasmSectionType section>
+  LogicalResult parseSection() {
+    auto secName = std::string{wasmSectionName<section>};
+    auto sectionNameAttr =
+        StringAttr::get(ctx, srcName.strref() + ":" + secName + "-SECTION");
+    unsigned offset = 0;
+    auto getLocation = [sectionNameAttr, &offset]() {
+      return FileLineColLoc::get(sectionNameAttr, 0, offset);
+    };
+    auto secContent = registry.getContentForSection<section>();
+    if (!secContent) {
+      emitRemark(this->getLocation())
+          << secName << " section is not present in file.";
+      return success();
+    }
+
+    auto secSrc = secContent.value();
+    ParserHead ph{secSrc, sectionNameAttr};
+    auto nElemsParsed = ph.parseVectorSize();
+    if (failed(nElemsParsed))
+      return failure();
+    auto nElems = *nElemsParsed;
+    llvm::dbgs() << "Starting to parse " << nElems << " items for section "
+                 << secName << ".\n";
+    for (size_t i = 0; i < nElems; ++i) {
+      if (failed(parseSectionItem<section>(ph)))
+        return failure();
+    }
+
+    if (!ph.end())
+      return emitError(getLocation(), "Unparsed garbage at end of section ")
+             << secName;
+    return success();
+  }
 public:
   WasmBinaryParser(llvm::SourceMgr &sourceMgr, MLIRContext *ctx)
       : builder{ctx}, ctx{ctx} {
@@ -272,6 +387,13 @@ public:
     auto fillRegistry = registry.populateFromBody(parser.copy());
     if (failed(fillRegistry))
       return;
+
+    mOp = builder.create<ModuleOp>(getLocation());
+    builder.setInsertionPointToStart(
+        &mOp.getBodyRegion().front());
+    auto parsingTypes = parseSection<WasmSectionType::TYPE>();
+    if (failed(parsingTypes))
+      return;
   }
 
   ModuleOp getModule() { return mOp; }
@@ -279,10 +401,21 @@ public:
 private:
   mlir::StringAttr srcName;
   OpBuilder builder;
+  llvm::SmallVector<FunctionType> funcTypes;
   MLIRContext *ctx;
   ModuleOp mOp;
   SectionRegistry registry;
 };
+template <>
+LogicalResult
+WasmBinaryParser::parseSectionItem<WasmSectionType::TYPE>(ParserHead &ph) {
+  auto funcType = ph.parseFunctionType(ctx);
+  if (failed(funcType))
+    return failure();
+  llvm::dbgs() << "Parsed function type " << *funcType << '\n';
+  funcTypes.push_back(*funcType);
+  return success();
+}
 } // namespace
 
 namespace mlir {
