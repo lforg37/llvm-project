@@ -592,6 +592,9 @@ public:
     auto parsingMems = parseSection<WasmSectionType::MEMORY>();
     if (failed(parsingMems))
       return;
+    auto parsingGlobals = parseSection<WasmSectionType::GLOBAL>();
+    if (failed(parsingGlobals))
+      return;
   }
 
   ModuleOp getModule() { return mOp; }
@@ -689,6 +692,22 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::MEMORY>(ParserHead &ph) {
   auto memOp = builder.create<MemOp>(opLocation, symbol, *memory);
   memOp.setVisibility(SymbolTable::Visibility::Nested);
   memSymbols.push_back(memOp.getSymNameAttr());
+  return success();
+}
+
+template <>
+LogicalResult
+WasmBinaryParser::parseSectionItem<WasmSectionType::GLOBAL>(ParserHead &ph) {
+  auto globalLocation = ph.getLocation();
+  auto globalTypeParsed = ph.parseGlobalType(ctx);
+  if (failed(globalTypeParsed)) {
+    return failure();
+  }
+  auto globalType = *globalTypeParsed;
+  auto symbol = builder.getStringAttr(getNewGlobalSymbolName());
+  auto globalOp = builder.create<wasm::GlobalOp>(
+      globalLocation, symbol, globalType.type, globalType.isMutable, false);
+  globalOp.setVisibility(SymbolTable::Visibility::Nested);
   return success();
 }
 } // namespace

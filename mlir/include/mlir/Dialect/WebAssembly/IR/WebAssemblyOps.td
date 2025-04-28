@@ -60,6 +60,22 @@ def Wasm_FuncImportOp : Wasm_Op<"import_func", [Symbol]> {
     bool isDeclaration() const { return true; }
   }];
 }
+
+def Wasm_GlobalOp : Wasm_Op<"global", [
+  AffineScope, AutomaticAllocationScope,
+  IsolatedFromAbove, Symbol]> {
+  let summary= "WebAssembly global value";
+  let arguments = (ins SymbolNameAttr: $sym_name,
+                     Wasm_ValTypeAttr: $type,
+                     UnitAttr: $isMutable,
+                     UnitAttr: $isExported);
+  let description = [{
+    WebAssembly global variable.
+    Body contains the initialization instructions for the variable value.
+  }];
+  let regions = (region AnyRegion: $initializer);
+}
+
 def Wasm_GlobalImportOp : Wasm_Op<"import_global", [Symbol]> {
   let summary = "Importing a global variable";
   let arguments = (ins SymbolNameAttr: $sym_name,
