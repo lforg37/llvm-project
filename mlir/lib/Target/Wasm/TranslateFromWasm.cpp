@@ -13,6 +13,8 @@
 #include "mlir/IR/OwningOpRef.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Target/Wasm/WasmImporter.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/Twine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/LEB128.h"
 #include "llvm/Support/LogicalResult.h"
@@ -420,6 +422,30 @@ private:
     return FileLineColLoc::get(srcName, 0, offset);
   }
 
+  std::string getNewSymbolName(llvm::StringRef prefix, size_t id) const {
+    return (prefix + llvm::Twine{id}).str();
+  }
+
+  std::string getNewFuncSymbolName() const {
+    auto id = funcSymbols.size();
+    return getNewSymbolName("func_", id);
+  }
+
+  std::string getNewGlobalSymbolName() const {
+    auto id = globalSymbols.size();
+    return getNewSymbolName("global_", id);
+  }
+
+  std::string getNewMemorySymbolName() const {
+    auto id = memSymbols.size();
+    return getNewSymbolName("mem_", id);
+  }
+
+  std::string getNewTableSymbolName() const {
+    auto id = tableSymbols.size();
+    return getNewSymbolName("table_", id);
+  }
+
   template <WasmSectionType>
   LogicalResult parseSectionItem(ParserHead &);
 
@@ -465,8 +491,7 @@ private:
     if (tid.id >= funcTypes.size())
       return emitError(loc, "Invalid type id: ") << tid.id << ". Only " << funcTypes.size() << " type registration.";
     auto type = funcTypes[tid.id];
-    auto funcId = funcSymbols.size();
-    auto symbol = (Twine{"func_"} + Twine{funcId}).str();
+    auto symbol = getNewFuncSymbolName();
     auto funcOp = builder.create<FuncImportOp>(
         loc, symbol, moduleName, importName, type);
     funcOp.setVisibility(SymbolTable::Visibility::Nested);
@@ -477,8 +502,7 @@ private:
   /// Handles the registration of a memory import
   LogicalResult visitImport(Location loc, llvm::StringRef moduleName,
                             llvm::StringRef importName, LimitType limitType) {
-    auto memId = memSymbols.size();
-    auto symbol = (Twine{"mem_"} + Twine{memId}).str();
+    auto symbol = getNewMemorySymbolName();
     auto memOp = builder.create<MemImportOp>(loc, symbol, moduleName,
                                              importName, limitType);
     memOp.setVisibility(SymbolTable::Visibility::Nested);
@@ -489,8 +513,7 @@ private:
   /// Handles the registration of a table import
   LogicalResult visitImport(Location loc, llvm::StringRef moduleName,
                             llvm::StringRef importName, TableType tableType) {
-    auto tableId = tableSymbols.size();
-    auto symbol = (Twine{"table_"} + Twine{tableId}).str();
+    auto symbol = getNewTableSymbolName();
     auto tableOp = builder.create<TableImportOp>(loc, symbol, moduleName,
                                                  importName, tableType);
     tableOp.setVisibility(SymbolTable::Visibility::Nested);
@@ -502,8 +525,7 @@ private:
   LogicalResult visitImport(Location loc, llvm::StringRef moduleName,
                             llvm::StringRef importName,
                             GlobalTypeRecord globalType) {
-    auto globalId = globalSymbols.size();
-    auto symbol = (Twine{"global_"} + Twine{globalId}).str();
+    auto symbol = getNewGlobalSymbolName();
     auto giOp =
         builder.create<GlobalImportOp>(loc, symbol, moduleName, importName,
                                        globalType.type, globalType.isMutable);
@@ -566,6 +588,10 @@ public:
     auto parsingTables = parseSection<WasmSectionType::TABLE>();
     if (failed(parsingTables))
       return;
+
+    auto parsingMems = parseSection<WasmSectionType::MEMORY>();
+    if (failed(parsingMems))
+      return;
   }
 
   ModuleOp getModule() { return mOp; }
@@ -614,8 +640,7 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::TABLE>(ParserHead &ph) {
   if (failed(tableType))
     return failure();
   llvm::dbgs() << "  Parsed table description: " << *tableType << '\n';
-  auto id = tableSymbols.size();
-  auto symbol = builder.getStringAttr(llvm::Twine{"table_"} + llvm::Twine{id});
+  auto symbol = builder.getStringAttr(getNewTableSymbolName());
   auto tableOp = builder.create<TableOp>(opLocation, symbol, TypeAttr::get(*tableType));
   tableOp.setVisibility(SymbolTable::Visibility::Nested);
   tableSymbols.push_back(symbol);
@@ -632,8 +657,7 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::FUNCTION>(ParserHead &ph) {
   auto typeIdx = *typeIdxParsed;
   if (typeIdx >= funcTypes.size())
     return emitError(getLocation(), "Invalid type index: ") << typeIdx;
-  auto funcId = funcSymbols.size();
-  auto symbol = (llvm::Twine{"func_"} + llvm::Twine{funcId}).str();
+  auto symbol = getNewFuncSymbolName();
   auto funcOp = builder.create<FuncOp>(
       opLoc, symbol, funcTypes[typeIdx]);
   funcOp.setVisibility(SymbolTable::Visibility::Nested);
@@ -649,6 +673,22 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::TYPE>(ParserHead &ph) {
     return failure();
   llvm::dbgs() << "Parsed function type " << *funcType << '\n';
   funcTypes.push_back(*funcType);
+  return success();
+}
+
+template <>
+LogicalResult
+WasmBinaryParser::parseSectionItem<WasmSectionType::MEMORY>(ParserHead &ph) {
+  auto opLocation = ph.getLocation();
+  auto memory = ph.parseLimit(ctx);
+  if (failed(memory))
+    return failure();
+
+  llvm::dbgs() << "  Registering memory " << *memory << '\n';
+  auto symbol = getNewMemorySymbolName();
+  auto memOp = builder.create<MemOp>(opLocation, symbol, *memory);
+  memOp.setVisibility(SymbolTable::Visibility::Nested);
+  memSymbols.push_back(memOp.getSymNameAttr());
   return success();
 }
 } // namespace
