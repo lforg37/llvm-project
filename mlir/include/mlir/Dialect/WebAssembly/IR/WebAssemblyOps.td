@@ -12,8 +12,54 @@
 
 include "mlir/Dialect/WebAssembly/IR/WebAssemblyBase.td"
 include "mlir/Dialect/WebAssembly/IR/WebAssemblyTypes.td"
+include "mlir/IR/SymbolInterfaces.td"
 
 class Wasm_Op<string mnemonic, list<Trait> traits = []> :
     Op<Wasm_Dialect, mnemonic, traits>;
+
+
+def Wasm_FuncImportOp : Wasm_Op<"import_func", [Symbol]> {
+  let summary = "Importing a function variable";
+  let arguments = (ins SymbolNameAttr: $sym_name,
+                     StrAttr: $moduleName,
+                     StrAttr: $importName,
+                     Wasm_FuncTypeAttr: $type);
+  let extraClassDeclaration = [{
+    bool isDeclaration() const { return true; }
+  }];
+}
+def Wasm_GlobalImportOp : Wasm_Op<"import_global", [Symbol]> {
+  let summary = "Importing a global variable";
+  let arguments = (ins SymbolNameAttr: $sym_name,
+                     StrAttr: $moduleName,
+                     StrAttr: $importName,
+                     Wasm_ValTypeAttr: $type,
+                     UnitAttr: $isMutable);
+  let extraClassDeclaration = [{
+    bool isDeclaration() const { return true; }
+  }];
+}
+
+def Wasm_MemImportOp : Wasm_Op<"import_mem", [Symbol]> {
+  let summary = "Importing a memory";
+  let arguments = (ins SymbolNameAttr: $sym_name,
+                     StrAttr: $moduleName,
+                     StrAttr: $importName,
+                     Wasm_LimitTypeAttr: $limits);
+  let extraClassDeclaration = [{
+    bool isDeclaration() const { return true; }
+  }];
+}
+
+def Wasm_TableImportOp : Wasm_Op<"import_table", [Symbol]> {
+  let summary = "Importing a table";
+  let arguments = (ins SymbolNameAttr: $sym_name,
+                     StrAttr: $moduleName,
+                     StrAttr: $importName,
+                     Wasm_TableTypeAttr: $type);
+  let extraClassDeclaration = [{
+    bool isDeclaration() const { return true; }
+  }];
+}
 
 #endif // WEBASSEMBLY_OPS

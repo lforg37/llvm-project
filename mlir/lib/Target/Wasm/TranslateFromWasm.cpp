@@ -15,8 +15,11 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/LEB128.h"
 #include "llvm/Support/LogicalResult.h"
+#include <variant>
 
 using namespace mlir;
+using namespace mlir::wasm;
+
 namespace {
 using section_id_t = uint8_t;
 enum struct WasmSectionType : section_id_t {
@@ -79,7 +82,25 @@ struct WasmEncodings {
     static constexpr uint8_t externRef{0x6F};
     static constexpr uint8_t funcType{0x60};
   };
+
+  struct ImportType {
+    static constexpr uint8_t typeID{0x00};
+    static constexpr uint8_t tableType{0x01};
+    static constexpr uint8_t memType{0x02};
+    static constexpr uint8_t globalType{0x03};
+  };
 };
+
+struct GlobalTypeRecord {
+  Type type;
+  bool isMutable;
+};
+
+struct TypeIdxRecord {
+  size_t id;
+};
+
+using ImportDesc = std::variant<TypeIdxRecord, TableType, LimitType, GlobalTypeRecord>;
 
 class ParserHead {
 public:
@@ -140,6 +161,28 @@ public:
              << static_cast<int>(*id);
     return static_cast<WasmSectionType>(*id);
   }
+
+  llvm::FailureOr<LimitType> parseLimit(MLIRContext* ctx) {
+    auto limitLocation = getLocation();
+    auto limitHeader = consumeByte();
+    if (failed(limitHeader))
+      return failure();
+    if (*limitHeader > 1)
+      return emitError(limitLocation, "Invalid limit header: ")
+             << static_cast<int>(*limitHeader);
+    auto minParse = parseUI32();
+    if (failed(minParse))
+      return failure();
+    std::optional<uint32_t> max{std::nullopt};
+    if (*limitHeader) {
+      auto maxParse = parseUI32();
+      if (failed(maxParse))
+        return failure();
+      max = *maxParse;
+    }
+    return LimitType::get(ctx, *minParse, max);
+  }
+
   llvm::FailureOr<Type> parseValueType(MLIRContext *ctx) {
     auto typeLoc = getLocation();
     auto typeEncoding = consumeByte();
@@ -165,6 +208,21 @@ public:
              << static_cast<int>(*typeEncoding);
     }
   }
+
+  llvm::FailureOr<GlobalTypeRecord> parseGlobalType(MLIRContext *ctx) {
+    auto typeParsed = parseValueType(ctx);
+    if (failed(typeParsed))
+      return failure();
+    auto mutLoc = getLocation();
+    auto mutSpec = consumeByte();
+    if (failed(mutSpec))
+      return failure();
+    if (*mutSpec > 1)
+      return emitError(mutLoc, "Invalid global mutability specifier: ")
+             << static_cast<int>(*mutSpec);
+    return GlobalTypeRecord{*typeParsed, *mutSpec == 1};
+  }
+
   llvm::FailureOr<TupleType> parseResultType(MLIRContext *ctx) {
     auto nParamsParsed = parseVectorSize();
     if (failed(nParamsParsed))
@@ -200,6 +258,51 @@ public:
 
     return FunctionType::get(ctx, inputTypes->getTypes(), resTypes->getTypes());
   }
+
+  llvm::FailureOr<TypeIdxRecord> parseTypeIndex() {
+    auto res = parseUI32();
+    if (failed(res))
+      return failure();
+    return TypeIdxRecord{*res};
+  }
+
+  llvm::FailureOr<TableType> parseTableType(MLIRContext *ctx) {
+    auto elmTypeParse = parseValueType(ctx);
+    if (failed(elmTypeParse))
+      return failure();
+    if (!isWasmRefType(*elmTypeParse))
+      return emitError(getLocation(), "Invalid element type for table");
+    auto limitParse = parseLimit(ctx);
+    if (failed(limitParse))
+      return failure();
+    return TableType::get(ctx, *elmTypeParse, *limitParse);
+  }
+
+  llvm::FailureOr<ImportDesc> parseImportDesc(MLIRContext *ctx) {
+    auto importLoc = getLocation();
+    auto importType = consumeByte();
+    auto packager = [](auto parseResult) -> llvm::FailureOr<ImportDesc> {
+      if (llvm::failed(parseResult))
+        return failure();
+      return {*parseResult};
+    };
+    if (failed(importType))
+      return failure();
+    switch (*importType) {
+    case WasmEncodings::ImportType::typeID:
+      return packager(parseTypeIndex());
+    case WasmEncodings::ImportType::tableType:
+      return packager(parseTableType(ctx));
+    case WasmEncodings::ImportType::memType:
+      return packager(parseLimit(ctx));
+    case WasmEncodings::ImportType::globalType:
+      return packager(parseGlobalType(ctx));
+    default:
+      return emitError(importLoc, "Invalid import type descriptor: ")
+             << static_cast<int>(*importType);
+    }
+  }
+
 
   bool end() const { return curHead().empty(); }
 
@@ -238,6 +341,7 @@ llvm::FailureOr<uint32_t> ParserHead::parseLiteral<uint32_t>() {
 llvm::FailureOr<uint32_t> ParserHead::parseVectorSize() {
   return parseLiteral<uint32_t>();
 }
+
 inline llvm::FailureOr<uint32_t> ParserHead::parseUI32() {
   return parseLiteral<uint32_t>();
 }
@@ -352,6 +456,61 @@ private:
              << secName;
     return success();
   }
+
+  /// Handles the registration of a function import
+  LogicalResult visitImport(Location loc, llvm::StringRef moduleName,
+                            llvm::StringRef importName, TypeIdxRecord tid) {
+    using llvm::Twine;
+    if (tid.id >= funcTypes.size())
+      return emitError(loc, "Invalid type id: ") << tid.id << ". Only " << funcTypes.size() << " type registration.";
+    auto type = funcTypes[tid.id];
+    auto funcId = funcSymbols.size();
+    auto symbol = (Twine{"func_"} + Twine{funcId}).str();
+    auto funcOp = builder.create<FuncImportOp>(
+        loc, symbol, moduleName, importName, type);
+    funcOp.setVisibility(SymbolTable::Visibility::Nested);
+    funcSymbols.push_back(funcOp.getSymNameAttr());
+    return funcOp.verify();
+  }
+
+  /// Handles the registration of a memory import
+  LogicalResult visitImport(Location loc, llvm::StringRef moduleName,
+                            llvm::StringRef importName, LimitType limitType) {
+    auto memId = memSymbols.size();
+    auto symbol = (Twine{"mem_"} + Twine{memId}).str();
+    auto memOp = builder.create<MemImportOp>(loc, symbol, moduleName,
+                                             importName, limitType);
+    memOp.setVisibility(SymbolTable::Visibility::Nested);
+    memSymbols.push_back(memOp.getSymNameAttr());
+    return memOp.verify();
+  }
+
+  /// Handles the registration of a table import
+  LogicalResult visitImport(Location loc, llvm::StringRef moduleName,
+                            llvm::StringRef importName, TableType tableType) {
+    auto tableId = tableSymbols.size();
+    auto symbol = (Twine{"table_"} + Twine{tableId}).str();
+    auto tableOp = builder.create<TableImportOp>(loc, symbol, moduleName,
+                                                 importName, tableType);
+    tableOp.setVisibility(SymbolTable::Visibility::Nested);
+    tableSymbols.push_back(tableOp.getSymNameAttr());
+    return tableOp.verify();
+  }
+
+  /// Handles the registration of a global variable import
+  LogicalResult visitImport(Location loc, llvm::StringRef moduleName,
+                            llvm::StringRef importName,
+                            GlobalTypeRecord globalType) {
+    auto globalId = globalSymbols.size();
+    auto symbol = (Twine{"global_"} + Twine{globalId}).str();
+    auto giOp =
+        builder.create<GlobalImportOp>(loc, symbol, moduleName, importName,
+                                       globalType.type, globalType.isMutable);
+    giOp.setVisibility(SymbolTable::Visibility::Nested);
+    globalSymbols.push_back(giOp.getSymNameAttr());
+    return giOp.verify();
+  }
+
 public:
   WasmBinaryParser(llvm::SourceMgr &sourceMgr, MLIRContext *ctx)
       : builder{ctx}, ctx{ctx} {
@@ -394,6 +553,10 @@ public:
     auto parsingTypes = parseSection<WasmSectionType::TYPE>();
     if (failed(parsingTypes))
       return;
+
+    auto parsingImports = parseSection<WasmSectionType::IMPORT>();
+    if (failed(parsingImports))
+      return;
   }
 
   ModuleOp getModule() { return mOp; }
@@ -402,10 +565,38 @@ private:
   mlir::StringAttr srcName;
   OpBuilder builder;
   llvm::SmallVector<FunctionType> funcTypes;
+  llvm::SmallVector<StringAttr> funcSymbols;
+  llvm::SmallVector<StringAttr> globalSymbols;
+  llvm::SmallVector<StringAttr> memSymbols;
+  llvm::SmallVector<StringAttr> tableSymbols;
   MLIRContext *ctx;
   ModuleOp mOp;
   SectionRegistry registry;
 };
+
+template <>
+LogicalResult
+WasmBinaryParser::parseSectionItem<WasmSectionType::IMPORT>(ParserHead &ph) {
+  auto importLoc = ph.getLocation();
+  auto moduleName = ph.parseName();
+  if (failed(moduleName))
+    return failure();
+
+  auto importName = ph.parseName();
+  if (failed(importName))
+    return failure();
+
+  auto import = ph.parseImportDesc(ctx);
+  if (failed(import))
+    return failure();
+
+  return std::visit(
+      [this, importLoc, &moduleName, &importName](auto import) {
+        return visitImport(importLoc, *moduleName, *importName, import);
+      },
+      *import);
+}
+
 template <>
 LogicalResult
 WasmBinaryParser::parseSectionItem<WasmSectionType::TYPE>(ParserHead &ph) {
