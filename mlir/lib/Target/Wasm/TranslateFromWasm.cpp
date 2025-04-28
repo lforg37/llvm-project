@@ -562,6 +562,10 @@ public:
     auto parsingFunctions = parseSection<WasmSectionType::FUNCTION>();
     if (failed(parsingFunctions))
       return;
+
+    auto parsingTables = parseSection<WasmSectionType::TABLE>();
+    if (failed(parsingTables))
+      return;
   }
 
   ModuleOp getModule() { return mOp; }
@@ -601,6 +605,23 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::IMPORT>(ParserHead &ph) {
       },
       *import);
 }
+
+template <>
+LogicalResult
+WasmBinaryParser::parseSectionItem<WasmSectionType::TABLE>(ParserHead &ph) {
+  auto opLocation = ph.getLocation();
+  auto tableType = ph.parseTableType(ctx);
+  if (failed(tableType))
+    return failure();
+  llvm::dbgs() << "  Parsed table description: " << *tableType << '\n';
+  auto id = tableSymbols.size();
+  auto symbol = builder.getStringAttr(llvm::Twine{"table_"} + llvm::Twine{id});
+  auto tableOp = builder.create<TableOp>(opLocation, symbol, TypeAttr::get(*tableType));
+  tableOp.setVisibility(SymbolTable::Visibility::Nested);
+  tableSymbols.push_back(symbol);
+  return success();
+}
+
 template <>
 LogicalResult
 WasmBinaryParser::parseSectionItem<WasmSectionType::FUNCTION>(ParserHead &ph) {
