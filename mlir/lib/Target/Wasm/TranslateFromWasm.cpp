@@ -11,6 +11,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/OwningOpRef.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/Target/Wasm/WasmImporter.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/LEB128.h"
@@ -557,6 +558,10 @@ public:
     auto parsingImports = parseSection<WasmSectionType::IMPORT>();
     if (failed(parsingImports))
       return;
+
+    auto parsingFunctions = parseSection<WasmSectionType::FUNCTION>();
+    if (failed(parsingFunctions))
+      return;
   }
 
   ModuleOp getModule() { return mOp; }
@@ -595,6 +600,24 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::IMPORT>(ParserHead &ph) {
         return visitImport(importLoc, *moduleName, *importName, import);
       },
       *import);
+}
+template <>
+LogicalResult
+WasmBinaryParser::parseSectionItem<WasmSectionType::FUNCTION>(ParserHead &ph) {
+  auto opLoc = ph.getLocation();
+  auto typeIdxParsed = ph.parseLiteral<uint32_t>();
+  if (failed(typeIdxParsed))
+    return failure();
+  auto typeIdx = *typeIdxParsed;
+  if (typeIdx >= funcTypes.size())
+    return emitError(getLocation(), "Invalid type index: ") << typeIdx;
+  auto funcId = funcSymbols.size();
+  auto symbol = (llvm::Twine{"func_"} + llvm::Twine{funcId}).str();
+  auto funcOp = builder.create<FuncOp>(
+      opLoc, symbol, funcTypes[typeIdx]);
+  funcOp.setVisibility(SymbolTable::Visibility::Nested);
+  funcSymbols.push_back(funcOp.getSymNameAttr());
+  return funcOp.verify();
 }
 
 template <>

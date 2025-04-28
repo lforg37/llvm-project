@@ -12,11 +12,43 @@
 
 include "mlir/Dialect/WebAssembly/IR/WebAssemblyBase.td"
 include "mlir/Dialect/WebAssembly/IR/WebAssemblyTypes.td"
+
+include "mlir/Interfaces/FunctionInterfaces.td"
 include "mlir/IR/SymbolInterfaces.td"
 
 class Wasm_Op<string mnemonic, list<Trait> traits = []> :
     Op<Wasm_Dialect, mnemonic, traits>;
 
+def Wasm_FuncOp : Wasm_Op<"func", [
+  AffineScope, AutomaticAllocationScope,
+  DeclareOpInterfaceMethods<FunctionOpInterface>, IsolatedFromAbove]> {
+  let arguments = (ins SymbolNameAttr: $sym_name,
+                     Wasm_FuncTypeAttr: $functionType,
+                     OptionalAttr<StrAttr>:$sym_visibility,
+                     OptionalAttr<DictArrayAttr>:$arg_attrs,
+                     OptionalAttr<DictArrayAttr>:$res_attrs);
+  let regions = (region AnyRegion: $body);
+  let extraClassDeclaration = [{
+    //===------------------------------------------------------------------===//
+    // FunctionOpInterface Methods
+    //===------------------------------------------------------------------===//
+
+    /// Returns the region on the current operation that is callable. This may
+    /// return null in the case of an external callable object, e.g. an external
+    /// function.
+    ::mlir::Region *getCallableRegion() { return isExternal() ? nullptr : &getBody(); }
+
+    /// Returns the argument types of this function.
+    ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
+
+    /// Returns the result types of this function.
+    ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
+  }];
+
+  let builders = [
+    OpBuilder<(ins "llvm::StringRef":$symbol, "FunctionType":$funcType )>
+  ];
+}
 
 def Wasm_FuncImportOp : Wasm_Op<"import_func", [Symbol]> {
   let summary = "Importing a function variable";
