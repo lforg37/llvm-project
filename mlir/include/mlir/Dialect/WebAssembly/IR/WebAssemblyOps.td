@@ -72,6 +72,13 @@ def Wasm_GlobalImportOp : Wasm_Op<"import_global", [Symbol]> {
   }];
 }
 
+def Wasm_MemOp : Wasm_Op<"memory", [Symbol]> {
+  let summary= "WebAssembly memory definition";
+  let arguments = (ins SymbolNameAttr: $sym_name,
+                     Wasm_LimitTypeAttr: $limits,
+                     UnitAttr: $isExported);
+}
+
 def Wasm_MemImportOp : Wasm_Op<"import_mem", [Symbol]> {
   let summary = "Importing a memory";
   let arguments = (ins SymbolNameAttr: $sym_name,
