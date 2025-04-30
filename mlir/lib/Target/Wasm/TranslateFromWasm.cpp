@@ -80,6 +80,10 @@ constexpr bool sectionShouldBeUnique(WasmSectionType secType) {
 
 struct WasmEncodings {
   struct OpCode {
+    // Control instructions
+    static constexpr std::byte call{0x10};
+
+    // Variable instructions
     static constexpr std::byte localGet{0x20};
 
     // Numerical constants
@@ -146,12 +150,45 @@ using ImportDesc = std::variant<TypeIdxRecord, TableType, LimitType, GlobalTypeR
 
 using parsed_inst_t = llvm::FailureOr<Value>;
 
+
+struct WasmModuleSymbolTables {
+  llvm::SmallVector<SymbolRefAttr> funcSymbols;
+  llvm::SmallVector<SymbolRefAttr> globalSymbols;
+  llvm::SmallVector<SymbolRefAttr> memSymbols;
+  llvm::SmallVector<SymbolRefAttr> tableSymbols;
+
+  std::string getNewSymbolName(llvm::StringRef prefix, size_t id) const {
+    return (prefix + llvm::Twine{id}).str();
+  }
+
+  std::string getNewFuncSymbolName() const {
+    auto id = funcSymbols.size();
+    return getNewSymbolName("func_", id);
+  }
+
+  std::string getNewGlobalSymbolName() const {
+    auto id = globalSymbols.size();
+    return getNewSymbolName("global_", id);
+  }
+
+  std::string getNewMemorySymbolName() const {
+    auto id = memSymbols.size();
+    return getNewSymbolName("mem_", id);
+  }
+
+  std::string getNewTableSymbolName() const {
+    auto id = tableSymbols.size();
+    return getNewSymbolName("table_", id);
+  }
+};
+
 class ParserHead;
 
 class ExpressionParser {
 public:
-  ExpressionParser(ParserHead &parser, llvm::ArrayRef<Value> initLocal)
-      : parser{parser}, locals{initLocal} {}
+  ExpressionParser(ParserHead &parser, WasmModuleSymbolTables const &symbols,
+                   llvm::ArrayRef<Value> initLocal)
+      : parser{parser}, symbols{symbols}, locals{initLocal} {}
 
 private:
 template <std::byte opCode>
@@ -199,6 +236,7 @@ public:
 
 private:
   ParserHead &parser;
+  WasmModuleSymbolTables const & symbols;
   llvm::SmallVector<Value> locals;
 };
 
@@ -407,12 +445,14 @@ public:
   }
 
   parsed_inst_t parseExpression(Value initStack, OpBuilder &builder,
+                                WasmModuleSymbolTables const &symbols,
                                 llvm::ArrayRef<Value> locals = {}) {
-    auto eParser = ExpressionParser{*this, locals};
+    auto eParser = ExpressionParser{*this, symbols, locals};
     return eParser.parse(initStack, builder);
   }
 
-  llvm::LogicalResult parseCodeFor(FuncOp func) {
+  llvm::LogicalResult parseCodeFor(FuncOp func,
+                                   WasmModuleSymbolTables const &symbols) {
     llvm::SmallVector<Value> locals{};
     // Populating locals with function argument
     auto &block = func.getBody().front();
@@ -448,7 +488,7 @@ public:
       }
     }
     auto emptyStack = builder.create<EmptyStackOp>(func->getLoc());
-    auto res = cParser.parseExpression(emptyStack.getResult(), builder, locals);
+    auto res = cParser.parseExpression(emptyStack.getResult(), builder, symbols, locals);
     if (failed(res))
       return failure();
     if (!cParser.end())
@@ -577,6 +617,21 @@ parsed_inst_t ExpressionParser::parse(Value initStack, OpBuilder &builder) {
       return failure();
     res = *resParsed;
   }
+}
+
+template <>
+inline parsed_inst_t
+ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::call>(
+    OpBuilder &builder, Value inStack) {
+  auto loc = parser.getLocation();
+  auto funcIdx = parser.parseLiteral<uint32_t>();
+  if (failed(funcIdx))
+    return failure();
+  if (*funcIdx >= symbols.funcSymbols.size())
+    return emitError(loc, "Invalid function index: ") << *funcIdx;
+  auto callOp =
+      builder.create<FuncCallOp>(loc, symbols.funcSymbols[*funcIdx], inStack);
+  return callOp.getResult();
 }
 
 template <>
@@ -724,30 +779,6 @@ private:
     return FileLineColLoc::get(srcName, 0, offset);
   }
 
-  std::string getNewSymbolName(llvm::StringRef prefix, size_t id) const {
-    return (prefix + llvm::Twine{id}).str();
-  }
-
-  std::string getNewFuncSymbolName() const {
-    auto id = funcSymbols.size();
-    return getNewSymbolName("func_", id);
-  }
-
-  std::string getNewGlobalSymbolName() const {
-    auto id = globalSymbols.size();
-    return getNewSymbolName("global_", id);
-  }
-
-  std::string getNewMemorySymbolName() const {
-    auto id = memSymbols.size();
-    return getNewSymbolName("mem_", id);
-  }
-
-  std::string getNewTableSymbolName() const {
-    auto id = tableSymbols.size();
-    return getNewSymbolName("table_", id);
-  }
-
   template <WasmSectionType>
   LogicalResult parseSectionItem(ParserHead &, size_t);
 
@@ -795,33 +826,33 @@ private:
              << tid.id << ". Only " << funcTypes.size()
              << " type registration.";
     auto type = funcTypes[tid.id];
-    auto symbol = getNewFuncSymbolName();
+    auto symbol = symbols.getNewFuncSymbolName();
     auto funcOp = builder.create<FuncImportOp>(
         loc, symbol, moduleName, importName, type);
     funcOp.setVisibility(SymbolTable::Visibility::Nested);
-    funcSymbols.push_back(funcOp.getSymNameAttr());
+    symbols.funcSymbols.push_back(SymbolRefAttr::get(funcOp));
     return funcOp.verify();
   }
 
   /// Handles the registration of a memory import
   LogicalResult visitImport(Location loc, llvm::StringRef moduleName,
                             llvm::StringRef importName, LimitType limitType) {
-    auto symbol = getNewMemorySymbolName();
+    auto symbol = symbols.getNewMemorySymbolName();
     auto memOp = builder.create<MemImportOp>(loc, symbol, moduleName,
                                              importName, limitType);
     memOp.setVisibility(SymbolTable::Visibility::Nested);
-    memSymbols.push_back(memOp.getSymNameAttr());
+    symbols.memSymbols.push_back(SymbolRefAttr::get(memOp));
     return memOp.verify();
   }
 
   /// Handles the registration of a table import
   LogicalResult visitImport(Location loc, llvm::StringRef moduleName,
                             llvm::StringRef importName, TableType tableType) {
-    auto symbol = getNewTableSymbolName();
+    auto symbol = symbols.getNewTableSymbolName();
     auto tableOp = builder.create<TableImportOp>(loc, symbol, moduleName,
                                                  importName, tableType);
     tableOp.setVisibility(SymbolTable::Visibility::Nested);
-    tableSymbols.push_back(tableOp.getSymNameAttr());
+    symbols.tableSymbols.push_back(SymbolRefAttr::get(tableOp));
     return tableOp.verify();
   }
 
@@ -829,12 +860,12 @@ private:
   LogicalResult visitImport(Location loc, llvm::StringRef moduleName,
                             llvm::StringRef importName,
                             GlobalTypeRecord globalType) {
-    auto symbol = getNewGlobalSymbolName();
+    auto symbol = symbols.getNewGlobalSymbolName();
     auto giOp =
         builder.create<GlobalImportOp>(loc, symbol, moduleName, importName,
                                        globalType.type, globalType.isMutable);
     giOp.setVisibility(SymbolTable::Visibility::Nested);
-    globalSymbols.push_back(giOp.getSymNameAttr());
+    symbols.globalSymbols.push_back(SymbolRefAttr::get(giOp));
     return giOp.verify();
   }
 
@@ -885,7 +916,7 @@ public:
     if (failed(parsingImports))
       return;
 
-    firstInternalFuncID = funcSymbols.size();
+    firstInternalFuncID = symbols.funcSymbols.size();
 
     auto parsingFunctions = parseSection<WasmSectionType::FUNCTION>();
     if (failed(parsingFunctions))
@@ -914,10 +945,7 @@ private:
   mlir::StringAttr srcName;
   OpBuilder builder;
   llvm::SmallVector<FunctionType> funcTypes;
-  llvm::SmallVector<StringAttr> funcSymbols;
-  llvm::SmallVector<StringAttr> globalSymbols;
-  llvm::SmallVector<StringAttr> memSymbols;
-  llvm::SmallVector<StringAttr> tableSymbols;
+  WasmModuleSymbolTables symbols;
   MLIRContext *ctx;
   ModuleOp mOp;
   SectionRegistry registry;
@@ -955,10 +983,10 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::TABLE>(ParserHead &ph, size_
   if (failed(tableType))
     return failure();
   llvm::dbgs() << "  Parsed table description: " << *tableType << '\n';
-  auto symbol = builder.getStringAttr(getNewTableSymbolName());
+  auto symbol = builder.getStringAttr(symbols.getNewTableSymbolName());
   auto tableOp = builder.create<TableOp>(opLocation, symbol, TypeAttr::get(*tableType));
   tableOp.setVisibility(SymbolTable::Visibility::Nested);
-  tableSymbols.push_back(symbol);
+  symbols.tableSymbols.push_back(SymbolRefAttr::get(tableOp));
   return success();
 }
 
@@ -972,7 +1000,7 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::FUNCTION>(ParserHead &ph, si
   auto typeIdx = *typeIdxParsed;
   if (typeIdx >= funcTypes.size())
     return emitError(getLocation(), "Invalid type index: ") << typeIdx;
-  auto symbol = getNewFuncSymbolName();
+  auto symbol = symbols.getNewFuncSymbolName();
   auto funcOp = builder.create<FuncOp>(
       opLoc, symbol, funcTypes[typeIdx]);
   funcOp.setVisibility(SymbolTable::Visibility::Nested);
@@ -981,7 +1009,7 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::FUNCTION>(ParserHead &ph, si
   builder.setInsertionPointToEnd(block);
   builder.create<ReturnOp>(opLoc);
   builder.restoreInsertionPoint(ip);
-  funcSymbols.push_back(funcOp.getSymNameAttr());
+  symbols.funcSymbols.push_back(SymbolRefAttr::get(funcOp.getSymNameAttr()));
   return funcOp.verify();
 }
 
@@ -1005,10 +1033,10 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::MEMORY>(ParserHead &ph, size
     return failure();
 
   llvm::dbgs() << "  Registering memory " << *memory << '\n';
-  auto symbol = getNewMemorySymbolName();
+  auto symbol = symbols.getNewMemorySymbolName();
   auto memOp = builder.create<MemOp>(opLocation, symbol, *memory);
   memOp.setVisibility(SymbolTable::Visibility::Nested);
-  memSymbols.push_back(memOp.getSymNameAttr());
+  symbols.memSymbols.push_back(SymbolRefAttr::get(memOp));
   return success();
 }
 
@@ -1021,16 +1049,16 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::GLOBAL>(ParserHead &ph, size
     return failure();
 
   auto globalType = *globalTypeParsed;
-  auto symbol = builder.getStringAttr(getNewGlobalSymbolName());
+  auto symbol = builder.getStringAttr(symbols.getNewGlobalSymbolName());
   auto globalOp = builder.create<wasm::GlobalOp>(
       globalLocation, symbol, globalType.type, globalType.isMutable, false);
-  globalSymbols.push_back(symbol);
+  symbols.globalSymbols.push_back(SymbolRefAttr::get(globalOp));
   globalOp.setVisibility(SymbolTable::Visibility::Nested);
   auto ip = builder.saveInsertionPoint();
   auto *block = builder.createBlock(&globalOp.getInitializer());
   builder.setInsertionPointToStart(block);
   auto initStack = builder.create<EmptyStackOp>(globalLocation);
-  auto expr = ph.parseExpression(initStack, builder);
+  auto expr = ph.parseExpression(initStack, builder, symbols);
   if (failed(expr))
     return failure();
   if (*expr == initStack)
@@ -1044,11 +1072,11 @@ template <>
 LogicalResult WasmBinaryParser::parseSectionItem<WasmSectionType::CODE>(
     ParserHead &ph, size_t innerFunctionId) {
   auto funcId = innerFunctionId + firstInternalFuncID;
-  auto sym = funcSymbols[funcId];
-  auto symTable = SymbolTable{mOp};
-  auto funcOp = llvm::dyn_cast<FuncOp>(symTable.lookup(sym));
+  auto symRef = symbols.funcSymbols[funcId];
+  auto funcOp =
+      llvm::dyn_cast<FuncOp>(SymbolTable::lookupSymbolIn(mOp, symRef));
   assert(funcOp);
-  if (failed(ph.parseCodeFor(funcOp)))
+  if (failed(ph.parseCodeFor(funcOp, symbols)))
     return failure();
   return success();
 }
