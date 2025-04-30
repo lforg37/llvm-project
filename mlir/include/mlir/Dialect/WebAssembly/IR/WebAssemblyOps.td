@@ -113,6 +113,15 @@ def Wasm_LocalOp : Wasm_Op<"local"> {
   let assemblyFormat = "type($result) attr-dict";
 }
 
+def Wasm_LocalGetOp : Wasm_Op<"local_get", [DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
+  let summary = "Push the value of a local variable on the stack";
+  let arguments = (ins Wasm_ValType: $local,
+                       Wasm_StackType: $stack);
+  let results = (outs Wasm_StackType: $result);
+  let assemblyFormat = "$local `:` type($local) `on` $stack attr-dict";
+}
+
+
 def Wasm_MemOp : Wasm_Op<"memory", [Symbol]> {
   let summary= "WebAssembly memory definition";
   let arguments = (ins SymbolNameAttr: $sym_name,
