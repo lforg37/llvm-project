@@ -97,9 +97,13 @@ struct WasmEncodings {
     // Numerical ops
     static constexpr std::byte addI32{0x6A};
     static constexpr std::byte mulI32{0x6C};
+    static constexpr std::byte divSI32{0x6d};
+    static constexpr std::byte divUI32{0x6e};
 
     static constexpr std::byte addI64{0x7C};
     static constexpr std::byte mulI64{0x7E};
+    static constexpr std::byte divSI64{0x7F};
+    static constexpr std::byte divUI64{0x80};
 
     static constexpr std::byte addF32{0x92};
     static constexpr std::byte mulF32{0x94};
@@ -754,6 +758,8 @@ template <typename valueT>
       return buildNumOp<OP_NAME, TYPE>(builder, stack);                        \
     }
 
+// Ops that exists for all numerical types
+
 #define ImplementNumericalOp(OP_NAME, PREFIX)                                \
     ImplementNumericalOpPat(OP_NAME, PREFIX, I32, int32_t)                   \
     ImplementNumericalOpPat(OP_NAME, PREFIX, I64, int64_t)                   \
@@ -764,6 +770,16 @@ ImplementNumericalOp(AddOp, add)
 ImplementNumericalOp(MulOp, mul)
 
 #undef ImplementNumericalOp
+
+// Ops that exists for integer types
+
+#define ImplementNumericalOp(OP_NAME, PREFIX)                                \
+    ImplementNumericalOpPat(OP_NAME, PREFIX, I32, int32_t)                   \
+    ImplementNumericalOpPat(OP_NAME, PREFIX, I64, int64_t)
+
+ImplementNumericalOp(DivUIOp, divU)
+ImplementNumericalOp(DivSIOp, divS)
+
 #undef ImplementNumericalOpPat
 
 class WasmBinaryParser {

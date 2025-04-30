@@ -199,6 +199,14 @@ def Wasm_AddOp : Wasm_NumericalOp<"add",
     "Sum two values from the stack and push the result",
     [Wasm_NumericType]>{}
 
+def Wasm_DivUIOp : Wasm_NumericalOp<"div_ui",
+    "Divide values interpreted as unsigned int from the stack and push the result",
+    [Wasm_IntegerType]>{}
+
+def Wasm_DivSIOp : Wasm_NumericalOp<"div_si",
+    "Divide values interpreted as signed int from the stack and push the result",
+    [Wasm_IntegerType]>{}
+
 def Wasm_MulOp : Wasm_NumericalOp<"mul",
     "Multiply two values from the stack and push the result",
     [Wasm_NumericType]>{}
