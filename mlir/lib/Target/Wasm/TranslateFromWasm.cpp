@@ -79,11 +79,15 @@ constexpr bool sectionShouldBeUnique(WasmSectionType secType) {
 }
 
 struct WasmEncodings {
-  // Numerical constants
-  static constexpr std::byte constI32{0x41};
-  static constexpr std::byte constI64{0x42};
-  static constexpr std::byte constFP32{0x43};
-  static constexpr std::byte constFP64{0x44};
+  struct OpCode {
+    static constexpr std::byte localGet{0x20};
+
+    // Numerical constants
+    static constexpr std::byte constI32{0x41};
+    static constexpr std::byte constI64{0x42};
+    static constexpr std::byte constFP32{0x43};
+    static constexpr std::byte constFP64{0x44};
+  };
 
   /// Byte encodings of types in wasm binaries
   /// These are defined in the wasm binary spec
@@ -152,7 +156,7 @@ public:
 private:
 template <std::byte opCode>
 inline parsed_inst_t parseSpecificInstruction(OpBuilder &builder,
-                                              Value operand);
+                                              Value);
 
   template <typename IntT>
   parsed_inst_t
@@ -411,10 +415,10 @@ public:
   llvm::LogicalResult parseCodeFor(FuncOp func) {
     llvm::SmallVector<Value> locals{};
     // Populating locals with function argument
-    auto & block = func.getBody().front();
-    for (auto arg : block.getArguments()) {
+    auto &block = func.getBody().front();
+    for (auto arg : block.getArguments())
       locals.push_back(arg);
-    }
+
     auto codeSizeInBytes = parseUI32();
     if (failed(codeSizeInBytes))
       return failure();
@@ -444,14 +448,14 @@ public:
       }
     }
     auto emptyStack = builder.create<EmptyStackOp>(func->getLoc());
-    auto res = cParser.parseExpression(emptyStack.getResult(), builder);
+    auto res = cParser.parseExpression(emptyStack.getResult(), builder, locals);
     if (failed(res))
       return failure();
-    if (!cParser.end()) {
-      emitError(cParser.getLocation(),
+    if (!cParser.end())
+      return emitError(cParser.getLocation(),
                 "Unparsed garbage remaining at end of code block");
-    }
-    return failure();
+
+    return success();
   }
 
   bool end() const { return curHead().empty(); }
@@ -575,6 +579,23 @@ parsed_inst_t ExpressionParser::parse(Value initStack, OpBuilder &builder) {
   }
 }
 
+template <>
+inline parsed_inst_t
+ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::localGet>(
+    OpBuilder &builder, Value inStack) {
+  auto id = parser.parseLiteral<uint32_t>();
+  auto instLoc = parser.getLocation();
+  if (failed(id))
+    return failure();
+  if (*id >= locals.size())
+    return emitError(instLoc, "Invalid local index. Function has ")
+           << locals.size() << " accessible locals, received index " << *id;
+  auto localVar = locals[*id];
+  auto localOp = builder.create<LocalGetOp>(instLoc, localVar, inStack);
+
+  return localOp.getResult();
+}
+
 template <typename IntT>
   parsed_inst_t
   ExpressionParser::parseIntConstInst(OpBuilder &builder, Value operand,
@@ -590,41 +611,45 @@ template <typename IntT>
     return constOp.getResult();
   }
 
-template <>
-inline parsed_inst_t ExpressionParser::parseSpecificInstruction<WasmEncodings::constI32>(
-    OpBuilder &builder, Value operand) {
-  return parseIntConstInst<int32_t>(builder, operand);
-}
+  template <>
+  inline parsed_inst_t
+  ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::constI32>(
+      OpBuilder &builder, Value operand) {
+    return parseIntConstInst<int32_t>(builder, operand);
+  }
 
-template <>
-inline parsed_inst_t ExpressionParser::parseSpecificInstruction<WasmEncodings::constI64>(
-    OpBuilder &builder, Value operand) {
-  return parseIntConstInst<int64_t>(builder, operand);
-}
+  template <>
+  inline parsed_inst_t
+  ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::constI64>(
+      OpBuilder &builder, Value operand) {
+    return parseIntConstInst<int64_t>(builder, operand);
+  }
 
-template <>
-inline parsed_inst_t ExpressionParser::parseSpecificInstruction<WasmEncodings::constFP32>(
-    OpBuilder &builder, Value operand) {
-  auto opLoc = parser.getLocation();
-  auto constVal = parser.parseLiteral<float>();
-  if (failed(constVal))
-    return failure();
-  auto constOp = builder.create<ConstOp>(opLoc, operand,
-                                         builder.getF32FloatAttr(*constVal));
-  return constOp.getResult();
-}
+  template <>
+  inline parsed_inst_t
+  ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::constFP32>(
+      OpBuilder &builder, Value operand) {
+    auto opLoc = parser.getLocation();
+    auto constVal = parser.parseLiteral<float>();
+    if (failed(constVal))
+      return failure();
+    auto constOp = builder.create<ConstOp>(opLoc, operand,
+                                           builder.getF32FloatAttr(*constVal));
+    return constOp.getResult();
+  }
 
-template <>
-inline parsed_inst_t ExpressionParser::parseSpecificInstruction<WasmEncodings::constFP64>(
-    OpBuilder &builder, Value operand) {
-  auto opLoc = parser.getLocation();
-  auto constVal = parser.parseLiteral<double>();
-  if (failed(constVal))
-    return failure();
-  auto constOp = builder.create<ConstOp>(opLoc, operand,
-                                         builder.getF64FloatAttr(*constVal));
-  return constOp.getResult();
-}
+  template <>
+  inline parsed_inst_t
+  ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::constFP64>(
+      OpBuilder &builder, Value operand) {
+    auto opLoc = parser.getLocation();
+    auto constVal = parser.parseLiteral<double>();
+    if (failed(constVal))
+      return failure();
+    auto constOp = builder.create<ConstOp>(opLoc, operand,
+                                           builder.getF64FloatAttr(*constVal));
+    return constOp.getResult();
+  }
 
 class WasmBinaryParser {
 private:
@@ -766,7 +791,9 @@ private:
                             llvm::StringRef importName, TypeIdxRecord tid) {
     using llvm::Twine;
     if (tid.id >= funcTypes.size())
-      return emitError(loc, "Invalid type id: ") << tid.id << ". Only " << funcTypes.size() << " type registration.";
+      return emitError(loc, "Invalid type id: ")
+             << tid.id << ". Only " << funcTypes.size()
+             << " type registration.";
     auto type = funcTypes[tid.id];
     auto symbol = getNewFuncSymbolName();
     auto funcOp = builder.create<FuncImportOp>(
