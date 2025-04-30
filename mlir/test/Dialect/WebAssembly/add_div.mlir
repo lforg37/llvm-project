@@ -19,11 +19,15 @@
   (export "add" (func $add)))
 */
 
-// CHECK: module {
-// CHECK-NEXT:   "wasm.global"() <{isMutable, sym_name = "global_0", type = i32}> ({
-// CHECK-NEXT:     %[[STACK:.*]] = wasm.empty_stack
-// CHECK-NEXT:     %[[CST_0:.*]] = wasm.const 66560 : i32 on %[[STACK]]
-// CHECK-NEXT:     %[[POP:.*]] = wasm.pop i32 from %[[CST_0]]
-// CHECK-NEXT:   }) {sym_visibility = "nested"} : () -> ()
-// CHECK-NEXT: }
+// CHECK-LABEL:   "wasm.import_func"() <{importName = "twoTimes", moduleName = "env", sym_name = "func_0", type = (i32) -> i32}> {sym_visibility = "nested"} : () -> ()
+
+// CHECK-LABEL:   "wasm.func"() <{functionType = (i32, i32) -> i32, sym_name = "func_1", sym_visibility = "nested"}> ({
+// CHECK:         }) : () -> ()
+// CHECK:         "wasm.memory"() <{limits = !wasm<limit"[2:]">, sym_name = "mem_0"}> {sym_visibility = "nested"} : () -> ()
+
+// CHECK-LABEL:   wasm.global @global_0 i32 mutable : {sym_visibility = "nested"} {
+// CHECK:           %[[VAL_0:.*]] = wasm.empty_stack
+// CHECK:           %[[VAL_1:.*]] = wasm.const 66560 : i32 on %[[VAL_0]]
+// CHECK:           %[[VAL_2:.*]] = wasm.pop i32 from %[[VAL_1]]
+// CHECK:         }
 

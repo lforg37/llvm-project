@@ -6,17 +6,28 @@
 (import "console" "log" (func $log (param i32)))
 
 ;; import a global variable from js
-(global $from_js (import "env" "from_js") i32)
+(global $imported_glob (import "env" "from_js") i32)
 
 ;; create a global variable
-(global $from_wasm i32(i32.const 10))
+(global $normal_glob i32(i32.const 10))
+(global $glob_mut (mut i32) (i32.const 10))
+(global $glob_mut_ext (mut i32) (i32.const 10))
+
+(export "blob" (global $glob_mut_ext))
+
+
 
 (func $main
 ;; load both global variables onto the stack
-global.get $from_js
-global.get $from_wasm
+global.get $imported_glob
+global.get $normal_glob
 
 i32.add ;; add up both globals
+
+global.get $glob_mut
+global.get $glob_mut_ext
+i32.add 
+i32.add 
 call $log ;; log the result
 )
 (start $main)
@@ -31,11 +42,28 @@ call $log ;; log the result
 // minimized and named to reflect the test intent.
 
 
+// CHECK-LABEL:   "wasm.import_func"() <{importName = "log", moduleName = "console", sym_name = "func_0", type = (i32) -> ()}> {sym_visibility = "nested"} : () -> ()
+// CHECK:         "wasm.import_global"() <{importName = "from_js", moduleName = "env", sym_name = "global_0", type = i32}> {sym_visibility = "nested"} : () -> ()
 
-// CHECK-LABEL:   "wasm.global"() <{sym_name = "global_0", type = i32}> ({
+// CHECK-LABEL:   "wasm.func"() <{functionType = () -> (), sym_name = "func_1", sym_visibility = "nested"}> ({
+// CHECK:         }) : () -> ()
+
+// CHECK-LABEL:   wasm.global @global_1 i32 : {sym_visibility = "nested"} {
 // CHECK:           %[[VAL_0:.*]] = wasm.empty_stack
 // CHECK:           %[[VAL_1:.*]] = wasm.const 10 : i32 on %[[VAL_0]]
 // CHECK:           %[[VAL_2:.*]] = wasm.pop i32 from %[[VAL_1]]
-// CHECK:         }) {sym_visibility = "nested"} : () -> ()
+// CHECK:         }
+
+// CHECK-LABEL:   wasm.global @global_2 i32 mutable : {sym_visibility = "nested"} {
+// CHECK:           %[[VAL_0:.*]] = wasm.empty_stack
+// CHECK:           %[[VAL_1:.*]] = wasm.const 10 : i32 on %[[VAL_0]]
+// CHECK:           %[[VAL_2:.*]] = wasm.pop i32 from %[[VAL_1]]
+// CHECK:         }
+
+// CHECK-LABEL:   wasm.global @global_3 i32 mutable : {sym_visibility = "nested"} {
+// CHECK:           %[[VAL_0:.*]] = wasm.empty_stack
+// CHECK:           %[[VAL_1:.*]] = wasm.const 10 : i32 on %[[VAL_0]]
+// CHECK:           %[[VAL_2:.*]] = wasm.pop i32 from %[[VAL_1]]
+// CHECK:         }
 
 //CHECK: FAIL
