@@ -8,6 +8,7 @@
 #include "mlir/Dialect/WebAssembly/IR/WebAssembly.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributeInterfaces.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Diagnostics.h"
@@ -91,6 +92,12 @@ struct WasmEncodings {
     static constexpr std::byte constI64{0x42};
     static constexpr std::byte constFP32{0x43};
     static constexpr std::byte constFP64{0x44};
+
+    // Numerical ops
+    static constexpr std::byte addI32{0x6A};
+    static constexpr std::byte addI64{0x7C};
+    static constexpr std::byte addF32{0x92};
+    static constexpr std::byte addF64{0xA0};
   };
 
   /// Byte encodings of types in wasm binaries
@@ -703,6 +710,42 @@ template <typename IntT>
       return failure();
     auto constOp = builder.create<ConstOp>(opLoc, operand,
                                            builder.getF64FloatAttr(*constVal));
+    return constOp.getResult();
+  }
+
+  template <>
+  inline parsed_inst_t
+  ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::addI32>(
+      OpBuilder &builder, Value operand) {
+    auto constOp = builder.create<AddOp>(
+        parser.getLocation(), TypeAttr::get(builder.getI32Type()), operand);
+    return constOp.getResult();
+  }
+
+  template <>
+  inline parsed_inst_t
+  ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::addI64>(
+      OpBuilder &builder, Value operand) {
+    auto constOp = builder.create<AddOp>(
+        parser.getLocation(), TypeAttr::get(builder.getI64Type()), operand);
+    return constOp.getResult();
+  }
+
+  template <>
+  inline parsed_inst_t
+  ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::addF32>(
+      OpBuilder &builder, Value operand) {
+    auto constOp = builder.create<AddOp>(
+        parser.getLocation(), TypeAttr::get(builder.getF32Type()), operand);
+    return constOp.getResult();
+  }
+
+  template <>
+  inline parsed_inst_t
+  ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::addF64>(
+      OpBuilder &builder, Value operand) {
+    auto constOp = builder.create<AddOp>(
+        parser.getLocation(), TypeAttr::get(builder.getF64Type()), operand);
     return constOp.getResult();
   }
 

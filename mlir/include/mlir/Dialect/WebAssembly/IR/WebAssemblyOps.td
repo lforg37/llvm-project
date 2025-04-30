@@ -183,4 +183,20 @@ def Wasm_ReturnOp : Wasm_Op<"return", [Terminator]> {
   let assemblyFormat = "attr-dict";
 }
 
+// ---- Numeric ops
+
+class Wasm_NumericalOp<string mnemonic, string summaryStr,
+                       list<Type> validOpTypes> :
+  Wasm_Op<mnemonic> {
+  let summary = summaryStr;
+  let arguments = (ins TypeAttrOf<AnyTypeOf<validOpTypes>>:$operandTypes,
+                       Wasm_StackType:$stack);
+  let results = (outs Wasm_StackType: $result);
+  let assemblyFormat = "$operandTypes $stack attr-dict";
+}
+
+def Wasm_AddOp : Wasm_NumericalOp<"add",
+    "Sum two values from the stack and push the result",
+    [Wasm_NumericType]>{}
+
 #endif // WEBASSEMBLY_OPS
