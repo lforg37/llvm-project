@@ -199,4 +199,8 @@ def Wasm_AddOp : Wasm_NumericalOp<"add",
     "Sum two values from the stack and push the result",
     [Wasm_NumericType]>{}
 
+def Wasm_MulOp : Wasm_NumericalOp<"mul",
+    "Multiply two values from the stack and push the result",
+    [Wasm_NumericType]>{}
+
 #endif // WEBASSEMBLY_OPS

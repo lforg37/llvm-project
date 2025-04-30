@@ -96,9 +96,16 @@ struct WasmEncodings {
 
     // Numerical ops
     static constexpr std::byte addI32{0x6A};
+    static constexpr std::byte mulI32{0x6C};
+
     static constexpr std::byte addI64{0x7C};
+    static constexpr std::byte mulI64{0x7E};
+
     static constexpr std::byte addF32{0x92};
+    static constexpr std::byte mulF32{0x94};
+
     static constexpr std::byte addF64{0xA0};
+    static constexpr std::byte mulF64{0xA2};
   };
 
   /// Byte encodings of types in wasm binaries
@@ -754,6 +761,7 @@ template <typename valueT>
     ImplementNumericalOpPat(OP_NAME, PREFIX, F64, double)
 
 ImplementNumericalOp(AddOp, add)
+ImplementNumericalOp(MulOp, mul)
 
 #undef ImplementNumericalOp
 #undef ImplementNumericalOpPat
