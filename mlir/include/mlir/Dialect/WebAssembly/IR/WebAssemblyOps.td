@@ -88,6 +88,7 @@ def Wasm_GlobalOp : Wasm_Op<"global", [
     Body contains the initialization instructions for the variable value.
   }];
   let regions = (region AnyRegion: $initializer);
+  let hasCustomAssemblyFormat = 1;
 }
 
 def Wasm_GlobalImportOp : Wasm_Op<"import_global", [Symbol]> {
