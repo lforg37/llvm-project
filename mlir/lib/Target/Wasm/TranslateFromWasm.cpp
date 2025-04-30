@@ -23,6 +23,7 @@
 #include <climits>
 #include <cstddef>
 #include <cstdint>
+#include <type_traits>
 #include <variant>
 
 static_assert(CHAR_BIT == 8, "This code expects std::byte to be exactly 8 bits");
@@ -202,10 +203,15 @@ template <std::byte opCode>
 inline parsed_inst_t parseSpecificInstruction(OpBuilder &builder,
                                               Value);
 
-  template <typename IntT>
+  template <typename valueT>
   parsed_inst_t
-  parseIntConstInst(OpBuilder &builder, Value operand,
-                    std::enable_if_t<std::is_integral_v<IntT>> * = nullptr);
+  parseConstInst(OpBuilder &builder, Value operand,
+                    std::enable_if_t<std::is_arithmetic_v<valueT>> * = nullptr);
+
+  template <typename OpType, typename valueType>
+  inline parsed_inst_t
+  buildNumOp(OpBuilder &builder, Value stack,
+             std::enable_if_t<std::is_arithmetic_v<valueType>> * = 0);
 
   /// This function generates a dispatch tree to associate an opcode with a
   /// parser. Parsers are registered by specialising the
@@ -658,17 +664,39 @@ ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::localGet>(
   return localOp.getResult();
 }
 
-template <typename IntT>
+template <typename T>
+inline Type buildLiteralType(OpBuilder &);
+
+template <>
+inline Type buildLiteralType<int32_t>(OpBuilder &builder) {
+  return builder.getI32Type();
+}
+
+template <>
+inline Type buildLiteralType<int64_t>(OpBuilder &builder) {
+  return builder.getI32Type();
+}
+
+template <>
+inline Type buildLiteralType<float>(OpBuilder &builder) {
+  return builder.getF32Type();
+}
+
+template <>
+inline Type buildLiteralType<double>(OpBuilder &builder) {
+  return builder.getF64Type();
+}
+
+template <typename valueT>
   parsed_inst_t
-  ExpressionParser::parseIntConstInst(OpBuilder &builder, Value operand,
-                    std::enable_if_t<std::is_integral_v<IntT>> *) {
-    constexpr size_t typeWidth = sizeof(IntT) * 8;
-    auto parsedConstant = parser.parseLiteral<IntT>();
+  ExpressionParser::parseConstInst(OpBuilder &builder, Value operand,
+                    std::enable_if_t<std::is_arithmetic_v<valueT>> *) {
+    auto parsedConstant = parser.parseLiteral<valueT>();
     if (failed(parsedConstant))
       return failure();
     auto constOp = builder.create<ConstOp>(
         parser.getLocation(), operand,
-        builder.getIntegerAttr(builder.getIntegerType(typeWidth),
+        builder.getIntegerAttr(buildLiteralType<valueT>(builder),
                                *parsedConstant));
     return constOp.getResult();
   }
@@ -677,77 +705,58 @@ template <typename IntT>
   inline parsed_inst_t
   ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::constI32>(
       OpBuilder &builder, Value operand) {
-    return parseIntConstInst<int32_t>(builder, operand);
+    return parseConstInst<int32_t>(builder, operand);
   }
 
   template <>
   inline parsed_inst_t
   ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::constI64>(
       OpBuilder &builder, Value operand) {
-    return parseIntConstInst<int64_t>(builder, operand);
+    return parseConstInst<int64_t>(builder, operand);
   }
 
   template <>
   inline parsed_inst_t
   ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::constFP32>(
       OpBuilder &builder, Value operand) {
-    auto opLoc = parser.getLocation();
-    auto constVal = parser.parseLiteral<float>();
-    if (failed(constVal))
-      return failure();
-    auto constOp = builder.create<ConstOp>(opLoc, operand,
-                                           builder.getF32FloatAttr(*constVal));
-    return constOp.getResult();
+    return parseConstInst<float>(builder, operand);
   }
 
   template <>
   inline parsed_inst_t
   ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::constFP64>(
       OpBuilder &builder, Value operand) {
-    auto opLoc = parser.getLocation();
-    auto constVal = parser.parseLiteral<double>();
-    if (failed(constVal))
-      return failure();
-    auto constOp = builder.create<ConstOp>(opLoc, operand,
-                                           builder.getF64FloatAttr(*constVal));
-    return constOp.getResult();
+    return parseConstInst<double>(builder, operand);
   }
 
-  template <>
-  inline parsed_inst_t
-  ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::addI32>(
-      OpBuilder &builder, Value operand) {
-    auto constOp = builder.create<AddOp>(
-        parser.getLocation(), TypeAttr::get(builder.getI32Type()), operand);
-    return constOp.getResult();
+  template <typename OpType, typename valueType>
+  inline parsed_inst_t ExpressionParser::buildNumOp(
+      OpBuilder &builder, Value stack,
+      std::enable_if_t<std::is_arithmetic_v<valueType>> *) {
+    return builder
+        .create<OpType>(parser.getLocation(),
+                        buildLiteralType<valueType>(builder), stack)
+        .getResult();
   }
 
-  template <>
-  inline parsed_inst_t
-  ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::addI64>(
-      OpBuilder &builder, Value operand) {
-    auto constOp = builder.create<AddOp>(
-        parser.getLocation(), TypeAttr::get(builder.getI64Type()), operand);
-    return constOp.getResult();
-  }
+#define ImplementNumericalOpPat(OP_NAME, PREFIX, SUFFIX, TYPE)               \
+    template <>                                                                \
+    inline parsed_inst_t ExpressionParser::parseSpecificInstruction<           \
+        WasmEncodings::OpCode::PREFIX##SUFFIX>(OpBuilder & builder,            \
+                                               Value stack) {                  \
+      return buildNumOp<OP_NAME, TYPE>(builder, stack);                        \
+    }
 
-  template <>
-  inline parsed_inst_t
-  ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::addF32>(
-      OpBuilder &builder, Value operand) {
-    auto constOp = builder.create<AddOp>(
-        parser.getLocation(), TypeAttr::get(builder.getF32Type()), operand);
-    return constOp.getResult();
-  }
+#define ImplementNumericalOp(OP_NAME, PREFIX)                                \
+    ImplementNumericalOpPat(OP_NAME, PREFIX, I32, int32_t)                   \
+    ImplementNumericalOpPat(OP_NAME, PREFIX, I64, int64_t)                   \
+    ImplementNumericalOpPat(OP_NAME, PREFIX, F32, float)                     \
+    ImplementNumericalOpPat(OP_NAME, PREFIX, F64, double)
 
-  template <>
-  inline parsed_inst_t
-  ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::addF64>(
-      OpBuilder &builder, Value operand) {
-    auto constOp = builder.create<AddOp>(
-        parser.getLocation(), TypeAttr::get(builder.getF64Type()), operand);
-    return constOp.getResult();
-  }
+ImplementNumericalOp(AddOp, add)
+
+#undef ImplementNumericalOp
+#undef ImplementNumericalOpPat
 
 class WasmBinaryParser {
 private:
