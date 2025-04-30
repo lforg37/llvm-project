@@ -881,6 +881,7 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::GLOBAL>(ParserHead &ph) {
   auto symbol = builder.getStringAttr(getNewGlobalSymbolName());
   auto globalOp = builder.create<wasm::GlobalOp>(
       globalLocation, symbol, globalType.type, globalType.isMutable, false);
+  globalSymbols.push_back(symbol);
   globalOp.setVisibility(SymbolTable::Visibility::Nested);
   auto ip = builder.saveInsertionPoint();
   auto *block = builder.createBlock(&globalOp.getInitializer());
