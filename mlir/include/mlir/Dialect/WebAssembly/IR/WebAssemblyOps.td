@@ -66,6 +66,17 @@ def Wasm_FuncOp : Wasm_Op<"func", [
   ];
 }
 
+def Wasm_FuncCallOp : Wasm_Op<"call"> {
+  let summary = "Calling a wasm function";
+  let arguments = (ins SymbolRefAttr: $callee,
+                       Wasm_StackType: $stack);
+  let results = (outs Wasm_StackType: $result);
+  let assemblyFormat = "$callee `(`$stack`)` attr-dict";
+  let description = [{
+    Emits a call to callee. Takes a stack as input, which is used as the set of function arguments for callee.
+  }];
+}
+
 def Wasm_FuncImportOp : Wasm_Op<"import_func", [Symbol]> {
   let summary = "Importing a function variable";
   let arguments = (ins SymbolNameAttr: $sym_name,
