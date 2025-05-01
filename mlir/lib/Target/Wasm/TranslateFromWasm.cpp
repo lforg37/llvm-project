@@ -15,8 +15,9 @@
 #include "mlir/IR/OwningOpRef.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Target/Wasm/WasmImporter.h"
-
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/Error.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/LEB128.h"
 #include "llvm/Support/LogicalResult.h"
 
@@ -141,6 +142,13 @@ struct WasmEncodings {
   struct GlobalMutability {
     static constexpr std::byte isConst{0x00};
     static constexpr std::byte isMutable{0x01};
+  };
+
+  struct ExportType {
+    static constexpr std::byte function{0x00};
+    static constexpr std::byte table{0x01};
+    static constexpr std::byte memory{0x02};
+    static constexpr std::byte global{0x03};
   };
 
   static constexpr std::byte endByte{0x0B};
@@ -1010,6 +1018,10 @@ public:
     if (failed(parsingGlobals))
       return;
 
+    auto parsingExports = parseSection<WasmSectionType::EXPORT>();
+    if (failed(parsingExports))
+      return;
+
     auto parsingCode = parseSection<WasmSectionType::CODE>();
     if (failed(parsingCode))
       return;
@@ -1049,6 +1061,56 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::IMPORT>(ParserHead &ph, size
         return visitImport(importLoc, *moduleName, *importName, import);
       },
       *import);
+}
+
+template <>
+LogicalResult
+WasmBinaryParser::parseSectionItem<WasmSectionType::EXPORT>(ParserHead &ph, size_t) {
+  auto exportLoc = ph.getLocation();
+
+  auto exportName = ph.parseName();
+  if (failed(exportName))
+    return failure();
+
+  auto opcode = ph.consumeByte();
+  if (failed(opcode))
+    return failure();
+
+  llvm::SmallVector<SymbolRefAttr> *currentSymbolList;
+  std::string symbolType = "";
+  switch(*opcode) {
+      case WasmEncodings::ExportType::function :
+        symbolType = "function";
+        currentSymbolList = &symbols.funcSymbols;
+        break;
+      case WasmEncodings::ExportType::table :
+        symbolType = "table";
+        currentSymbolList = &symbols.tableSymbols;
+        break;
+      case WasmEncodings::ExportType::memory:
+        symbolType = "memory";
+        currentSymbolList = &symbols.memSymbols;
+        break;
+      case WasmEncodings::ExportType::global:
+        symbolType = "global";
+        currentSymbolList = &symbols.globalSymbols;
+        break;
+      default:
+        return emitError(exportLoc, "Invalid value for export type: ") << std::to_integer<unsigned>(*opcode);
+  }
+
+  auto idx = ph.parseLiteral<uint32_t>();
+  if (failed(opcode))
+    return failure();
+  if (*idx > currentSymbolList->size()) {
+    emitError(exportLoc, llvm::formatv("Trying to export {0} {1} which is undefined in this scope", symbolType, *idx));
+    return failure();
+  }
+  auto opSymbol = (*currentSymbolList)[*idx];
+  builder.create<ExportOp>(
+      exportLoc, *exportName, SymbolRefAttr::get(ctx,opSymbol.getLeafReference()));
+  return success();
+
 }
 
 template <>
@@ -1127,7 +1189,7 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::GLOBAL>(ParserHead &ph, size
   auto globalType = *globalTypeParsed;
   auto symbol = builder.getStringAttr(symbols.getNewGlobalSymbolName());
   auto globalOp = builder.create<wasm::GlobalOp>(
-      globalLocation, symbol, globalType.type, globalType.isMutable, false);
+      globalLocation, symbol, globalType.type, globalType.isMutable);
   symbols.globalSymbols.push_back(SymbolRefAttr::get(globalOp));
   globalOp.setVisibility(SymbolTable::Visibility::Nested);
   auto ip = builder.saveInsertionPoint();

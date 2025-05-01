@@ -14,8 +14,6 @@
 
 (export "blob" (global $glob_mut_ext))
 
-
-
 (func $main
 ;; load both global variables onto the stack
 global.get $imported_glob
@@ -37,22 +35,25 @@ call $log ;; log the result
 // CHECK:         wasm.import_global "from_js" from "env" as @global_0 {sym_visibility = "nested", type = i32}
 
 // CHECK-LABEL:   "wasm.func"() <{functionType = () -> (), sym_name = "func_1", sym_visibility = "nested"}> ({
+// CHECK:           %[[VAL_0:.*]] = wasm.empty_stack
+// CHECK:           wasm.return
 // CHECK:         }) : () -> ()
 
-// CHECK-LABEL:   wasm.global @global_1 i32 : {sym_visibility = "nested"} {
+// CHECK-LABEL:   wasm.global @global_1 i32 : {
 // CHECK:           %[[VAL_0:.*]] = wasm.empty_stack
 // CHECK:           %[[VAL_1:.*]] = wasm.const 10 : i32 on %[[VAL_0]]
 // CHECK:           %[[VAL_2:.*]] = wasm.pop i32 from %[[VAL_1]]
 // CHECK:         }
 
-// CHECK-LABEL:   wasm.global @global_2 i32 mutable : {sym_visibility = "nested"} {
+// CHECK-LABEL:   wasm.global @global_2 i32 mutable : {
 // CHECK:           %[[VAL_0:.*]] = wasm.empty_stack
 // CHECK:           %[[VAL_1:.*]] = wasm.const 10 : i32 on %[[VAL_0]]
 // CHECK:           %[[VAL_2:.*]] = wasm.pop i32 from %[[VAL_1]]
 // CHECK:         }
 
-// CHECK-LABEL:   wasm.global @global_3 i32 mutable : {sym_visibility = "nested"} {
+// CHECK-LABEL:   wasm.global @global_3 i32 mutable : {
 // CHECK:           %[[VAL_0:.*]] = wasm.empty_stack
 // CHECK:           %[[VAL_1:.*]] = wasm.const 10 : i32 on %[[VAL_0]]
 // CHECK:           %[[VAL_2:.*]] = wasm.pop i32 from %[[VAL_1]]
 // CHECK:         }
+// CHECK:         wasm.export @global_3 as @blob

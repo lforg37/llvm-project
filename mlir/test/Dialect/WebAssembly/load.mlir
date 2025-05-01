@@ -1,7 +1,6 @@
-// XFAIL: *
 // RUN: mlir-translate --import-wasm %S/inputs/load.wasm | FileCheck %s
 
-/* Source code used to create this test: 
+/* Source code used to create this test:
 (module
 (memory (import "js" "mem")1)
 (func(export "load_from_mem")(param $ptr i32)(param $len i32)(result i32)
@@ -19,6 +18,13 @@
 // about what constitutes a good test! The CHECK should be
 // minimized and named to reflect the test intent.
 
+// CHECK-LABEL:   wasm.import_mem "mem" from "js" as @mem_0 {limits = !wasm<limit"[1:]">, sym_visibility = "nested"}
 
-
-//CHECK: FAIL
+// CHECK-LABEL:   "wasm.func"() <{functionType = (i32, i32) -> i32, sym_name = "func_0", sym_visibility = "nested"}> ({
+// CHECK:         ^bb0(%[[VAL_0:.*]]: i32, %[[VAL_1:.*]]: i32):
+// CHECK:           %[[VAL_2:.*]] = wasm.local i32
+// CHECK:           %[[VAL_3:.*]] = wasm.empty_stack
+// CHECK:           %[[VAL_4:.*]] = wasm.local_get %[[VAL_0]] : i32 on %[[VAL_3]]
+// CHECK:           wasm.return
+// CHECK:         }) : () -> ()
+// CHECK:         wasm.export @func_0 as @load_from_mem
