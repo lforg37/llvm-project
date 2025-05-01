@@ -1,7 +1,6 @@
-// XFAIL: *
 // RUN: mlir-translate --import-wasm %S/inputs/store.wasm | FileCheck %s
 
-/* Source code used to create this test: 
+/* Source code used to create this test:
 (module
 (memory $memory 1)
 (export "memory" (memory $memory))
@@ -21,6 +20,13 @@ i32.store
 // about what constitutes a good test! The CHECK should be
 // minimized and named to reflect the test intent.
 
-
-
-//CHECK: FAIL
+// CHECK-LABEL:   "wasm.func"() <{functionType = (i32) -> (), sym_name = "func_0", sym_visibility = "nested"}> ({
+// CHECK:         ^bb0(%[[VAL_0:.*]]: i32):
+// CHECK:           %[[VAL_1:.*]] = wasm.empty_stack
+// CHECK:           %[[VAL_2:.*]] = wasm.const 0 : i32 on %[[VAL_1]]
+// CHECK:           %[[VAL_3:.*]] = wasm.local_get %[[VAL_0]] : i32 on %[[VAL_2]]
+// CHECK:           wasm.return
+// CHECK:         }) : () -> ()
+// CHECK:         "wasm.memory"() <{limits = !wasm<limit"[1:]">, sym_name = "mem_0"}> {sym_visibility = "nested"} : () -> ()
+// CHECK:         wasm.export @mem_0 as @memory
+// CHECK:         wasm.export @func_0 as @store_in_mem

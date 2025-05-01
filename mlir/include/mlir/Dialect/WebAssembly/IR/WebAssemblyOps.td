@@ -95,8 +95,7 @@ def Wasm_GlobalOp : Wasm_Op<"global", [
   let summary= "WebAssembly global value";
   let arguments = (ins SymbolNameAttr: $sym_name,
                      Wasm_ValTypeAttr: $type,
-                     UnitAttr: $isMutable,
-                     UnitAttr: $isExported);
+                     UnitAttr: $isMutable);
   let description = [{
     WebAssembly global variable.
     Body contains the initialization instructions for the variable value.
@@ -133,11 +132,18 @@ def Wasm_LocalGetOp : Wasm_Op<"local_get", [DeclareOpInterfaceMethods<InferTypeO
 }
 
 
+def Wasm_ExportOp: Wasm_Op<"export", [Symbol]> {
+  let summary = "Exports a symbol. Can be a function, a global, a memory or a table.";
+  let arguments = (ins SymbolNameAttr: $sym_name,
+                     SymbolRefAttr: $local_name);
+  let assemblyFormat = "$local_name `as` $sym_name attr-dict";
+  let hasVerifier = 1;
+}
+
 def Wasm_MemOp : Wasm_Op<"memory", [Symbol]> {
   let summary= "WebAssembly memory definition";
   let arguments = (ins SymbolNameAttr: $sym_name,
-                     Wasm_LimitTypeAttr: $limits,
-                     UnitAttr: $isExported);
+                     Wasm_LimitTypeAttr: $limits);
 }
 
 def Wasm_MemImportOp : Wasm_Op<"import_mem", [Symbol]> {
@@ -155,8 +161,7 @@ def Wasm_MemImportOp : Wasm_Op<"import_mem", [Symbol]> {
 def Wasm_TableOp : Wasm_Op<"table", [Symbol]> {
   let summary= "WebAssembly table value";
   let arguments = (ins SymbolNameAttr: $sym_name,
-                     Wasm_TableTypeAttr: $type,
-                     UnitAttr: $isExported);
+                     Wasm_TableTypeAttr: $type);
 }
 
 def Wasm_TableImportOp : Wasm_Op<"import_table", [Symbol]> {
