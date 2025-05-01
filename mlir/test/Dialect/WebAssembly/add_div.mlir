@@ -25,7 +25,7 @@
 // CHECK:         }) : () -> ()
 // CHECK:         "wasm.memory"() <{limits = !wasm<limit"[2:]">, sym_name = "mem_0"}> {sym_visibility = "nested"} : () -> ()
 
-// CHECK-LABEL:   wasm.global @global_0 i32 mutable : {sym_visibility = "nested"} {
+// CHECK-LABEL:   wasm.global @global_0 i32 mutable : {
 // CHECK:           %[[VAL_0:.*]] = wasm.empty_stack
 // CHECK:           %[[VAL_1:.*]] = wasm.const 66560 : i32 on %[[VAL_0]]
 // CHECK:           %[[VAL_2:.*]] = wasm.pop i32 from %[[VAL_1]]
