@@ -73,6 +73,7 @@ def Wasm_FuncImportOp : Wasm_Op<"import_func", [Symbol]> {
   let extraClassDeclaration = [{
     bool isDeclaration() const { return true; }
   }];
+  let assemblyFormat = "$importName `from` $moduleName `as` $sym_name attr-dict";
 }
 
 def Wasm_GlobalOp : Wasm_Op<"global", [
@@ -101,6 +102,7 @@ def Wasm_GlobalImportOp : Wasm_Op<"import_global", [Symbol]> {
   let extraClassDeclaration = [{
     bool isDeclaration() const { return true; }
   }];
+  let assemblyFormat = "$importName `from` $moduleName `as` $sym_name attr-dict";
 }
 
 def Wasm_MemOp : Wasm_Op<"memory", [Symbol]> {
@@ -119,6 +121,7 @@ def Wasm_MemImportOp : Wasm_Op<"import_mem", [Symbol]> {
   let extraClassDeclaration = [{
     bool isDeclaration() const { return true; }
   }];
+  let assemblyFormat = "$importName `from` $moduleName `as` $sym_name attr-dict";
 }
 
 def Wasm_TableOp : Wasm_Op<"table", [Symbol]> {
@@ -137,6 +140,7 @@ def Wasm_TableImportOp : Wasm_Op<"import_table", [Symbol]> {
   let extraClassDeclaration = [{
     bool isDeclaration() const { return true; }
   }];
+  let assemblyFormat = "$importName `from` $moduleName `as` $sym_name attr-dict";
 }
 
 def Wasm_PopOp : Wasm_Op<"pop", [Terminator]> {

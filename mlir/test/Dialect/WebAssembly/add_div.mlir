@@ -19,7 +19,7 @@
   (export "add" (func $add)))
 */
 
-// CHECK-LABEL:   "wasm.import_func"() <{importName = "twoTimes", moduleName = "env", sym_name = "func_0", type = (i32) -> i32}> {sym_visibility = "nested"} : () -> ()
+// CHECK-LABEL:   wasm.import_func "twoTimes" from "env" as @func_0 {sym_visibility = "nested", type = (i32) -> i32}
 
 // CHECK-LABEL:   "wasm.func"() <{functionType = (i32, i32) -> i32, sym_name = "func_1", sym_visibility = "nested"}> ({
 // CHECK:         }) : () -> ()
