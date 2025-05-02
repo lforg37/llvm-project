@@ -22,8 +22,8 @@ module {
   }
 }
 
-// CHECK-LABEL:   "wasm.import_func"() <{importName = "log", moduleName = "console", sym_name = "func_0", type = (i32) -> ()}> {sym_visibility = "nested"} : () -> ()
-// CHECK:         "wasm.import_global"() <{importName = "from_js", moduleName = "env", sym_name = "global_0", type = i32}> {sym_visibility = "nested"} : () -> ()
+// CHECK-LABEL:   wasm.import_func "log" from "console" as @func_0 {sym_visibility = "nested", type = (i32) -> ()}
+// CHECK:         wasm.import_global "from_js" from "env" as @global_0 {sym_visibility = "nested", type = i32}
 
 // CHECK-LABEL:   "wasm.func"() <{functionType = () -> (), sym_name = "func_1", sym_visibility = "nested"}> ({
 // CHECK:         }) : () -> ()
