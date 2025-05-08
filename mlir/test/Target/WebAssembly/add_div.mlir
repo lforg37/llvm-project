@@ -19,7 +19,7 @@
   (export "add" (func $add)))
 */
 
-// CHECK-LABEL:   wasm.import_func "twoTimes" from "env" as @func_0 {sym_visibility = "nested", type = (i32) -> i32}
+// CHECK-LABEL:   wasm.import_func "twoTimes" from "env" as @func_0 {type = (i32) -> i32}
 
 // CHECK-LABEL:   wasm.func nested @func_1(
 // CHECK-SAME:      %[[VAL_0:.*]]: i32,
@@ -31,7 +31,7 @@
 // CHECK:           %[[VAL_6:.*]] = wasm.div_si %[[VAL_4]] %[[VAL_5]] : i32
 // CHECK:           wasm.return %[[VAL_6]] : i32
 // CHECK:         }
-// CHECK:         "wasm.memory"() <{limits = !wasm<limit"[2:]">, sym_name = "mem_0"}> {sym_visibility = "nested"} : () -> ()
+// CHECK:         "wasm.memory"() <{limits = !wasm<limit"[2:]">, sym_name = "mem_0", sym_visibility = "nested"}> : () -> ()
 
 // CHECK-LABEL:   wasm.global @global_0 i32 mutable : {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 66560 : i32
