@@ -69,9 +69,9 @@ def Wasm_LimitTypeAttr : TypeAttrOf<Wasm_LimitType>;
 def Wasm_TableTypeAttr : TypeAttrOf<Wasm_TableType>;
 def Wasm_ValTypeAttr : TypeAttrOf<Wasm_ValType>;
 
-def Wasm_IntegrAttr : AnyAttrOf<[I32Attr, I64Attr]>;
+def Wasm_IntegerAttr : AnyAttrOf<[I32Attr, I64Attr]>;
 def Wasm_FPAttr : AnyAttrOf<[F32Attr, F64Attr]>;
-def Wasm_NumericAttr : AnyAttrOf<[Wasm_IntegrAttr, Wasm_FPAttr]>;
+def Wasm_NumericAttr : AnyAttrOf<[Wasm_IntegerAttr, Wasm_FPAttr]>;
 def Wasm_VecAttr : TypedSignlessIntegerAttrBase<
     I128, "::llvm::APInt", "128 bits signless integer attribute">;
 
