@@ -92,6 +92,7 @@ void FuncOp::print(OpAsmPrinter &p) {
 
 void mlir::wasm::FuncOp::build(::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState, llvm::StringRef symbol, FunctionType funcType) {
   odsState.addAttribute("sym_name", odsBuilder.getStringAttr(symbol));
+  odsState.addAttribute("sym_visibility", odsBuilder.getStringAttr("nested"));
   odsState.addAttribute("functionType", TypeAttr::get(funcType));
   odsState.addRegion();
 }
