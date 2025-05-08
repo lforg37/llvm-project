@@ -10,6 +10,7 @@ add_mlir_conversion_library(MLIRWasmToStandard
   LINK_LIBS PUBLIC
   MLIRArithDialect
   MLIRFuncDialect
+  MLIRMemRefDialect
   MLIRTransforms
   MLIRVectorDialect
   MLIRWasmDialect
