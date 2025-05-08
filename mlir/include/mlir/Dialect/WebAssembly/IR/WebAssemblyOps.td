@@ -37,7 +37,7 @@ def Wasm_FuncOp : Wasm_Op<"func", [
     AffineScope, AutomaticAllocationScope,
     DeclareOpInterfaceMethods<FunctionOpInterface>,
     IsolatedFromAbove,
-    SymbolTable]> {
+    Symbol]> {
   let arguments = (ins SymbolNameAttr: $sym_name,
                      Wasm_FuncTypeAttr: $functionType,
                      OptionalAttr<StrAttr>:$sym_visibility,
