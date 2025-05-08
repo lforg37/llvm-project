@@ -706,6 +706,27 @@ inline Type buildLiteralType<double>(OpBuilder &builder) {
   return builder.getF64Type();
 }
 
+template<typename ValT, typename E = std::enable_if_t<std::is_arithmetic_v<ValT>>>
+struct AttrHolder;
+
+template <typename ValT>
+struct AttrHolder<ValT, std::enable_if_t<std::is_integral_v<ValT>>> {
+  using type = IntegerAttr;
+};
+
+template <typename ValT>
+struct AttrHolder<ValT, std::enable_if_t<std::is_floating_point_v<ValT>>> {
+  using type = FloatAttr;
+};
+
+template<typename ValT>
+using attr_holder_t = typename AttrHolder<ValT>::type;
+
+template<typename ValT, typename EnableT = std::enable_if_t<std::is_arithmetic_v<ValT>>>
+attr_holder_t<ValT> buildLiteralAttr(OpBuilder & builder, ValT val) {
+  return attr_holder_t<ValT>::get(buildLiteralType<ValT>(builder), val);
+}
+
 template <typename valueT>
   parsed_inst_t
   ExpressionParser::parseConstInst(OpBuilder &builder, Value operand,
@@ -715,7 +736,7 @@ template <typename valueT>
       return failure();
     auto constOp = builder.create<ConstOp>(
         parser.getLocation(), operand,
-        builder.getIntegerAttr(buildLiteralType<valueT>(builder),
+        buildLiteralAttr<valueT>(builder,
                                *parsedConstant));
     return constOp.getResult();
   }
