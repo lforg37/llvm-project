@@ -1008,7 +1008,6 @@ private:
     auto symbol = symbols.getNewFuncSymbolName();
     auto funcOp = builder.create<FuncImportOp>(
         loc, symbol, moduleName, importName, type, ArrayAttr{}, ArrayAttr{});
-    funcOp.setVisibility(SymbolTable::Visibility::Nested);
     symbols.funcSymbols.push_back({SymbolRefAttr::get(funcOp), type});
     return funcOp.verify();
   }
@@ -1019,7 +1018,6 @@ private:
     auto symbol = symbols.getNewMemorySymbolName();
     auto memOp = builder.create<MemImportOp>(loc, symbol, moduleName,
                                              importName, limitType);
-    memOp.setVisibility(SymbolTable::Visibility::Nested);
     symbols.memSymbols.push_back({SymbolRefAttr::get(memOp)});
     return memOp.verify();
   }
@@ -1030,7 +1028,6 @@ private:
     auto symbol = symbols.getNewTableSymbolName();
     auto tableOp = builder.create<TableImportOp>(loc, symbol, moduleName,
                                                  importName, tableType);
-    tableOp.setVisibility(SymbolTable::Visibility::Nested);
     symbols.tableSymbols.push_back({SymbolRefAttr::get(tableOp)});
     return tableOp.verify();
   }
@@ -1043,7 +1040,6 @@ private:
     auto giOp =
         builder.create<GlobalImportOp>(loc, symbol, moduleName, importName,
                                        globalType.type, globalType.isMutable);
-    giOp.setVisibility(SymbolTable::Visibility::Nested);
     symbols.globalSymbols.push_back({SymbolRefAttr::get(giOp), giOp.getType()});
     return giOp.verify();
   }
@@ -1233,7 +1229,6 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::TABLE>(ParserHead &ph, size_
   llvm::dbgs() << "  Parsed table description: " << *tableType << '\n';
   auto symbol = builder.getStringAttr(symbols.getNewTableSymbolName());
   auto tableOp = builder.create<TableOp>(opLocation, symbol, TypeAttr::get(*tableType));
-  tableOp.setVisibility(SymbolTable::Visibility::Nested);
   symbols.tableSymbols.push_back({SymbolRefAttr::get(tableOp)});
   return success();
 }
@@ -1251,7 +1246,6 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::FUNCTION>(ParserHead &ph, si
   auto symbol = symbols.getNewFuncSymbolName();
   auto funcOp = builder.create<FuncOp>(
       opLoc, symbol, funcTypes[typeIdx]);
-  funcOp.setVisibility(SymbolTable::Visibility::Nested);
   auto* block = funcOp.addEntryBlock();
   auto ip = builder.saveInsertionPoint();
   builder.setInsertionPointToEnd(block);
@@ -1283,7 +1277,6 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::MEMORY>(ParserHead &ph, size
   llvm::dbgs() << "  Registering memory " << *memory << '\n';
   auto symbol = symbols.getNewMemorySymbolName();
   auto memOp = builder.create<MemOp>(opLocation, symbol, *memory);
-  memOp.setVisibility(SymbolTable::Visibility::Nested);
   symbols.memSymbols.push_back({SymbolRefAttr::get(memOp)});
   return success();
 }
@@ -1301,7 +1294,6 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::GLOBAL>(ParserHead &ph, size
   auto globalOp = builder.create<wasm::GlobalOp>(
       globalLocation, symbol, globalType.type, globalType.isMutable);
   symbols.globalSymbols.push_back({SymbolRefAttr::get(globalOp), globalOp.getType()});
-  globalOp.setVisibility(SymbolTable::Visibility::Nested);
   auto ip = builder.saveInsertionPoint();
   auto *block = builder.createBlock(&globalOp.getInitializer());
   builder.setInsertionPointToStart(block);

@@ -36,9 +36,9 @@ def Wasm_FuncOp : Wasm_Op<"func", [
     Symbol]> {
   let arguments = (ins SymbolNameAttr: $sym_name,
                      Wasm_FuncTypeAttr: $functionType,
-                     OptionalAttr<StrAttr>:$sym_visibility,
                      OptionalAttr<DictArrayAttr>:$arg_attrs,
-                     OptionalAttr<DictArrayAttr>:$res_attrs);
+                     OptionalAttr<DictArrayAttr>:$res_attrs,
+                     DefaultValuedAttr<StrAttr, "\"nested\"">:$sym_visibility);
   let regions = (region AnyRegion: $body);
   let extraClassDeclaration = [{
     //===------------------------------------------------------------------===//
@@ -83,7 +83,8 @@ def Wasm_FuncImportOp : Wasm_Op<"import_func", [
                      StrAttr: $importName,
                      Wasm_FuncTypeAttr: $type,
                      OptionalAttr<DictArrayAttr>:$arg_attrs,
-                     OptionalAttr<DictArrayAttr>:$res_attrs);
+                     OptionalAttr<DictArrayAttr>:$res_attrs,
+                     DefaultValuedAttr<StrAttr, "\"nested\"">:$sym_visibility);
   let extraClassDeclaration = [{
     bool isDeclaration() const { return true; }
 
@@ -106,7 +107,8 @@ def Wasm_GlobalOp : Wasm_Op<"global", [
   let summary= "WebAssembly global value";
   let arguments = (ins SymbolNameAttr: $sym_name,
                      Wasm_ValTypeAttr: $type,
-                     UnitAttr: $isMutable);
+                     UnitAttr: $isMutable,
+                     DefaultValuedAttr<StrAttr, "\"nested\"">:$sym_visibility);
   let description = [{
     WebAssembly global variable.
     Body contains the initialization instructions for the variable value.
@@ -121,7 +123,8 @@ def Wasm_GlobalImportOp : Wasm_Op<"import_global", [Symbol]> {
                      StrAttr: $moduleName,
                      StrAttr: $importName,
                      Wasm_ValTypeAttr: $type,
-                     UnitAttr: $isMutable);
+                     UnitAttr: $isMutable,
+                     DefaultValuedAttr<StrAttr, "\"nested\"">:$sym_visibility);
   let extraClassDeclaration = [{
     bool isDeclaration() const { return true; }
   }];
@@ -145,7 +148,8 @@ def Wasm_ExportOp: Wasm_Op<"export", [Symbol]> {
 def Wasm_MemOp : Wasm_Op<"memory", [Symbol]> {
   let summary= "WebAssembly memory definition";
   let arguments = (ins SymbolNameAttr: $sym_name,
-                     Wasm_LimitTypeAttr: $limits);
+                     Wasm_LimitTypeAttr: $limits,
+                     DefaultValuedAttr<StrAttr, "\"nested\"">:$sym_visibility);
 }
 
 def Wasm_MemImportOp : Wasm_Op<"import_mem", [Symbol]> {
@@ -153,7 +157,8 @@ def Wasm_MemImportOp : Wasm_Op<"import_mem", [Symbol]> {
   let arguments = (ins SymbolNameAttr: $sym_name,
                      StrAttr: $moduleName,
                      StrAttr: $importName,
-                     Wasm_LimitTypeAttr: $limits);
+                     Wasm_LimitTypeAttr: $limits,
+                     DefaultValuedAttr<StrAttr, "\"nested\"">:$sym_visibility);
   let extraClassDeclaration = [{
     bool isDeclaration() const { return true; }
   }];
@@ -163,7 +168,8 @@ def Wasm_MemImportOp : Wasm_Op<"import_mem", [Symbol]> {
 def Wasm_TableOp : Wasm_Op<"table", [Symbol]> {
   let summary= "WebAssembly table value";
   let arguments = (ins SymbolNameAttr: $sym_name,
-                     Wasm_TableTypeAttr: $type);
+                     Wasm_TableTypeAttr: $type,
+                     DefaultValuedAttr<StrAttr, "\"nested\"">:$sym_visibility);
 }
 
 def Wasm_TableImportOp : Wasm_Op<"import_table", [Symbol]> {
@@ -171,7 +177,8 @@ def Wasm_TableImportOp : Wasm_Op<"import_table", [Symbol]> {
   let arguments = (ins SymbolNameAttr: $sym_name,
                      StrAttr: $moduleName,
                      StrAttr: $importName,
-                     Wasm_TableTypeAttr: $type);
+                     Wasm_TableTypeAttr: $type,
+                     DefaultValuedAttr<StrAttr, "\"nested\"">:$sym_visibility);
   let extraClassDeclaration = [{
     bool isDeclaration() const { return true; }
   }];
