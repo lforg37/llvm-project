@@ -1500,7 +1500,7 @@ def ConvertVectorToXeGPU : Pass<"convert-vector-to-xegpu"> {
 def ConvertWasmToStandard : Pass<"convert-wasm-to-standard"> {
   let summary = "Lower Wasm dialect to standard generic dialects";
   let dependentDialects = [
-    "func::FuncDialect", "arith::ArithDialect",
+    "func::FuncDialect", "arith::ArithDialect", "memref::MemRefDialect",
     "vector::VectorDialect", "wasm::WasmDialect"
   ];
 }
