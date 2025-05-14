@@ -23,22 +23,18 @@
 
 // CHECK-LABEL:   "wasm.func"() <{functionType = (i32, i32) -> i32, sym_name = "func_1", sym_visibility = "nested"}> ({
 // CHECK:         ^bb0(%[[VAL_0:.*]]: i32, %[[VAL_1:.*]]: i32):
-// CHECK:           %[[VAL_2:.*]] = wasm.empty_stack
-// CHECK:           %[[VAL_3:.*]] = wasm.local_get %[[VAL_0]] : i32 on %[[VAL_2]]
-// CHECK:           %[[VAL_4:.*]] = wasm.call @func_0(%[[VAL_3]])
-// CHECK:           %[[VAL_5:.*]] = wasm.local_get %[[VAL_1]] : i32 on %[[VAL_4]]
-// CHECK:           %[[VAL_6:.*]] = wasm.call @func_0(%[[VAL_5]])
-// CHECK:           %[[VAL_7:.*]] = wasm.add i32 %[[VAL_6]]
-// CHECK:           %[[VAL_8:.*]] = wasm.const 2 : i32 on %[[VAL_7]]
-// CHECK:           %[[VAL_9:.*]] = wasm.div_si i32 %[[VAL_8]]
-// CHECK:           wasm.return
+// CHECK:           %[[VAL_2:.*]] = wasm.call @func_0(%[[VAL_0]]) : (i32) -> i32
+// CHECK:           %[[VAL_3:.*]] = wasm.call @func_0(%[[VAL_1]]) : (i32) -> i32
+// CHECK:           %[[VAL_4:.*]] = wasm.add %[[VAL_2]] %[[VAL_3]] : i32
+// CHECK:           %[[VAL_5:.*]] = wasm.const 2 : i32
+// CHECK:           %[[VAL_6:.*]] = wasm.div_si %[[VAL_4]] %[[VAL_5]] : i32
+// CHECK:           wasm.return %[[VAL_6]] : i32
 // CHECK:         }) : () -> ()
 // CHECK:         "wasm.memory"() <{limits = !wasm<limit"[2:]">, sym_name = "mem_0"}> {sym_visibility = "nested"} : () -> ()
 
 // CHECK-LABEL:   wasm.global @global_0 i32 mutable : {
-// CHECK:           %[[VAL_0:.*]] = wasm.empty_stack
-// CHECK:           %[[VAL_1:.*]] = wasm.const 66560 : i32 on %[[VAL_0]]
-// CHECK:           %[[VAL_2:.*]] = wasm.pop i32 from %[[VAL_1]]
+// CHECK:           %[[VAL_0:.*]] = wasm.const 66560 : i32
+// CHECK:           wasm.return %[[VAL_0]] : i32
 // CHECK:         }
 // CHECK:         wasm.export @mem_0 as @memory
 // CHECK:         wasm.export @func_1 as @add
