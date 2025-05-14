@@ -92,6 +92,8 @@ struct WasmEncodings {
 
     // Variable instructions
     static constexpr std::byte localGet{0x20};
+    static constexpr std::byte localSet{0x21};
+    static constexpr std::byte localTee{0x22};
     static constexpr std::byte globalGet{0x23};
 
     // Numerical constants
@@ -256,6 +258,39 @@ struct WasmModuleSymbolTables {
 
 class ParserHead;
 
+/// Wrapper around SmallVector to only allow access as push and pop on the stack.
+/// Makes sure that there are no "free accesses" on the stack to preserve its state.
+class ValueStack {
+
+  public:
+    bool empty() const {
+      return values.empty();
+    }
+
+    size_t size() const {
+      return values.size();
+    }
+
+    /// Pops values from the stack because they are being used in an operation.
+    /// @param operandTypes The list of expected types of the operation, used
+    ///   to know how many values to pop and check if the types match the
+    ///   expectation.
+    /// @param opLoc Location of the caller, used to report accurately the location
+    ///   if an error occurs.
+    /// @return Failure or the vector of popped values.
+    llvm::FailureOr<llvm::SmallVector<Value>> popOperands(TypeRange operandTypes, Location *opLoc);
+
+    /// Push the results of an operation to the stack so they can be used in a
+    /// following operation.
+    /// @param results The list of results of the operation
+    /// @param opLoc Location of the caller, used to report accurately the location
+    ///   if an error occurs.
+    LogicalResult pushResults(ValueRange results, Location *opLoc);
+
+  private:
+    llvm::SmallVector<Value> values;
+};
+
 class ExpressionParser {
 public:
   ExpressionParser(ParserHead &parser, WasmModuleSymbolTables const &symbols,
@@ -309,21 +344,30 @@ private:
     }
   }
 
-  llvm::FailureOr<llvm::SmallVector<Value>> popOperands(TypeRange operandTypes);
-
-  LogicalResult pushResults(ValueRange results);
-
 public:
   template <typename FilterType = decltype(allOpCodes)>
   parsed_inst_t parse(OpBuilder &builder, FilterType = {},
                       llvm::StringRef = "");
+
+  llvm::FailureOr<llvm::SmallVector<Value>> popOperands(TypeRange operandTypes) {
+    return valueStack.popOperands(operandTypes, &currentOpLoc.value());
+  }
+
+  LogicalResult pushResults(ValueRange results) {
+    return valueStack.pushResults(results, &currentOpLoc.value());
+  }
+
+  /// The local.set and local.tee operations behave similarly and only differ
+  /// on their return value. This function factorizes the behavior of the two
+  /// operations in one place.
+  llvm::FailureOr<Value> parseSetOrTee();
 
 private:
   std::optional<Location> currentOpLoc;
   ParserHead &parser;
   WasmModuleSymbolTables const &symbols;
   llvm::SmallVector<Value> locals;
-  llvm::SmallVector<Value> valueStack;
+  ValueStack valueStack;
 };
 
 class ParserHead {
@@ -701,35 +745,35 @@ inline parsed_inst_t ExpressionParser::parseSpecificInstruction(OpBuilder &) {
          << static_cast<int>(opCode);
 }
 
-parsed_inst_t ExpressionParser::popOperands(TypeRange operandTypes) {
-  if (operandTypes.size() > valueStack.size())
-    return emitError(*currentOpLoc,
+parsed_inst_t ValueStack::popOperands(TypeRange operandTypes, Location* opLoc) {
+  if (operandTypes.size() > values.size())
+    return emitError(*opLoc,
                      "Stack doesn't contain enough values. Trying to get ")
            << operandTypes.size() << " operands on a stack containing only "
-           << valueStack.size() << " values.";
-  size_t stackIdxOffset = valueStack.size() - operandTypes.size();
+           << values.size() << " values.";
+  size_t stackIdxOffset = values.size() - operandTypes.size();
   llvm::SmallVector<Value> res{};
   res.reserve(operandTypes.size());
   for (size_t i{0}; i < operandTypes.size(); ++i) {
-    Value operand = valueStack[i + stackIdxOffset];
+    Value operand = values[i + stackIdxOffset];
     Type stackType = operand.getType();
     if (stackType != operandTypes[i])
-      return emitError(*currentOpLoc,
+      return emitError(*opLoc,
                        "Invalid operand type on stack. Expecting ")
              << operandTypes[i] << ", value on stack is of type " << stackType
              << ".";
     res.push_back(operand);
   }
-  valueStack.resize(valueStack.size() - operandTypes.size());
+  values.resize(values.size() - operandTypes.size());
   return res;
 }
 
-LogicalResult ExpressionParser::pushResults(ValueRange results) {
+LogicalResult ValueStack::pushResults(ValueRange results, Location *opLoc) {
   for (auto val : results) {
     if (!isWasmValueType(val.getType()))
-      return emitError(*currentOpLoc, "Invalid value type on stack: ")
+      return emitError(*opLoc, "Invalid value type on stack: ")
              << val.getType();
-    valueStack.push_back(val);
+    values.push_back(val);
   }
   return success();
 }
@@ -813,6 +857,42 @@ ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::globalGet>(
   auto globalOp = builder.create<GlobalGetOp>(instLoc, globalVar.globalType, globalVar.symbol);
 
   return {{globalOp.getResult()}};
+}
+
+llvm::FailureOr<Value> ExpressionParser::parseSetOrTee() {
+  auto id = parser.parseLiteral<uint32_t>();
+  if (failed(id))
+    return failure();
+  if (*id >= locals.size())
+    return emitError(*currentOpLoc, "Invalid local index. Function has ")
+           << locals.size() << " accessible locals, received index " << *id;
+  if (valueStack.empty())
+    return emitError(*currentOpLoc, "Invalid stack access, trying to access a value on an empty stack.");
+
+  parsed_inst_t poppedOp = popOperands(locals[*id].getType());
+  if (failed(poppedOp))
+    return failure();
+  locals[*id] = poppedOp->front();
+  return locals[*id];
+}
+
+template <>
+inline parsed_inst_t
+ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::localSet>(
+    OpBuilder &) {
+  if (failed(parseSetOrTee()))
+      return failure();
+  return {{}};
+}
+
+template <>
+inline parsed_inst_t
+ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::localTee>(
+    OpBuilder &) {
+  llvm::FailureOr<Value> res = parseSetOrTee();
+  if (failed(res))
+      return failure();
+  return {{*res}};
 }
 
 template <typename T>
