@@ -31,8 +31,8 @@ call $log ;; log the result
 )
 */
 
-// CHECK-LABEL:   wasm.import_func "log" from "console" as @func_0 {sym_visibility = "nested", type = (i32) -> ()}
-// CHECK:         wasm.import_global "from_js" from "env" as @global_0 {sym_visibility = "nested", type = i32}
+// CHECK-LABEL:   wasm.import_func "log" from "console" as @func_0 {type = (i32) -> ()}
+// CHECK:         wasm.import_global "from_js" from "env" as @global_0 {type = i32}
 
 // CHECK-LABEL:   wasm.func nested @func_1() {
 // CHECK:           %[[VAL_0:.*]] = "wasm.global_get"() <{global = @global_0}> : () -> i32
