@@ -143,7 +143,6 @@ def Wasm_GlobalGetOp : Wasm_Op<"global_get"> {
   let results = (outs Wasm_ValType: $global_val);
 }
 
-
 def Wasm_ExportOp: Wasm_Op<"export", [Symbol]> {
   let summary = "Exports a symbol. Can be a function, a global, a memory or a table.";
   let arguments = (ins SymbolNameAttr: $sym_name,
