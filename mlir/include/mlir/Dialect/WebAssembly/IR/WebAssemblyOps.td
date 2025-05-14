@@ -15,22 +15,18 @@ include "mlir/Dialect/WebAssembly/IR/WebAssemblyTypes.td"
 
 include "mlir/Interfaces/FunctionInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
+include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/IR/SymbolInterfaces.td"
 
 class Wasm_Op<string mnemonic, list<Trait> traits = []> :
     Op<Wasm_Dialect, mnemonic, traits>;
 
-def Wasm_ConstOp : Wasm_Op<"const", [DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
+def Wasm_ConstOp : Wasm_Op<"const", [
+    AllTypesMatch<["value", "result"]>]> {
   let summary = "Push a constant to the stack";
-  let arguments = (ins Wasm_StackType: $stack, Wasm_NumericAttr: $value);
-  let results = (outs Wasm_StackType: $result);
-  let assemblyFormat = "$value `on` $stack attr-dict";
-}
-
-def Wasm_EmptyStackOp : Wasm_Op<"empty_stack", [DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
-  let summary = "Operation for initializing an empty stack";
-  let results = (outs Wasm_StackType:$result);
-  let assemblyFormat = "attr-dict";
+  let arguments = (ins TypedAttrInterface: $value);
+  let results = (outs Wasm_NumericType: $result);
+  let assemblyFormat = "$value attr-dict";
 }
 
 def Wasm_FuncOp : Wasm_Op<"func", [
@@ -69,22 +65,36 @@ def Wasm_FuncOp : Wasm_Op<"func", [
 def Wasm_FuncCallOp : Wasm_Op<"call"> {
   let summary = "Calling a wasm function";
   let arguments = (ins SymbolRefAttr: $callee,
-                       Wasm_StackType: $stack);
-  let results = (outs Wasm_StackType: $result);
-  let assemblyFormat = "$callee `(`$stack`)` attr-dict";
+                       Variadic<Wasm_ValType>:  $operands);
+  let results = (outs Variadic<Wasm_ValType>: $results);
+  let assemblyFormat = "$callee `(` $operands `)` attr-dict `:` functional-type($operands, $results)";
   let description = [{
     Emits a call to callee. Takes a stack as input, which is used as the set of function arguments for callee.
   }];
 }
 
-def Wasm_FuncImportOp : Wasm_Op<"import_func", [Symbol]> {
+def Wasm_FuncImportOp : Wasm_Op<"import_func", [
+    Symbol,
+    CallableOpInterface]> {
   let summary = "Importing a function variable";
   let arguments = (ins SymbolNameAttr: $sym_name,
                      StrAttr: $moduleName,
                      StrAttr: $importName,
-                     Wasm_FuncTypeAttr: $type);
+                     Wasm_FuncTypeAttr: $type,
+                     OptionalAttr<DictArrayAttr>:$arg_attrs,
+                     OptionalAttr<DictArrayAttr>:$res_attrs);
   let extraClassDeclaration = [{
     bool isDeclaration() const { return true; }
+
+    Region *getCallableRegion() { return nullptr; }
+
+    llvm::ArrayRef<Type> getArgumentTypes() {
+      return getType().getInputs();
+    }
+
+    llvm::ArrayRef<Type> getResultTypes() {
+      return getType().getResults();
+    }
   }];
   let assemblyFormat = "$importName `from` $moduleName `as` $sym_name attr-dict";
 }
@@ -122,15 +132,6 @@ def Wasm_LocalOp : Wasm_Op<"local"> {
   let results = (outs Wasm_ValType: $result);
   let assemblyFormat = "type($result) attr-dict";
 }
-
-def Wasm_LocalGetOp : Wasm_Op<"local_get", [DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
-  let summary = "Push the value of a local variable on the stack";
-  let arguments = (ins Wasm_ValType: $local,
-                       Wasm_StackType: $stack);
-  let results = (outs Wasm_StackType: $result);
-  let assemblyFormat = "$local `:` type($local) `on` $stack attr-dict";
-}
-
 
 def Wasm_ExportOp: Wasm_Op<"export", [Symbol]> {
   let summary = "Exports a symbol. Can be a function, a global, a memory or a table.";
@@ -176,43 +177,39 @@ def Wasm_TableImportOp : Wasm_Op<"import_table", [Symbol]> {
   let assemblyFormat = "$importName `from` $moduleName `as` $sym_name attr-dict";
 }
 
-def Wasm_PopOp : Wasm_Op<"pop", [Terminator]> {
-  let summary = "Pop a value from the stack";
-  let arguments = (ins Wasm_StackType:$stack);
-  let results = (outs Wasm_ValType:$result);
-  let assemblyFormat = "type($result) `from` $stack attr-dict";
-}
-
 def Wasm_ReturnOp : Wasm_Op<"return", [Terminator]> {
   let summary = "Return from the current function frame";
-  let assemblyFormat = "attr-dict";
+  let arguments = (ins Variadic<Wasm_ValType>:  $operands);
+  let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
+  let builders = [
+    OpBuilder<(ins)>
+  ];
 }
 
 // ---- Numeric ops
 
-class Wasm_NumericalOp<string mnemonic, string summaryStr,
+class Wasm_BinaryNumericalOp<string mnemonic, string summaryStr,
                        list<Type> validOpTypes> :
-  Wasm_Op<mnemonic> {
+  Wasm_Op<mnemonic, [AllTypesMatch<["lhs", "rhs", "result"]>]> {
   let summary = summaryStr;
-  let arguments = (ins TypeAttrOf<AnyTypeOf<validOpTypes>>:$operandTypes,
-                       Wasm_StackType:$stack);
-  let results = (outs Wasm_StackType: $result);
-  let assemblyFormat = "$operandTypes $stack attr-dict";
+  let arguments = (ins AnyTypeOf<validOpTypes>:$lhs, AnyTypeOf<validOpTypes>:$rhs);
+  let results = (outs AnyTypeOf<validOpTypes>:$result);
+  let assemblyFormat = "$lhs $rhs `:` type($lhs) attr-dict";
 }
 
-def Wasm_AddOp : Wasm_NumericalOp<"add",
+def Wasm_AddOp : Wasm_BinaryNumericalOp<"add",
     "Sum two values from the stack and push the result",
     [Wasm_NumericType]>{}
 
-def Wasm_DivUIOp : Wasm_NumericalOp<"div_ui",
+def Wasm_DivUIOp : Wasm_BinaryNumericalOp<"div_ui",
     "Divide values interpreted as unsigned int from the stack and push the result",
     [Wasm_IntegerType]>{}
 
-def Wasm_DivSIOp : Wasm_NumericalOp<"div_si",
+def Wasm_DivSIOp : Wasm_BinaryNumericalOp<"div_si",
     "Divide values interpreted as signed int from the stack and push the result",
     [Wasm_IntegerType]>{}
 
-def Wasm_MulOp : Wasm_NumericalOp<"mul",
+def Wasm_MulOp : Wasm_BinaryNumericalOp<"mul",
     "Multiply two values from the stack and push the result",
     [Wasm_NumericType]>{}
 

@@ -33,6 +33,9 @@ LogicalResult ExportOp::verify() {
   return success();
 }
 
+void ReturnOp::build(::mlir::OpBuilder &odsBuilder,
+                     ::mlir::OperationState &odsState) {}
+
 // Custom formats
 
 ParseResult GlobalOp::parse(OpAsmParser &parser, OperationState &result) {

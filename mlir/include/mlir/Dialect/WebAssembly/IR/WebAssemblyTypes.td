@@ -18,7 +18,9 @@ include "mlir/IR/CommonTypeConstraints.td"
 
 def Wasm_IntegerType : AnyTypeOf<[I32, I64]>;
 def Wasm_FPType: AnyTypeOf<[F32, F64]>;
-def Wasm_NumericType : AnyTypeOf<[Wasm_IntegerType, Wasm_FPType]>;
+def Wasm_NumericType : AnyTypeOf<[Wasm_IntegerType, Wasm_FPType]>{
+  let cppFunctionName = "isWasmNumericType";
+}
 def Wasm_VecType : AnyTypeOf<[I128]>;
 
 class Wasm_Type<string name, string typeMnemonic, list<Trait> traits = []>
@@ -35,15 +37,13 @@ def Wasm_ExternRefType : Wasm_Type<"ExternRef", "externref"> {
   let summary = "Opaque type for external reference";
 }
 
-def Wasm_StackType : Wasm_Type<"Stack", "stack"> {
-  let summary = "Opaque type for representing a stack";
-}
-
 def Wasm_RefType : AnyTypeOf<[Wasm_FuncRefType, Wasm_ExternRefType]> {
   let cppFunctionName = "isWasmRefType";
 }
 
-def Wasm_ValType : AnyTypeOf<[Wasm_NumericType, Wasm_VecType, Wasm_RefType]>;
+def Wasm_ValType : AnyTypeOf<[Wasm_NumericType, Wasm_VecType, Wasm_RefType]> {
+  let cppFunctionName = "isWasmValueType";
+}
 
 def Wasm_ResultType : TupleOf<[Wasm_ValType]>;
 

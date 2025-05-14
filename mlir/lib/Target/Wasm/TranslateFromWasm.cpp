@@ -15,6 +15,7 @@
 #include "mlir/IR/OwningOpRef.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Target/Wasm/WasmImporter.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -24,6 +25,7 @@
 #include <climits>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <type_traits>
 #include <variant>
 
@@ -175,7 +177,7 @@ struct TypeIdxRecord {
 
 using ImportDesc = std::variant<TypeIdxRecord, TableType, LimitType, GlobalTypeRecord>;
 
-using parsed_inst_t = llvm::FailureOr<Value>;
+using parsed_inst_t = llvm::FailureOr<llvm::SmallVector<Value>>;
 
 
 struct WasmModuleSymbolTables {
@@ -218,19 +220,20 @@ public:
       : parser{parser}, symbols{symbols}, locals{initLocal} {}
 
 private:
-template <std::byte opCode>
-inline parsed_inst_t parseSpecificInstruction(OpBuilder &builder,
-                                              Value);
+  template <std::byte opCode>
+  inline parsed_inst_t parseSpecificInstruction(OpBuilder &builder);
 
   template <typename valueT>
   parsed_inst_t
-  parseConstInst(OpBuilder &builder, Value operand,
-                    std::enable_if_t<std::is_arithmetic_v<valueT>> * = nullptr);
+  parseConstInst(OpBuilder &builder,
+                 std::enable_if_t<std::is_arithmetic_v<valueT>> * = nullptr);
 
+  /// Operation builder helper for binary numerical ops that reduces two
+  /// operands of type T to one value of type T
   template <typename OpType, typename valueType>
   inline parsed_inst_t
-  buildNumOp(OpBuilder &builder, Value stack,
-             std::enable_if_t<std::is_arithmetic_v<valueType>> * = 0);
+  buildBinNumOp(OpBuilder &builder,
+                std::enable_if_t<std::is_arithmetic_v<valueType>> * = 0);
 
   /// This function generates a dispatch tree to associate an opcode with a
   /// parser. Parsers are registered by specialising the
@@ -244,8 +247,8 @@ inline parsed_inst_t parseSpecificInstruction(OpBuilder &builder,
   /// @tparam highBitPattern is the fixed pattern that this instance handles for
   /// the 8-patternBitSize bits
   template <size_t patternBitSize = 0, std::byte highBitPattern = std::byte{0}>
-  inline parsed_inst_t dispatchToInstParser(std::byte opCode, OpBuilder &builder,
-                                            Value operand) {
+  inline parsed_inst_t dispatchToInstParser(std::byte opCode,
+                                            OpBuilder &builder) {
     static_assert(patternBitSize <= 8,
                   "PatternBitSize is outside of range of opcode space! "
                   "(expected at most 8 bits)");
@@ -255,21 +258,27 @@ inline parsed_inst_t parseSpecificInstruction(OpBuilder &builder,
       constexpr size_t nextPatternBitSize = patternBitSize + 1;
       if ((opCode & bitSelect) != std::byte{0})
         return dispatchToInstParser < nextPatternBitSize,
-               nextHighBitPatternStem | std::byte{1} > (opCode, builder, operand);
-      return dispatchToInstParser<nextPatternBitSize, nextHighBitPatternStem>(opCode, builder,
-                                                               operand);
+               nextHighBitPatternStem | std::byte{1} > (opCode, builder);
+      return dispatchToInstParser<nextPatternBitSize, nextHighBitPatternStem>(
+          opCode, builder);
     } else {
-      return parseSpecificInstruction<highBitPattern>(builder, operand);
+      return parseSpecificInstruction<highBitPattern>(builder);
     }
   }
 
+  llvm::FailureOr<llvm::SmallVector<Value>> popOperands(TypeRange operandTypes);
+
+  LogicalResult pushResults(ValueRange results);
+
 public:
-  parsed_inst_t parse(Value initStack, OpBuilder &builder);
+  parsed_inst_t parse(OpBuilder &builder);
 
 private:
+  std::optional<Location> currentOpLoc;
   ParserHead &parser;
-  WasmModuleSymbolTables const & symbols;
+  WasmModuleSymbolTables const &symbols;
   llvm::SmallVector<Value> locals;
+  llvm::SmallVector<Value> valueStack;
 };
 
 class ParserHead {
@@ -476,11 +485,11 @@ public:
     }
   }
 
-  parsed_inst_t parseExpression(Value initStack, OpBuilder &builder,
+  parsed_inst_t parseExpression(OpBuilder &builder,
                                 WasmModuleSymbolTables const &symbols,
                                 llvm::ArrayRef<Value> locals = {}) {
     auto eParser = ExpressionParser{*this, symbols, locals};
-    return eParser.parse(initStack, builder);
+    return eParser.parse(builder);
   }
 
   llvm::LogicalResult parseCodeFor(FuncOp func,
@@ -488,6 +497,13 @@ public:
     llvm::SmallVector<Value> locals{};
     // Populating locals with function argument
     auto &block = func.getBody().front();
+    // Delete temporary return argument which was only created for IR validity
+    assert(func.getBody().getBlocks().size() == 1 &&
+           "Function should only have its default created block at this point");
+    assert(block.getOperations().size() == 1 &&
+           "Only the placeholder return op should be present at this point");
+    auto returnOp = cast<ReturnOp>(&block.back());
+    assert(returnOp);
     for (auto arg : block.getArguments())
       locals.push_back(arg);
 
@@ -519,14 +535,14 @@ public:
         locals.push_back(local.getResult());
       }
     }
-    auto emptyStack = builder.create<EmptyStackOp>(func->getLoc());
-    auto res = cParser.parseExpression(emptyStack.getResult(), builder, symbols, locals);
+    auto res = cParser.parseExpression(builder, symbols, locals);
     if (failed(res))
       return failure();
     if (!cParser.end())
       return emitError(cParser.getLocation(),
                 "Unparsed garbage remaining at end of code block");
-
+    builder.create<ReturnOp>(func->getLoc(), *res);
+    returnOp->erase();
     return success();
   }
 
@@ -628,59 +644,98 @@ inline llvm::FailureOr<uint32_t> ParserHead::parseUI32() {
 }
 
 template <std::byte opCode>
-  inline parsed_inst_t ExpressionParser::parseSpecificInstruction(OpBuilder &builder,
-                                                Value operand) {
-    return emitError(parser.getLocation(), "Unknown instruction opcode: ")
-           << static_cast<int>(opCode);
+inline parsed_inst_t ExpressionParser::parseSpecificInstruction(OpBuilder &) {
+  return emitError(*currentOpLoc, "Unknown instruction opcode: ")
+         << static_cast<int>(opCode);
 }
 
-parsed_inst_t ExpressionParser::parse(Value initStack, OpBuilder &builder) {
-  assert(initStack.getType() == StackType::get(builder.getContext()) &&
-         "initStack should have stack type");
-  Value res = initStack;
+parsed_inst_t ExpressionParser::popOperands(TypeRange operandTypes) {
+  if (operandTypes.size() > valueStack.size())
+    return emitError(*currentOpLoc,
+                     "Stack doesn't contain enough values. Trying to get ")
+           << operandTypes.size() << " operands on a stack containing only "
+           << valueStack.size() << " values.";
+  size_t stackIdxOffset = valueStack.size() - operandTypes.size();
+  llvm::SmallVector<Value> res{};
+  res.reserve(operandTypes.size());
+  for (size_t i{0}; i < operandTypes.size(); ++i) {
+    Value operand = valueStack[i + stackIdxOffset];
+    Type stackType = operand.getType();
+    if (stackType != operandTypes[i])
+      return emitError(*currentOpLoc,
+                       "Invalid operand type on stack. Expecting ")
+             << operandTypes[i] << ", value on stack is of type " << stackType
+             << ".";
+    res.push_back(operand);
+  }
+  valueStack.resize(valueStack.size() - operandTypes.size());
+  return res;
+}
+
+LogicalResult ExpressionParser::pushResults(ValueRange results) {
+  for (auto val : results) {
+    if (!isWasmValueType(val.getType()))
+      return emitError(*currentOpLoc, "Invalid value type on stack: ")
+             << val.getType();
+    valueStack.push_back(val);
+  }
+  return success();
+}
+
+parsed_inst_t ExpressionParser::parse(OpBuilder &builder) {
+  llvm::SmallVector<Value> res;
   for (;;) {
+    currentOpLoc = parser.getLocation();
     auto opCode = parser.consumeByte();
     if (failed(opCode))
       return failure();
     if (*opCode == WasmEncodings::endByte)
       return res;
-    auto resParsed = dispatchToInstParser(*opCode, builder, res);
+    auto resParsed = dispatchToInstParser(*opCode, builder);
     if (failed(resParsed))
       return failure();
-    res = *resParsed;
+    std::swap(res, *resParsed);
+    if (failed(pushResults(res)))
+      return failure();
   }
 }
 
 template <>
 inline parsed_inst_t
 ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::call>(
-    OpBuilder &builder, Value inStack) {
-  auto loc = parser.getLocation();
+    OpBuilder &builder) {
+  auto loc = *currentOpLoc;
   auto funcIdx = parser.parseLiteral<uint32_t>();
   if (failed(funcIdx))
     return failure();
   if (*funcIdx >= symbols.funcSymbols.size())
     return emitError(loc, "Invalid function index: ") << *funcIdx;
-  auto callOp =
-      builder.create<FuncCallOp>(loc, symbols.funcSymbols[*funcIdx], inStack);
-  return callOp.getResult();
+  auto callee = symbols.funcSymbols[*funcIdx];
+  auto *parent = builder.getBlock()->getParentOp();
+  auto funcOp = llvm::cast<CallableOpInterface>(
+      SymbolTable::lookupNearestSymbolFrom(parent, callee));
+  llvm::ArrayRef<Type> inTypes = funcOp.getArgumentTypes();
+  llvm::ArrayRef<Type> resTypes = funcOp.getResultTypes();
+  parsed_inst_t inOperands = popOperands(inTypes);
+  if (failed(inOperands))
+    return failure();
+  auto callOp = builder.create<FuncCallOp>(
+      loc, resTypes, symbols.funcSymbols[*funcIdx], *inOperands);
+  return {callOp.getResults()};
 }
 
 template <>
 inline parsed_inst_t
 ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::localGet>(
-    OpBuilder &builder, Value inStack) {
+    OpBuilder &builder) {
   auto id = parser.parseLiteral<uint32_t>();
-  auto instLoc = parser.getLocation();
+  auto instLoc = *currentOpLoc;
   if (failed(id))
     return failure();
   if (*id >= locals.size())
     return emitError(instLoc, "Invalid local index. Function has ")
            << locals.size() << " accessible locals, received index " << *id;
-  auto localVar = locals[*id];
-  auto localOp = builder.create<LocalGetOp>(instLoc, localVar, inStack);
-
-  return localOp.getResult();
+  return {{locals[*id]}};
 }
 
 template <typename T>
@@ -722,69 +777,66 @@ struct AttrHolder<ValT, std::enable_if_t<std::is_floating_point_v<ValT>>> {
 template<typename ValT>
 using attr_holder_t = typename AttrHolder<ValT>::type;
 
-template<typename ValT, typename EnableT = std::enable_if_t<std::is_arithmetic_v<ValT>>>
-attr_holder_t<ValT> buildLiteralAttr(OpBuilder & builder, ValT val) {
+template <typename ValT,
+          typename EnableT = std::enable_if_t<std::is_arithmetic_v<ValT>>>
+attr_holder_t<ValT> buildLiteralAttr(OpBuilder &builder, ValT val) {
   return attr_holder_t<ValT>::get(buildLiteralType<ValT>(builder), val);
 }
 
 template <typename valueT>
-  parsed_inst_t
-  ExpressionParser::parseConstInst(OpBuilder &builder, Value operand,
-                    std::enable_if_t<std::is_arithmetic_v<valueT>> *) {
-    auto parsedConstant = parser.parseLiteral<valueT>();
-    if (failed(parsedConstant))
-      return failure();
-    auto constOp = builder.create<ConstOp>(
-        parser.getLocation(), operand,
-        buildLiteralAttr<valueT>(builder,
-                               *parsedConstant));
-    return constOp.getResult();
-  }
+parsed_inst_t ExpressionParser::parseConstInst(
+    OpBuilder &builder, std::enable_if_t<std::is_arithmetic_v<valueT>> *) {
+  auto parsedConstant = parser.parseLiteral<valueT>();
+  if (failed(parsedConstant))
+    return failure();
+  auto constOp = builder.create<ConstOp>(
+      *currentOpLoc, buildLiteralAttr<valueT>(builder, *parsedConstant));
+  return {{constOp.getResult()}};
+}
 
-  template <>
-  inline parsed_inst_t
-  ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::constI32>(
-      OpBuilder &builder, Value operand) {
-    return parseConstInst<int32_t>(builder, operand);
-  }
+template <>
+inline parsed_inst_t
+ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::constI32>(
+    OpBuilder &builder) {
+  return parseConstInst<int32_t>(builder);
+}
 
-  template <>
-  inline parsed_inst_t
-  ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::constI64>(
-      OpBuilder &builder, Value operand) {
-    return parseConstInst<int64_t>(builder, operand);
-  }
+template <>
+inline parsed_inst_t
+ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::constI64>(
+    OpBuilder &builder) {
+  return parseConstInst<int64_t>(builder);
+}
 
-  template <>
-  inline parsed_inst_t
-  ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::constFP32>(
-      OpBuilder &builder, Value operand) {
-    return parseConstInst<float>(builder, operand);
-  }
+template <>
+inline parsed_inst_t
+ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::constFP32>(
+    OpBuilder &builder) {
+  return parseConstInst<float>(builder);
+}
 
-  template <>
-  inline parsed_inst_t
-  ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::constFP64>(
-      OpBuilder &builder, Value operand) {
-    return parseConstInst<double>(builder, operand);
-  }
+template <>
+inline parsed_inst_t
+ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::constFP64>(
+    OpBuilder &builder) {
+  return parseConstInst<double>(builder);
+}
 
-  template <typename OpType, typename valueType>
-  inline parsed_inst_t ExpressionParser::buildNumOp(
-      OpBuilder &builder, Value stack,
-      std::enable_if_t<std::is_arithmetic_v<valueType>> *) {
-    return builder
-        .create<OpType>(parser.getLocation(),
-                        buildLiteralType<valueType>(builder), stack)
-        .getResult();
-  }
+template <typename OpType, typename valueType>
+inline parsed_inst_t ExpressionParser::buildBinNumOp(
+    OpBuilder &builder, std::enable_if_t<std::is_arithmetic_v<valueType>> *) {
+  auto opType = buildLiteralType<valueType>(builder);
+  auto operands = popOperands({opType, opType});
+  if (failed(operands))
+    return failure();
+  return {{builder.create<OpType>(*currentOpLoc, *operands).getResult()}};
+}
 
 #define ImplementNumericalOpPat(OP_NAME, PREFIX, SUFFIX, TYPE)               \
     template <>                                                                \
     inline parsed_inst_t ExpressionParser::parseSpecificInstruction<           \
-        WasmEncodings::OpCode::PREFIX##SUFFIX>(OpBuilder & builder,            \
-                                               Value stack) {                  \
-      return buildNumOp<OP_NAME, TYPE>(builder, stack);                        \
+        WasmEncodings::OpCode::PREFIX##SUFFIX>(OpBuilder & builder) {          \
+      return buildBinNumOp<OP_NAME, TYPE>(builder);                            \
     }
 
 // Ops that exists for all numerical types
@@ -933,7 +985,7 @@ private:
     auto type = funcTypes[tid.id];
     auto symbol = symbols.getNewFuncSymbolName();
     auto funcOp = builder.create<FuncImportOp>(
-        loc, symbol, moduleName, importName, type);
+        loc, symbol, moduleName, importName, type, ArrayAttr{}, ArrayAttr{});
     funcOp.setVisibility(SymbolTable::Visibility::Nested);
     symbols.funcSymbols.push_back(SymbolRefAttr::get(funcOp));
     return funcOp.verify();
@@ -1216,13 +1268,16 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::GLOBAL>(ParserHead &ph, size
   auto ip = builder.saveInsertionPoint();
   auto *block = builder.createBlock(&globalOp.getInitializer());
   builder.setInsertionPointToStart(block);
-  auto initStack = builder.create<EmptyStackOp>(globalLocation);
-  auto expr = ph.parseExpression(initStack, builder, symbols);
+  auto expr = ph.parseExpression(builder, symbols);
   if (failed(expr))
     return failure();
-  if (*expr == initStack)
+  if (block->empty())
     return emitError(globalLocation, "global with empty initializer");
-  builder.create<PopOp>(globalLocation, globalType.type, *expr);
+  if (expr->size() != 1 && (*expr)[0].getType() != globalType.type)
+    return emitError(
+        globalLocation,
+        "initializer result type does not match global declaration type");
+  builder.create<ReturnOp>(globalLocation, *expr);
   builder.restoreInsertionPoint(ip);
   return success();
 }

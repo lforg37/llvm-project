@@ -1,7 +1,6 @@
-// XFAIL: *
 // RUN: mlir-translate --import-wasm %S/inputs/const.wasm | FileCheck %s
 
-/* Source code used to create this test: 
+/* Source code used to create this test:
 (module
 (func(result i32)
 i32.const 0
@@ -16,6 +15,7 @@ i32.const 0
 // about what constitutes a good test! The CHECK should be
 // minimized and named to reflect the test intent.
 
-
-
-//CHECK: FAIL
+// CHECK-LABEL:   "wasm.func"() <{functionType = () -> i32, sym_name = "func_0", sym_visibility = "nested"}> ({
+// CHECK:           %[[VAL_0:.*]] = wasm.const 0 : i32
+// CHECK:           wasm.return %[[VAL_0]] : i32
+// CHECK:         }) : () -> ()
