@@ -16,6 +16,7 @@
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Target/Wasm/WasmImporter.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -175,16 +176,28 @@ struct TypeIdxRecord {
   size_t id;
 };
 
+struct SymbolRefContainer {
+  SymbolRefAttr symbol;
+};
+
+struct GlobalSymbolRefContainer : SymbolRefContainer {
+  Type globalType;
+};
+
+struct FunctionSymbolRefContainer : SymbolRefContainer {
+  FunctionType functionType;
+};
+
 using ImportDesc = std::variant<TypeIdxRecord, TableType, LimitType, GlobalTypeRecord>;
 
 using parsed_inst_t = llvm::FailureOr<llvm::SmallVector<Value>>;
 
 
 struct WasmModuleSymbolTables {
-  llvm::SmallVector<SymbolRefAttr> funcSymbols;
-  llvm::SmallVector<SymbolRefAttr> globalSymbols;
-  llvm::SmallVector<SymbolRefAttr> memSymbols;
-  llvm::SmallVector<SymbolRefAttr> tableSymbols;
+  llvm::SmallVector<FunctionSymbolRefContainer> funcSymbols;
+  llvm::SmallVector<GlobalSymbolRefContainer> globalSymbols;
+  llvm::SmallVector<SymbolRefContainer> memSymbols;
+  llvm::SmallVector<SymbolRefContainer> tableSymbols;
 
   std::string getNewSymbolName(llvm::StringRef prefix, size_t id) const {
     return (prefix + llvm::Twine{id}).str();
@@ -711,16 +724,13 @@ ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::call>(
   if (*funcIdx >= symbols.funcSymbols.size())
     return emitError(loc, "Invalid function index: ") << *funcIdx;
   auto callee = symbols.funcSymbols[*funcIdx];
-  auto *parent = builder.getBlock()->getParentOp();
-  auto funcOp = llvm::cast<CallableOpInterface>(
-      SymbolTable::lookupNearestSymbolFrom(parent, callee));
-  llvm::ArrayRef<Type> inTypes = funcOp.getArgumentTypes();
-  llvm::ArrayRef<Type> resTypes = funcOp.getResultTypes();
+  llvm::ArrayRef<Type> inTypes = callee.functionType.getInputs();
+  llvm::ArrayRef<Type> resTypes = callee.functionType.getResults();
   parsed_inst_t inOperands = popOperands(inTypes);
   if (failed(inOperands))
     return failure();
   auto callOp = builder.create<FuncCallOp>(
-      loc, resTypes, symbols.funcSymbols[*funcIdx], *inOperands);
+      loc, resTypes, callee.symbol, *inOperands);
   return {callOp.getResults()};
 }
 
@@ -987,7 +997,7 @@ private:
     auto funcOp = builder.create<FuncImportOp>(
         loc, symbol, moduleName, importName, type, ArrayAttr{}, ArrayAttr{});
     funcOp.setVisibility(SymbolTable::Visibility::Nested);
-    symbols.funcSymbols.push_back(SymbolRefAttr::get(funcOp));
+    symbols.funcSymbols.push_back({SymbolRefAttr::get(funcOp), type});
     return funcOp.verify();
   }
 
@@ -998,7 +1008,7 @@ private:
     auto memOp = builder.create<MemImportOp>(loc, symbol, moduleName,
                                              importName, limitType);
     memOp.setVisibility(SymbolTable::Visibility::Nested);
-    symbols.memSymbols.push_back(SymbolRefAttr::get(memOp));
+    symbols.memSymbols.push_back({SymbolRefAttr::get(memOp)});
     return memOp.verify();
   }
 
@@ -1009,7 +1019,7 @@ private:
     auto tableOp = builder.create<TableImportOp>(loc, symbol, moduleName,
                                                  importName, tableType);
     tableOp.setVisibility(SymbolTable::Visibility::Nested);
-    symbols.tableSymbols.push_back(SymbolRefAttr::get(tableOp));
+    symbols.tableSymbols.push_back({SymbolRefAttr::get(tableOp)});
     return tableOp.verify();
   }
 
@@ -1022,7 +1032,7 @@ private:
         builder.create<GlobalImportOp>(loc, symbol, moduleName, importName,
                                        globalType.type, globalType.isMutable);
     giOp.setVisibility(SymbolTable::Visibility::Nested);
-    symbols.globalSymbols.push_back(SymbolRefAttr::get(giOp));
+    symbols.globalSymbols.push_back({SymbolRefAttr::get(giOp), giOp.getType()});
     return giOp.verify();
   }
 
@@ -1149,39 +1159,54 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::EXPORT>(ParserHead &ph, size
   if (failed(opcode))
     return failure();
 
-  llvm::SmallVector<SymbolRefAttr> *currentSymbolList;
+  auto idx = ph.parseLiteral<uint32_t>();
+  if (failed(idx))
+    return failure();
+
+
+  using SymbolRefDesc = std::variant<
+                        llvm::SmallVector<SymbolRefContainer>,
+                        llvm::SmallVector<GlobalSymbolRefContainer>,
+                        llvm::SmallVector<FunctionSymbolRefContainer>>;
+
+  SymbolRefDesc currentSymbolList;
   std::string symbolType = "";
   switch(*opcode) {
       case WasmEncodings::ExportType::function :
         symbolType = "function";
-        currentSymbolList = &symbols.funcSymbols;
+        currentSymbolList = symbols.funcSymbols;
         break;
       case WasmEncodings::ExportType::table :
         symbolType = "table";
-        currentSymbolList = &symbols.tableSymbols;
+        currentSymbolList = symbols.tableSymbols;
         break;
       case WasmEncodings::ExportType::memory:
         symbolType = "memory";
-        currentSymbolList = &symbols.memSymbols;
+        currentSymbolList = symbols.memSymbols;
         break;
       case WasmEncodings::ExportType::global:
         symbolType = "global";
-        currentSymbolList = &symbols.globalSymbols;
+        currentSymbolList = symbols.globalSymbols;
         break;
       default:
         return emitError(exportLoc, "Invalid value for export type: ") << std::to_integer<unsigned>(*opcode);
   }
 
-  auto idx = ph.parseLiteral<uint32_t>();
-  if (failed(opcode))
-    return failure();
-  if (*idx > currentSymbolList->size()) {
-    emitError(exportLoc, llvm::formatv("Trying to export {0} {1} which is undefined in this scope", symbolType, *idx));
-    return failure();
-  }
-  auto opSymbol = (*currentSymbolList)[*idx];
+  auto currentSymbol = std::visit(
+      [&](const auto &list) -> FailureOr<SymbolRefAttr> {
+        if (*idx > list.size()) {
+          emitError(exportLoc,
+            llvm::formatv("Trying to export {0} {1} which is undefined in this scope", symbolType, *idx));
+          return failure();
+        }
+        return list[*idx].symbol;
+      }, currentSymbolList);
+
+  if (failed(currentSymbol))
+      return failure();
+
   builder.create<ExportOp>(
-      exportLoc, *exportName, SymbolRefAttr::get(ctx,opSymbol.getLeafReference()));
+      exportLoc, *exportName, SymbolRefAttr::get(ctx,currentSymbol->getLeafReference()));
   return success();
 
 }
@@ -1197,7 +1222,7 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::TABLE>(ParserHead &ph, size_
   auto symbol = builder.getStringAttr(symbols.getNewTableSymbolName());
   auto tableOp = builder.create<TableOp>(opLocation, symbol, TypeAttr::get(*tableType));
   tableOp.setVisibility(SymbolTable::Visibility::Nested);
-  symbols.tableSymbols.push_back(SymbolRefAttr::get(tableOp));
+  symbols.tableSymbols.push_back({SymbolRefAttr::get(tableOp)});
   return success();
 }
 
@@ -1220,7 +1245,7 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::FUNCTION>(ParserHead &ph, si
   builder.setInsertionPointToEnd(block);
   builder.create<ReturnOp>(opLoc);
   builder.restoreInsertionPoint(ip);
-  symbols.funcSymbols.push_back(SymbolRefAttr::get(funcOp.getSymNameAttr()));
+  symbols.funcSymbols.push_back({SymbolRefAttr::get(funcOp.getSymNameAttr()), funcTypes[typeIdx]});
   return funcOp.verify();
 }
 
@@ -1247,7 +1272,7 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::MEMORY>(ParserHead &ph, size
   auto symbol = symbols.getNewMemorySymbolName();
   auto memOp = builder.create<MemOp>(opLocation, symbol, *memory);
   memOp.setVisibility(SymbolTable::Visibility::Nested);
-  symbols.memSymbols.push_back(SymbolRefAttr::get(memOp));
+  symbols.memSymbols.push_back({SymbolRefAttr::get(memOp)});
   return success();
 }
 
@@ -1263,7 +1288,7 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::GLOBAL>(ParserHead &ph, size
   auto symbol = builder.getStringAttr(symbols.getNewGlobalSymbolName());
   auto globalOp = builder.create<wasm::GlobalOp>(
       globalLocation, symbol, globalType.type, globalType.isMutable);
-  symbols.globalSymbols.push_back(SymbolRefAttr::get(globalOp));
+  symbols.globalSymbols.push_back({SymbolRefAttr::get(globalOp), globalOp.getType()});
   globalOp.setVisibility(SymbolTable::Visibility::Nested);
   auto ip = builder.saveInsertionPoint();
   auto *block = builder.createBlock(&globalOp.getInitializer());
@@ -1288,7 +1313,7 @@ LogicalResult WasmBinaryParser::parseSectionItem<WasmSectionType::CODE>(
   auto funcId = innerFunctionId + firstInternalFuncID;
   auto symRef = symbols.funcSymbols[funcId];
   auto funcOp =
-      llvm::dyn_cast<FuncOp>(SymbolTable::lookupSymbolIn(mOp, symRef));
+      llvm::dyn_cast<FuncOp>(SymbolTable::lookupSymbolIn(mOp, symRef.symbol));
   assert(funcOp);
   if (failed(ph.parseCodeFor(funcOp, symbols)))
     return failure();
