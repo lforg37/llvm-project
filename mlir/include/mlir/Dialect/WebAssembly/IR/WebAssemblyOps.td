@@ -201,6 +201,10 @@ def Wasm_AddOp : Wasm_BinaryNumericalOp<"add",
     "Sum two values from the stack and push the result",
     [Wasm_NumericType]>{}
 
+def Wasm_DivOp : Wasm_BinaryNumericalOp<"div",
+    "Divide floating point values from the stack and push the result",
+    [Wasm_FPType]>{}
+
 def Wasm_DivUIOp : Wasm_BinaryNumericalOp<"div_ui",
     "Divide values interpreted as unsigned int from the stack and push the result",
     [Wasm_IntegerType]>{}

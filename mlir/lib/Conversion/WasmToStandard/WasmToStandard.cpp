@@ -59,6 +59,23 @@ struct BinaryIntFPOpConversionPattern : OpConversionPattern<SourceOp> {
 using WasmAddOpConversion =
     BinaryIntFPOpConversionPattern<AddOp, arith::AddIOp, arith::AddFOp>;
 
+template <typename SourceOp, typename TargetOp>
+struct BinaryOpConversion : OpConversionPattern<SourceOp> {
+  using OpConversionPattern<SourceOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(SourceOp srcOp, typename SourceOp::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<TargetOp>(srcOp, srcOp->getResultTypes(),
+                                          adaptor.getOperands());
+    return success();
+  }
+};
+
+using WasmDivFPOpConversion = BinaryOpConversion<DivOp, arith::DivFOp>;
+using WasmDivSIOpConversion = BinaryOpConversion<DivSIOp, arith::DivSIOp>;
+using WasmDivUIOpConversion = BinaryOpConversion<DivUIOp, arith::DivUIOp>;
+
 struct WasmFuncOpConversion : OpConversionPattern<FuncOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -110,6 +127,7 @@ void mlir::populateWasmToStandardConversionPatterns(
     TypeConverter &tc, RewritePatternSet &patternSet) {
   auto *ctx = patternSet.getContext();
   patternSet
-      .add<WasmAddOpConversion, WasmFuncOpConversion, WasmReturnOpConversion>(
+      .add<WasmAddOpConversion, WasmDivFPOpConversion, WasmDivSIOpConversion,
+           WasmDivUIOpConversion, WasmFuncOpConversion, WasmReturnOpConversion>(
           tc, ctx);
 }
