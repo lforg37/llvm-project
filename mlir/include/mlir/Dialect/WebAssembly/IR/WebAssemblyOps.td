@@ -60,6 +60,7 @@ def Wasm_FuncOp : Wasm_Op<"func", [
   let builders = [
     OpBuilder<(ins "llvm::StringRef":$symbol, "FunctionType":$funcType )>
   ];
+  let hasCustomAssemblyFormat = 1;
 }
 
 def Wasm_FuncCallOp : Wasm_Op<"call"> {
