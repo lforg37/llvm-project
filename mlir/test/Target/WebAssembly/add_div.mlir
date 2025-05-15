@@ -21,15 +21,16 @@
 
 // CHECK-LABEL:   wasm.import_func "twoTimes" from "env" as @func_0 {sym_visibility = "nested", type = (i32) -> i32}
 
-// CHECK-LABEL:   "wasm.func"() <{functionType = (i32, i32) -> i32, sym_name = "func_1", sym_visibility = "nested"}> ({
-// CHECK:         ^bb0(%[[VAL_0:.*]]: i32, %[[VAL_1:.*]]: i32):
+// CHECK-LABEL:   wasm.func nested @func_1(
+// CHECK-SAME:      %[[VAL_0:.*]]: i32,
+// CHECK-SAME:      %[[VAL_1:.*]]: i32) -> i32 {
 // CHECK:           %[[VAL_2:.*]] = wasm.call @func_0(%[[VAL_0]]) : (i32) -> i32
 // CHECK:           %[[VAL_3:.*]] = wasm.call @func_0(%[[VAL_1]]) : (i32) -> i32
 // CHECK:           %[[VAL_4:.*]] = wasm.add %[[VAL_2]] %[[VAL_3]] : i32
 // CHECK:           %[[VAL_5:.*]] = wasm.const 2 : i32
 // CHECK:           %[[VAL_6:.*]] = wasm.div_si %[[VAL_4]] %[[VAL_5]] : i32
 // CHECK:           wasm.return %[[VAL_6]] : i32
-// CHECK:         }) : () -> ()
+// CHECK:         }
 // CHECK:         "wasm.memory"() <{limits = !wasm<limit"[2:]">, sym_name = "mem_0"}> {sym_visibility = "nested"} : () -> ()
 
 // CHECK-LABEL:   wasm.global @global_0 i32 mutable : {

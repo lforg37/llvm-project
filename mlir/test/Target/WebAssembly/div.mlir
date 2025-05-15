@@ -68,61 +68,61 @@
 )
 */
 
-// CHECK-LABEL:   "wasm.func"() <{functionType = () -> i32, sym_name = "func_0", sym_visibility = "nested"}> ({
+// CHECK-LABEL:   wasm.func nested @func_0() -> i32 {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 10 : i32
 // CHECK:           %[[VAL_1:.*]] = wasm.const 2 : i32
 // CHECK:           %[[VAL_2:.*]] = wasm.div_ui %[[VAL_0]] %[[VAL_1]] : i32
 // CHECK:           wasm.return %[[VAL_2]] : i32
 
-// CHECK-LABEL:   "wasm.func"() <{functionType = () -> i32, sym_name = "func_1", sym_visibility = "nested"}> ({
+// CHECK-LABEL:   wasm.func nested @func_1() -> i32 {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 10 : i32
 // CHECK:           %[[VAL_1:.*]] = wasm.const 0 : i32
 // CHECK:           %[[VAL_2:.*]] = wasm.div_ui %[[VAL_0]] %[[VAL_1]] : i32
 // CHECK:           wasm.return %[[VAL_2]] : i32
 
-// CHECK-LABEL:   "wasm.func"() <{functionType = () -> i32, sym_name = "func_2", sym_visibility = "nested"}> ({
+// CHECK-LABEL:   wasm.func nested @func_2() -> i32 {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 10 : i32
 // CHECK:           %[[VAL_1:.*]] = wasm.const 2 : i32
 // CHECK:           %[[VAL_2:.*]] = wasm.div_si %[[VAL_0]] %[[VAL_1]] : i32
 // CHECK:           wasm.return %[[VAL_2]] : i32
 
-// CHECK-LABEL:   "wasm.func"() <{functionType = () -> i32, sym_name = "func_3", sym_visibility = "nested"}> ({
+// CHECK-LABEL:   wasm.func nested @func_3() -> i32 {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 10 : i32
 // CHECK:           %[[VAL_1:.*]] = wasm.const 0 : i32
 // CHECK:           %[[VAL_2:.*]] = wasm.div_si %[[VAL_0]] %[[VAL_1]] : i32
 // CHECK:           wasm.return %[[VAL_2]] : i32
 
-// CHECK-LABEL:   "wasm.func"() <{functionType = () -> i64, sym_name = "func_4", sym_visibility = "nested"}> ({
+// CHECK-LABEL:   wasm.func nested @func_4() -> i64 {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 10 : i32
 // CHECK:           %[[VAL_1:.*]] = wasm.const 2 : i32
 // CHECK:           %[[VAL_2:.*]] = wasm.div_ui %[[VAL_0]] %[[VAL_1]] : i32
 // CHECK:           wasm.return %[[VAL_2]] : i32
 
-// CHECK-LABEL:   "wasm.func"() <{functionType = () -> i64, sym_name = "func_5", sym_visibility = "nested"}> ({
+// CHECK-LABEL:   wasm.func nested @func_5() -> i64 {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 10 : i32
 // CHECK:           %[[VAL_1:.*]] = wasm.const 0 : i32
 // CHECK:           %[[VAL_2:.*]] = wasm.div_ui %[[VAL_0]] %[[VAL_1]] : i32
 // CHECK:           wasm.return %[[VAL_2]] : i32
 
-// CHECK-LABEL:   "wasm.func"() <{functionType = () -> i64, sym_name = "func_6", sym_visibility = "nested"}> ({
+// CHECK-LABEL:   wasm.func nested @func_6() -> i64 {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 10 : i32
 // CHECK:           %[[VAL_1:.*]] = wasm.const 2 : i32
 // CHECK:           %[[VAL_2:.*]] = wasm.div_si %[[VAL_0]] %[[VAL_1]] : i32
 // CHECK:           wasm.return %[[VAL_2]] : i32
 
-// CHECK-LABEL:   "wasm.func"() <{functionType = () -> i64, sym_name = "func_7", sym_visibility = "nested"}> ({
+// CHECK-LABEL:   wasm.func nested @func_7() -> i64 {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 10 : i32
 // CHECK:           %[[VAL_1:.*]] = wasm.const 0 : i32
 // CHECK:           %[[VAL_2:.*]] = wasm.div_si %[[VAL_0]] %[[VAL_1]] : i32
 // CHECK:           wasm.return %[[VAL_2]] : i32
 
-// CHECK-LABEL:   "wasm.func"() <{functionType = () -> f32, sym_name = "func_8", sym_visibility = "nested"}> ({
+// CHECK-LABEL:   wasm.func nested @func_8() -> f32 {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 1.000000e+01 : f32
 // CHECK:           %[[VAL_1:.*]] = wasm.const 2.000000e+00 : f32
 // CHECK:           %[[VAL_2:.*]] = wasm.div %[[VAL_0]] %[[VAL_1]] : f32
 // CHECK:           wasm.return %[[VAL_2]] : f32
 
-// CHECK-LABEL:   "wasm.func"() <{functionType = () -> f64, sym_name = "func_9", sym_visibility = "nested"}> ({
+// CHECK-LABEL:   wasm.func nested @func_9() -> f64 {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 1.000000e+01 : f64
 // CHECK:           %[[VAL_1:.*]] = wasm.const 2.000000e+00 : f64
 // CHECK:           %[[VAL_2:.*]] = wasm.div %[[VAL_0]] %[[VAL_1]] : f64
