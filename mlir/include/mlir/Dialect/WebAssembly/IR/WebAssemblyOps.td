@@ -137,6 +137,13 @@ def Wasm_LocalOp : Wasm_Op<"local"> {
   let assemblyFormat = "type($result) attr-dict";
 }
 
+def Wasm_GlobalGetOp : Wasm_Op<"global_get"> {
+  let summary = "Returns the value of the global passed as argument.";
+  let arguments = (ins SymbolRefAttr: $global);
+  let results = (outs Wasm_ValType: $global_val);
+}
+
+
 def Wasm_ExportOp: Wasm_Op<"export", [Symbol]> {
   let summary = "Exports a symbol. Can be a function, a global, a memory or a table.";
   let arguments = (ins SymbolNameAttr: $sym_name,

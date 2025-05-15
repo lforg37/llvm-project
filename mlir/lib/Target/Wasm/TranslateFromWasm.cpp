@@ -28,6 +28,7 @@
 #include <cstdint>
 #include <optional>
 #include <type_traits>
+#include <utility>
 #include <variant>
 
 static_assert(CHAR_BIT == 8, "This code expects std::byte to be exactly 8 bits");
@@ -91,6 +92,7 @@ struct WasmEncodings {
 
     // Variable instructions
     static constexpr std::byte localGet{0x20};
+    static constexpr std::byte globalGet{0x23};
 
     // Numerical constants
     static constexpr std::byte constI32{0x41};
@@ -159,13 +161,39 @@ struct WasmEncodings {
   static constexpr std::byte endByte{0x0B};
 };
 
+template <std::byte... Bytes>
+struct ByteSequence{};
+
+template <std::byte... Bytes1, std::byte... Bytes2>
+constexpr ByteSequence<Bytes1..., Bytes2...>
+operator+(ByteSequence<Bytes1...>, ByteSequence<Bytes2...>) {
+  return {};
+};
+
+constexpr ByteSequence<
+    WasmEncodings::OpCode::constI32, WasmEncodings::OpCode::constI64,
+    WasmEncodings::OpCode::constFP32, WasmEncodings::OpCode::constFP64>
+    numericalConstantOps{};
+
+constexpr auto constantExprOps =
+    numericalConstantOps + ByteSequence<WasmEncodings::OpCode::globalGet>{};
+
+template <typename T, T... Values>
+constexpr ByteSequence<std::byte{Values}...>
+byteSeqFromIntSeq(std::integer_sequence<T, Values...>) {
+  return {};
+}
+
+constexpr auto allOpCodes =
+    byteSeqFromIntSeq(std::make_integer_sequence<int, 256>());
+
 template<std::byte... allowedFlags>
-bool isValueOneOf(std::byte value) {
+constexpr bool isValueOneOf(std::byte value, ByteSequence<allowedFlags...> = {}) {
   return  ((value == allowedFlags) | ... | false);
 }
 
 template<std::byte... flags>
-bool isNotIn(std::byte value) {
+constexpr bool isNotIn(std::byte value, ByteSequence<flags...> = {}) {
   return !isValueOneOf<flags...>(value);
 }
 
@@ -286,7 +314,9 @@ private:
   LogicalResult pushResults(ValueRange results);
 
 public:
-  parsed_inst_t parse(OpBuilder &builder);
+  template <typename FilterType = decltype(allOpCodes)>
+  parsed_inst_t parse(OpBuilder &builder, FilterType = {},
+                      llvm::StringRef = "");
 
 private:
   std::optional<Location> currentOpLoc;
@@ -507,6 +537,13 @@ public:
     return eParser.parse(builder);
   }
 
+  parsed_inst_t parseConstantExpression(OpBuilder &builder,
+                                WasmModuleSymbolTables const &symbols,
+                                llvm::ArrayRef<Value> locals = {}) {
+    auto eParser = ExpressionParser{*this, symbols, locals};
+    return eParser.parse(builder, constantExprOps, "constant expression");
+  }
+
   llvm::LogicalResult parseCodeFor(FuncOp func,
                                    WasmModuleSymbolTables const &symbols) {
     llvm::SmallVector<Value> locals{};
@@ -697,7 +734,9 @@ LogicalResult ExpressionParser::pushResults(ValueRange results) {
   return success();
 }
 
-parsed_inst_t ExpressionParser::parse(OpBuilder &builder) {
+template <typename FilterType>
+parsed_inst_t ExpressionParser::parse(OpBuilder &builder, FilterType filter,
+                                      llvm::StringRef filterMessage) {
   llvm::SmallVector<Value> res;
   for (;;) {
     currentOpLoc = parser.getLocation();
@@ -706,7 +745,16 @@ parsed_inst_t ExpressionParser::parse(OpBuilder &builder) {
       return failure();
     if (*opCode == WasmEncodings::endByte)
       return res;
-    auto resParsed = dispatchToInstParser(*opCode, builder);
+    parsed_inst_t resParsed;
+    if (isValueOneOf(*opCode, filter))
+      resParsed = dispatchToInstParser(*opCode, builder);
+    else {
+      emitError(*currentOpLoc,
+                llvm::formatv(
+                    "Op should be a {0} a constant expression, got opCode: {1}",
+                    filterMessage, std::to_integer<unsigned>(*opCode)));
+      return failure();
+    }
     if (failed(resParsed))
       return failure();
     std::swap(res, *resParsed);
@@ -748,6 +796,23 @@ ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::localGet>(
     return emitError(instLoc, "Invalid local index. Function has ")
            << locals.size() << " accessible locals, received index " << *id;
   return {{locals[*id]}};
+}
+
+template <>
+inline parsed_inst_t
+ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::globalGet>(
+    OpBuilder &builder) {
+  auto id = parser.parseLiteral<uint32_t>();
+  auto instLoc = *currentOpLoc;
+  if (failed(id))
+    return failure();
+  if (*id >= symbols.globalSymbols.size())
+    return emitError(instLoc, "Invalid global index. Function has ")
+           << symbols.globalSymbols.size() << " accessible globals, received index " << *id;
+  auto globalVar = symbols.globalSymbols[*id];
+  auto globalOp = builder.create<GlobalGetOp>(instLoc, globalVar.globalType, globalVar.symbol);
+
+  return {{globalOp.getResult()}};
 }
 
 template <typename T>
@@ -1297,7 +1362,7 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::GLOBAL>(ParserHead &ph, size
   auto ip = builder.saveInsertionPoint();
   auto *block = builder.createBlock(&globalOp.getInitializer());
   builder.setInsertionPointToStart(block);
-  auto expr = ph.parseExpression(builder, symbols);
+  auto expr = ph.parseConstantExpression(builder, symbols);
   if (failed(expr))
     return failure();
   if (block->empty())
