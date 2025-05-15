@@ -111,9 +111,11 @@ struct WasmEncodings {
 
     static constexpr std::byte addF32{0x92};
     static constexpr std::byte mulF32{0x94};
+    static constexpr std::byte divF32{0x95};
 
     static constexpr std::byte addF64{0xA0};
     static constexpr std::byte mulF64{0xA2};
+    static constexpr std::byte divF64{0xA3};
   };
 
   /// Byte encodings of types in wasm binaries
@@ -851,25 +853,35 @@ inline parsed_inst_t ExpressionParser::buildBinNumOp(
 
 // Ops that exists for all numerical types
 
-#define ImplementNumericalOp(OP_NAME, PREFIX)                                \
+#define ImplementNumericalOpIntFP(OP_NAME, PREFIX)                           \
     ImplementNumericalOpPat(OP_NAME, PREFIX, I32, int32_t)                   \
     ImplementNumericalOpPat(OP_NAME, PREFIX, I64, int64_t)                   \
     ImplementNumericalOpPat(OP_NAME, PREFIX, F32, float)                     \
     ImplementNumericalOpPat(OP_NAME, PREFIX, F64, double)
 
-ImplementNumericalOp(AddOp, add)
-ImplementNumericalOp(MulOp, mul)
+ImplementNumericalOpIntFP(AddOp, add)
+ImplementNumericalOpIntFP(MulOp, mul)
 
-#undef ImplementNumericalOp
+#undef ImplementNumericalOpIntFP
 
 // Ops that exists for integer types
 
-#define ImplementNumericalOp(OP_NAME, PREFIX)                                \
-    ImplementNumericalOpPat(OP_NAME, PREFIX, I32, int32_t)                   \
+#define ImplementNumericalOpInt(OP_NAME, PREFIX)                                \
+    ImplementNumericalOpPat(OP_NAME, PREFIX, I32, int32_t)                      \
     ImplementNumericalOpPat(OP_NAME, PREFIX, I64, int64_t)
 
-ImplementNumericalOp(DivUIOp, divU)
-ImplementNumericalOp(DivSIOp, divS)
+ImplementNumericalOpInt(DivUIOp, divU)
+ImplementNumericalOpInt(DivSIOp, divS)
+
+#undef ImplementNumericalOpInt
+
+#define ImplementNumericalOpFP(OP_NAME, PREFIX)                                \
+    ImplementNumericalOpPat(OP_NAME, PREFIX, F32, float)                       \
+    ImplementNumericalOpPat(OP_NAME, PREFIX, F64, double)
+
+ImplementNumericalOpFP(DivOp, div)
+
+#undef ImplementNumericalOpFP
 
 #undef ImplementNumericalOpPat
 
