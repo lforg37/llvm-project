@@ -35,6 +35,30 @@ using namespace mlir::wasm;
 
 namespace {
 
+template <typename SourceOp, typename TargetIntOp, typename TargetFPOp>
+struct BinaryIntFPOpConversionPattern : OpConversionPattern<SourceOp> {
+  using OpConversionPattern<SourceOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(SourceOp srcOp, typename SourceOp::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    Type type = srcOp.getRhs().getType();
+    if (type.isInteger()) {
+      rewriter.replaceOpWithNewOp<TargetIntOp>(srcOp, srcOp->getResultTypes(),
+                                               adaptor.getOperands());
+      return success();
+    }
+    if (!type.isFloat())
+      return failure();
+    rewriter.replaceOpWithNewOp<TargetFPOp>(srcOp, srcOp->getResultTypes(),
+                                            adaptor.getOperands());
+    return success();
+  }
+};
+
+using WasmAddOpConversion =
+    BinaryIntFPOpConversionPattern<AddOp, arith::AddIOp, arith::AddFOp>;
+
 struct WasmFuncOpConversion : OpConversionPattern<FuncOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -66,8 +90,8 @@ struct ConvertWasmToStandardPass
   void runOnOperation() override {
     ConversionTarget target{getContext()};
     target.addIllegalDialect<WasmDialect>();
-    target.addLegalDialect<BuiltinDialect, func::FuncDialect,
-                            memref::MemRefDialect>();
+    target.addLegalDialect<arith::ArithDialect, BuiltinDialect,
+                           func::FuncDialect, memref::MemRefDialect>();
     RewritePatternSet patterns(&getContext());
     TypeConverter tc{};
     tc.addConversion([](Type type)->std::optional<Type>{
@@ -85,5 +109,7 @@ struct ConvertWasmToStandardPass
 void mlir::populateWasmToStandardConversionPatterns(
     TypeConverter &tc, RewritePatternSet &patternSet) {
   auto *ctx = patternSet.getContext();
-  patternSet.add<WasmFuncOpConversion, WasmReturnOpConversion>(tc, ctx);
+  patternSet
+      .add<WasmAddOpConversion, WasmFuncOpConversion, WasmReturnOpConversion>(
+          tc, ctx);
 }
