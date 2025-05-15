@@ -67,7 +67,7 @@ def Wasm_FuncCallOp : Wasm_Op<"call"> {
   let arguments = (ins SymbolRefAttr: $callee,
                        Variadic<Wasm_ValType>:  $operands);
   let results = (outs Variadic<Wasm_ValType>: $results);
-  let assemblyFormat = "$callee `(` $operands `)` attr-dict `:` functional-type($operands, $results)";
+  let assemblyFormat = "$callee (`(`$operands^`)`)? attr-dict `:` functional-type($operands, $results)";
   let description = [{
     Emits a call to callee. Takes a stack as input, which is used as the set of function arguments for callee.
   }];
