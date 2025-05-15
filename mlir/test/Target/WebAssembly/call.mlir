@@ -8,12 +8,13 @@ i32.const 42)
 call $forty_two))
 */
 
-// CHECK-LABEL:   "wasm.func"() <{functionType = () -> i32, sym_name = "func_0", sym_visibility = "nested"}> ({
+// CHECK-LABEL:   wasm.func nested @func_0() -> i32 {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 42 : i32
 // CHECK:           wasm.return %[[VAL_0]] : i32
-// CHECK:         }) : () -> ()
+// CHECK:         }
 
-// CHECK-LABEL:   "wasm.func"() <{functionType = () -> i32, sym_name = "func_1", sym_visibility = "nested"}> ({
+// CHECK-LABEL:   wasm.func nested @func_1() -> i32 {
 // CHECK:           %[[VAL_0:.*]] = wasm.call @func_0 : () -> i32
 // CHECK:           wasm.return %[[VAL_0]] : i32
-// CHECK:         }) : () -> ()
+// CHECK:         }
+// CHECK:         wasm.export @func_1 as @forty_two
