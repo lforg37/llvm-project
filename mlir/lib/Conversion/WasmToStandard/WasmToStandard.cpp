@@ -76,6 +76,19 @@ using WasmDivFPOpConversion = BinaryOpConversion<DivOp, arith::DivFOp>;
 using WasmDivSIOpConversion = BinaryOpConversion<DivSIOp, arith::DivSIOp>;
 using WasmDivUIOpConversion = BinaryOpConversion<DivUIOp, arith::DivUIOp>;
 
+struct WasmCallOpConversion : OpConversionPattern<FuncCallOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(FuncCallOp funcCallOp, FuncCallOp::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<func::CallOp>(
+        funcCallOp, funcCallOp.getCallee(), funcCallOp.getResults().getTypes(),
+        funcCallOp.getOperands());
+    return success();
+  }
+};
+
 struct WasmFuncOpConversion : OpConversionPattern<FuncOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -127,7 +140,7 @@ void mlir::populateWasmToStandardConversionPatterns(
     TypeConverter &tc, RewritePatternSet &patternSet) {
   auto *ctx = patternSet.getContext();
   patternSet
-      .add<WasmAddOpConversion, WasmDivFPOpConversion, WasmDivSIOpConversion,
-           WasmDivUIOpConversion, WasmFuncOpConversion, WasmReturnOpConversion>(
-          tc, ctx);
+      .add<WasmAddOpConversion, WasmCallOpConversion, WasmDivFPOpConversion,
+           WasmDivSIOpConversion, WasmDivUIOpConversion, WasmFuncOpConversion,
+           WasmReturnOpConversion>(tc, ctx);
 }
