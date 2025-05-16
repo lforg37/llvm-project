@@ -89,6 +89,18 @@ struct WasmCallOpConversion : OpConversionPattern<FuncCallOp> {
   }
 };
 
+struct WasmConstOpConversion : OpConversionPattern<ConstOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(ConstOp constOp, ConstOp::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<arith::ConstantOp>(
+        constOp, constOp.getValue());
+    return success();
+  }
+};
+
 struct WasmFuncOpConversion : OpConversionPattern<FuncOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -140,7 +152,7 @@ void mlir::populateWasmToStandardConversionPatterns(
     TypeConverter &tc, RewritePatternSet &patternSet) {
   auto *ctx = patternSet.getContext();
   patternSet
-      .add<WasmAddOpConversion, WasmCallOpConversion, WasmDivFPOpConversion,
-           WasmDivSIOpConversion, WasmDivUIOpConversion, WasmFuncOpConversion,
-           WasmReturnOpConversion>(tc, ctx);
+      .add<WasmAddOpConversion, WasmCallOpConversion, WasmConstOpConversion,
+           WasmDivFPOpConversion, WasmDivSIOpConversion, WasmDivUIOpConversion,
+           WasmFuncOpConversion, WasmReturnOpConversion>(tc, ctx);
 }
