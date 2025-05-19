@@ -21,8 +21,6 @@
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/Transforms/Passes.h"
 
-
-#include <algorithm>
 #include <optional>
 
 namespace mlir {
@@ -101,6 +99,20 @@ struct WasmConstOpConversion : OpConversionPattern<ConstOp> {
   }
 };
 
+struct WasmFuncImportOpConversion : OpConversionPattern<FuncImportOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(FuncImportOp funcImportOp, FuncImportOp::Adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto nFunc = rewriter.replaceOpWithNewOp<func::FuncOp>(
+        funcImportOp, funcImportOp.getSymName(),
+        funcImportOp.getType());
+    nFunc.setVisibility(SymbolTable::Visibility::Private);
+    return success();
+  }
+};
+
 struct WasmFuncOpConversion : OpConversionPattern<FuncOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -136,14 +148,27 @@ struct ConvertWasmToStandardPass
                            func::FuncDialect, memref::MemRefDialect>();
     RewritePatternSet patterns(&getContext());
     TypeConverter tc{};
-    tc.addConversion([](Type type)->std::optional<Type>{
-      return type;
-    });
+    tc.addConversion([](Type type) -> std::optional<Type> { return type; });
 
     populateWasmToStandardConversionPatterns(tc, patterns);
 
-    if (failed(applyFullConversion(getOperation(), target, std::move(patterns))))
+    llvm::DenseMap<StringAttr, StringAttr> idxSymToImportSym{};
+    auto *topOp = getOperation();
+    topOp->walk([&idxSymToImportSym, this](WasmImportOpInterface importOp) {
+      auto const qualifiedImportName = importOp.getQualifiedImportName();
+      auto qualNameAttr = StringAttr::get(&getContext(), qualifiedImportName);
+      idxSymToImportSym.insert(
+          std::make_pair(importOp.getSymbolName(), qualNameAttr));
+    });
+
+    if (failed(applyFullConversion(topOp, target, std::move(patterns))))
       return signalPassFailure();
+
+    auto symTable = SymbolTable{topOp};
+    for (auto &[oldName, newName] : idxSymToImportSym) {
+      if (failed(symTable.rename(oldName, newName)))
+        return signalPassFailure();
+    }
   }
 };
 } // namespace
@@ -154,5 +179,6 @@ void mlir::populateWasmToStandardConversionPatterns(
   patternSet
       .add<WasmAddOpConversion, WasmCallOpConversion, WasmConstOpConversion,
            WasmDivFPOpConversion, WasmDivSIOpConversion, WasmDivUIOpConversion,
-           WasmFuncOpConversion, WasmReturnOpConversion>(tc, ctx);
+           WasmFuncImportOpConversion, WasmFuncOpConversion,
+           WasmReturnOpConversion>(tc, ctx);
 }
