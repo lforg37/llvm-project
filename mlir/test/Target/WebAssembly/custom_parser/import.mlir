@@ -1,15 +1,13 @@
-// RUN: mlir-translate --import-wasm %S/inputs/import.wasm | FileCheck %s
+// RUN: mlir-opt %s | FileCheck %s
 
-/* Source code used to create this test:
-(module
-(import "my_module" "foo" (func $foo (param i32)))
-(import "my_module" "bar" (func $bar (param i32)))
-(import "my_module" "table" (table $round 2 funcref))
-(import "my_module" "mem" (memory $mymem 2))
-(import "my_module" "glob" (global $globglob i32))
-(import "my_other_module" "glob_mut" (global $glob_mut (mut i32)))
-)
-*/
+module {
+  wasm.import_func "foo" from "my_module" as @func_0 {sym_visibility = "nested", type = (i32) -> ()}
+  wasm.import_func "bar" from "my_module" as @func_1 {sym_visibility = "nested", type = (i32) -> ()}
+  wasm.import_table "table" from "my_module" as @table_0 {sym_visibility = "nested", type = !wasm<tabletype !wasm.funcref [2:]>}
+  wasm.import_mem "mem" from "my_module" as @mem_0 {limits = !wasm<limit[2:]>, sym_visibility = "nested"}
+  wasm.import_global "glob" from "my_module" as @global_0 {sym_visibility = "nested", type = i32}
+  wasm.import_global "glob_mut" from "my_other_module" as @global_1 {isMutable, sym_visibility = "nested", type = i32}
+}
 
 // CHECK-LABEL:   wasm.import_func "foo" from "my_module" as @func_0 {sym_visibility = "nested", type = (i32) -> ()}
 // CHECK:         wasm.import_func "bar" from "my_module" as @func_1 {sym_visibility = "nested", type = (i32) -> ()}
