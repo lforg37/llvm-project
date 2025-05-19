@@ -12,6 +12,7 @@
 
 include "mlir/Dialect/WebAssembly/IR/WebAssemblyBase.td"
 include "mlir/Dialect/WebAssembly/IR/WebAssemblyTypes.td"
+include "mlir/Dialect/WebAssembly/IR/WebAssemblyInterfaces.td"
 
 include "mlir/Interfaces/FunctionInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
@@ -76,7 +77,8 @@ def Wasm_FuncCallOp : Wasm_Op<"call"> {
 
 def Wasm_FuncImportOp : Wasm_Op<"import_func", [
     Symbol,
-    CallableOpInterface]> {
+    CallableOpInterface,
+    WasmImportOpInterface]> {
   let summary = "Importing a function variable";
   let arguments = (ins SymbolNameAttr: $sym_name,
                      StrAttr: $moduleName,
@@ -117,7 +119,9 @@ def Wasm_GlobalOp : Wasm_Op<"global", [
   let hasCustomAssemblyFormat = 1;
 }
 
-def Wasm_GlobalImportOp : Wasm_Op<"import_global", [Symbol]> {
+def Wasm_GlobalImportOp : Wasm_Op<"import_global", [
+    Symbol,
+    WasmImportOpInterface]> {
   let summary = "Importing a global variable";
   let arguments = (ins SymbolNameAttr: $sym_name,
                      StrAttr: $moduleName,
@@ -158,7 +162,7 @@ def Wasm_MemOp : Wasm_Op<"memory", [Symbol]> {
                      DefaultValuedAttr<StrAttr, "\"nested\"">:$sym_visibility);
 }
 
-def Wasm_MemImportOp : Wasm_Op<"import_mem", [Symbol]> {
+def Wasm_MemImportOp : Wasm_Op<"import_mem", [Symbol, WasmImportOpInterface]> {
   let summary = "Importing a memory";
   let arguments = (ins SymbolNameAttr: $sym_name,
                      StrAttr: $moduleName,
@@ -178,7 +182,7 @@ def Wasm_TableOp : Wasm_Op<"table", [Symbol]> {
                      DefaultValuedAttr<StrAttr, "\"nested\"">:$sym_visibility);
 }
 
-def Wasm_TableImportOp : Wasm_Op<"import_table", [Symbol]> {
+def Wasm_TableImportOp : Wasm_Op<"import_table", [Symbol, WasmImportOpInterface]> {
   let summary = "Importing a table";
   let arguments = (ins SymbolNameAttr: $sym_name,
                      StrAttr: $moduleName,

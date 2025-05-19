@@ -1,6 +1,7 @@
 add_mlir_dialect_library(MLIRWasmDialect
   WebAssemblyOps.cpp
   WebAssemblyDialect.cpp
+  WebAssemblyInterfaces.cpp
   WebAssemblyTypes.cpp
 
   ADDITIONAL_HEADER_DIRS
@@ -8,6 +9,7 @@ add_mlir_dialect_library(MLIRWasmDialect
 
   DEPENDS
   MLIRWebAssemblyOpsIncGen
+  MLIRWebAssemblyInterfacesIncGen
 
   LINK_LIBS PUBLIC
   MLIRCastInterfaces
