@@ -13,4 +13,8 @@
 #include "mlir/Dialect/WebAssembly/IR/WebAssemblyInterfaces.h"
 #include "mlir/Dialect/WebAssembly/IR/WebAssembly.h"
 
+namespace mlir {
+namespace wasm {
 #include "mlir/Dialect/WebAssembly/IR/WebAssemblyInterfaces.cpp.inc"
+} // namespace wasm
+} // namespace mlir
