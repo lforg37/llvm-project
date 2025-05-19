@@ -31,7 +31,7 @@
 // CHECK:           %[[VAL_6:.*]] = wasm.div_si %[[VAL_4]] %[[VAL_5]] : i32
 // CHECK:           wasm.return %[[VAL_6]] : i32
 // CHECK:         }
-// CHECK:         "wasm.memory"() <{limits = !wasm<limit"[2:]">, sym_name = "mem_0", sym_visibility = "nested"}> : () -> ()
+// CHECK:         "wasm.memory"() <{limits = !wasm<limit[2:]>, sym_name = "mem_0", sym_visibility = "nested"}> : () -> ()
 
 // CHECK-LABEL:   wasm.global @global_0 i32 mutable : {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 66560 : i32

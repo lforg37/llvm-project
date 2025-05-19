@@ -31,11 +31,9 @@ Type wasm::LimitType::parse(::mlir::AsmParser &parser) {
 }
 
 void wasm::LimitType::print(AsmPrinter & printer) const {
-  std::stringstream ss;
-  ss <<  '[' << getMin() << ':';
+  printer <<  '[' << getMin() << ':';
   auto maxLim = getMax();
   if (maxLim)
-    ss << *maxLim;
-  ss << ']';
-  printer.printString(ss.str());
+    printer << *maxLim;
+  printer << ']';
 }
