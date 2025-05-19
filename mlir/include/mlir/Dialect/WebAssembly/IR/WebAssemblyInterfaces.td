@@ -26,23 +26,13 @@ def WasmImportOpInterface : OpInterface<"WasmImportOpInterface"> {
       /*desc=*/        "Returns the module name for the import",
       /*returnType=*/  "::llvm::StringRef",
       /*methodName=*/  "getModuleName",
-      /*args=*/        (ins),
-      /*methodBody=*/  [{}],
-      /*defaultImpl=*/ [{
-        auto op = mlir::cast<ConcreteOp>(this->getOperation());
-        return op.getModuleName();
-      }]
+      /*args=*/        (ins)
       >,
     InterfaceMethod<
       /*desc=*/        "Returns the import name for the import",
       /*returnType=*/  "::llvm::StringRef",
       /*methodName=*/  "getImportName",
-      /*args=*/        (ins),
-      /*methodBody=*/  [{}],
-      /*defaultImpl=*/ [{
-        auto op = mlir::cast<ConcreteOp>(this->getOperation());
-        return op.getImportName();
-      }]
+      /*args=*/        (ins)
       >,
     InterfaceMethod<
       /*desc=*/        "Returns the wasm index based symbol of the op",
@@ -52,7 +42,7 @@ def WasmImportOpInterface : OpInterface<"WasmImportOpInterface"> {
       /*methodBody=*/  [{}],
       /*defaultImpl=*/ [{
         auto op = mlir::cast<ConcreteOp>(this->getOperation());
-        return op.getSymbolName();
+        return op.getSymNameAttr();
       }]
       >,
     InterfaceMethod<
