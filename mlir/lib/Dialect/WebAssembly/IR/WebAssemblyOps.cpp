@@ -90,9 +90,85 @@ void FuncOp::print(OpAsmPrinter &p) {
 
 // Custom builders
 
-void mlir::wasm::FuncOp::build(::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState, llvm::StringRef symbol, FunctionType funcType) {
+void mlir::wasm::FuncImportOp::build(::mlir::OpBuilder &odsBuilder,
+                                     ::mlir::OperationState &odsState,
+                                     StringRef symbol, StringRef moduleName,
+                                     StringRef importName, FunctionType type) {
+  odsState.addAttribute("sym_name", odsBuilder.getStringAttr(symbol));
+  odsState.addAttribute("sym_visibility", odsBuilder.getStringAttr("nested"));
+  odsState.addAttribute("moduleName", odsBuilder.getStringAttr(moduleName));
+  odsState.addAttribute("importName", odsBuilder.getStringAttr(importName));
+  odsState.addAttribute("type", TypeAttr::get(type));
+}
+
+void mlir::wasm::GlobalImportOp::build(::mlir::OpBuilder &odsBuilder,
+                                       ::mlir::OperationState &odsState,
+                                       StringRef symbol, StringRef moduleName,
+                                       StringRef importName, Type type,
+                                       bool isMutable) {
+  odsState.addAttribute("sym_name", odsBuilder.getStringAttr(symbol));
+  odsState.addAttribute("sym_visibility", odsBuilder.getStringAttr("nested"));
+  odsState.addAttribute("moduleName", odsBuilder.getStringAttr(moduleName));
+  odsState.addAttribute("importName", odsBuilder.getStringAttr(importName));
+  odsState.addAttribute("type", TypeAttr::get(type));
+  if (isMutable)
+    odsState.addAttribute("isMutable", odsBuilder.getUnitAttr());
+}
+
+void mlir::wasm::FuncOp::build(::mlir::OpBuilder &odsBuilder,
+                               ::mlir::OperationState &odsState,
+                               llvm::StringRef symbol, FunctionType funcType) {
   odsState.addAttribute("sym_name", odsBuilder.getStringAttr(symbol));
   odsState.addAttribute("sym_visibility", odsBuilder.getStringAttr("nested"));
   odsState.addAttribute("functionType", TypeAttr::get(funcType));
   odsState.addRegion();
+}
+
+void GlobalOp::build(::mlir::OpBuilder &odsBuilder,
+                     ::mlir::OperationState &odsState, llvm::StringRef symbol,
+                     Type type, bool isMutable) {
+  odsState.addAttribute("sym_name", odsBuilder.getStringAttr(symbol));
+  odsState.addAttribute("sym_visibility", odsBuilder.getStringAttr("nested"));
+  odsState.addAttribute("type", TypeAttr::get(type));
+  if (isMutable)
+    odsState.addAttribute("isMutable", odsBuilder.getUnitAttr());
+  odsState.addRegion();
+}
+
+void MemOp::build(::mlir::OpBuilder &odsBuilder,
+                  ::mlir::OperationState &odsState, llvm::StringRef symbol,
+                  LimitType limit) {
+  odsState.addAttribute("sym_name", odsBuilder.getStringAttr(symbol));
+  odsState.addAttribute("sym_visibility", odsBuilder.getStringAttr("nested"));
+  odsState.addAttribute("limits", TypeAttr::get(limit));
+}
+
+void MemImportOp::build(mlir::OpBuilder &odsBuilder,
+                        ::mlir::OperationState &odsState,
+                        llvm::StringRef symbol, llvm::StringRef moduleName,
+                        llvm::StringRef importName, LimitType limits) {
+  odsState.addAttribute("sym_name", odsBuilder.getStringAttr(symbol));
+  odsState.addAttribute("sym_visibility", odsBuilder.getStringAttr("nested"));
+  odsState.addAttribute("moduleName", odsBuilder.getStringAttr(moduleName));
+  odsState.addAttribute("importName", odsBuilder.getStringAttr(importName));
+  odsState.addAttribute("limits", TypeAttr::get(limits));
+}
+
+void TableOp::build(::mlir::OpBuilder &odsBuilder,
+                    ::mlir::OperationState &odsState, llvm::StringRef symbol,
+                    TableType type) {
+  odsState.addAttribute("sym_name", odsBuilder.getStringAttr(symbol));
+  odsState.addAttribute("sym_visibility", odsBuilder.getStringAttr("nested"));
+  odsState.addAttribute("type", TypeAttr::get(type));
+}
+
+void TableImportOp::build(mlir::OpBuilder &odsBuilder,
+                          ::mlir::OperationState &odsState,
+                          llvm::StringRef symbol, llvm::StringRef moduleName,
+                          llvm::StringRef importName, TableType type) {
+  odsState.addAttribute("sym_name", odsBuilder.getStringAttr(symbol));
+  odsState.addAttribute("sym_visibility", odsBuilder.getStringAttr("nested"));
+  odsState.addAttribute("moduleName", odsBuilder.getStringAttr(moduleName));
+  odsState.addAttribute("importName", odsBuilder.getStringAttr(importName));
+  odsState.addAttribute("type", TypeAttr::get(type));
 }

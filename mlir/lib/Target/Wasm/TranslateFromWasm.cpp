@@ -1155,7 +1155,7 @@ private:
     auto type = funcTypes[tid.id];
     auto symbol = symbols.getNewFuncSymbolName();
     auto funcOp = builder.create<FuncImportOp>(
-        loc, symbol, moduleName, importName, type, ArrayAttr{}, ArrayAttr{});
+        loc, symbol, moduleName, importName, type);
     symbols.funcSymbols.push_back({SymbolRefAttr::get(funcOp), type});
     return funcOp.verify();
   }
@@ -1376,7 +1376,7 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::TABLE>(ParserHead &ph, size_
     return failure();
   llvm::dbgs() << "  Parsed table description: " << *tableType << '\n';
   auto symbol = builder.getStringAttr(symbols.getNewTableSymbolName());
-  auto tableOp = builder.create<TableOp>(opLocation, symbol, TypeAttr::get(*tableType));
+  auto tableOp = builder.create<TableOp>(opLocation, symbol.strref(), *tableType);
   symbols.tableSymbols.push_back({SymbolRefAttr::get(tableOp)});
   return success();
 }
