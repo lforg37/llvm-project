@@ -4,4 +4,4 @@
 (module (memory 1))
 */
 
-// CHECK-LABEL:   "wasm.memory"() <{limits = !wasm<limit"[1:]">, sym_name = "mem_0", sym_visibility = "nested"}> : () -> ()
+// CHECK-LABEL:   "wasm.memory"() <{limits = !wasm<limit[1:]>, sym_name = "mem_0", sym_visibility = "nested"}> : () -> ()
