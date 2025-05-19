@@ -86,7 +86,7 @@ def Wasm_FuncImportOp : Wasm_Op<"import_func", [
                      Wasm_FuncTypeAttr: $type,
                      OptionalAttr<DictArrayAttr>:$arg_attrs,
                      OptionalAttr<DictArrayAttr>:$res_attrs,
-                     DefaultValuedAttr<StrAttr, "\"nested\"">:$sym_visibility);
+                     OptionalAttr<StrAttr>:$sym_visibility);
   let extraClassDeclaration = [{
     bool isDeclaration() const { return true; }
 
@@ -100,6 +100,12 @@ def Wasm_FuncImportOp : Wasm_Op<"import_func", [
       return getType().getResults();
     }
   }];
+  let builders = [
+    OpBuilder<(ins "StringRef":$symbol,
+                   "StringRef":$moduleName,
+                   "StringRef":$importName,
+                   "FunctionType": $type)>
+  ];
   let assemblyFormat = "$importName `from` $moduleName `as` $sym_name attr-dict";
 }
 
@@ -110,12 +116,18 @@ def Wasm_GlobalOp : Wasm_Op<"global", [
   let arguments = (ins SymbolNameAttr: $sym_name,
                      Wasm_ValTypeAttr: $type,
                      UnitAttr: $isMutable,
-                     DefaultValuedAttr<StrAttr, "\"nested\"">:$sym_visibility);
+                     OptionalAttr<StrAttr>:$sym_visibility);
   let description = [{
     WebAssembly global variable.
     Body contains the initialization instructions for the variable value.
   }];
   let regions = (region AnyRegion: $initializer);
+
+  let builders = [
+    OpBuilder<(ins "StringRef":$symbol,
+                   "Type": $type,
+                   "bool": $isMutable)>
+  ];
   let hasCustomAssemblyFormat = 1;
 }
 
@@ -128,10 +140,17 @@ def Wasm_GlobalImportOp : Wasm_Op<"import_global", [
                      StrAttr: $importName,
                      Wasm_ValTypeAttr: $type,
                      UnitAttr: $isMutable,
-                     DefaultValuedAttr<StrAttr, "\"nested\"">:$sym_visibility);
+                     OptionalAttr<StrAttr>:$sym_visibility);
   let extraClassDeclaration = [{
     bool isDeclaration() const { return true; }
   }];
+  let builders = [
+    OpBuilder<(ins "StringRef":$symbol,
+                   "StringRef":$moduleName,
+                   "StringRef":$importName,
+                   "Type": $type,
+                   "bool": $isMutable)>
+  ];
   let assemblyFormat = "$importName `from` $moduleName `as` $sym_name attr-dict";
 }
 
@@ -159,7 +178,12 @@ def Wasm_MemOp : Wasm_Op<"memory", [Symbol]> {
   let summary= "WebAssembly memory definition";
   let arguments = (ins SymbolNameAttr: $sym_name,
                      Wasm_LimitTypeAttr: $limits,
-                     DefaultValuedAttr<StrAttr, "\"nested\"">:$sym_visibility);
+                     OptionalAttr<StrAttr>:$sym_visibility);
+  let builders = [
+    OpBuilder<(ins
+    "llvm::StringRef":$symbol,
+    "LimitType":$limit)>
+  ];
 }
 
 def Wasm_MemImportOp : Wasm_Op<"import_mem", [Symbol, WasmImportOpInterface]> {
@@ -168,10 +192,15 @@ def Wasm_MemImportOp : Wasm_Op<"import_mem", [Symbol, WasmImportOpInterface]> {
                      StrAttr: $moduleName,
                      StrAttr: $importName,
                      Wasm_LimitTypeAttr: $limits,
-                     DefaultValuedAttr<StrAttr, "\"nested\"">:$sym_visibility);
+                     OptionalAttr<StrAttr>:$sym_visibility);
   let extraClassDeclaration = [{
-    bool isDeclaration() const { return true; }
-  }];
+     bool isDeclaration() const { return true; }
+   }];
+  let builders = [OpBuilder<(ins
+    "llvm::StringRef":$symbol,
+    "llvm::StringRef":$moduleName,
+    "llvm::StringRef":$importName,
+    "wasm::LimitType":$limits)>];
   let assemblyFormat = "$importName `from` $moduleName `as` $sym_name attr-dict";
 }
 
@@ -179,7 +208,10 @@ def Wasm_TableOp : Wasm_Op<"table", [Symbol]> {
   let summary= "WebAssembly table value";
   let arguments = (ins SymbolNameAttr: $sym_name,
                      Wasm_TableTypeAttr: $type,
-                     DefaultValuedAttr<StrAttr, "\"nested\"">:$sym_visibility);
+                     OptionalAttr<StrAttr>:$sym_visibility);
+  let builders = [OpBuilder<(ins
+      "llvm::StringRef":$symbol,
+      "wasm::TableType":$type)>];
 }
 
 def Wasm_TableImportOp : Wasm_Op<"import_table", [Symbol, WasmImportOpInterface]> {
@@ -188,11 +220,16 @@ def Wasm_TableImportOp : Wasm_Op<"import_table", [Symbol, WasmImportOpInterface]
                      StrAttr: $moduleName,
                      StrAttr: $importName,
                      Wasm_TableTypeAttr: $type,
-                     DefaultValuedAttr<StrAttr, "\"nested\"">:$sym_visibility);
+                     OptionalAttr<StrAttr>:$sym_visibility);
   let extraClassDeclaration = [{
     bool isDeclaration() const { return true; }
   }];
   let assemblyFormat = "$importName `from` $moduleName `as` $sym_name attr-dict";
+  let builders = [OpBuilder<(ins
+      "llvm::StringRef":$symbol,
+      "llvm::StringRef":$moduleName,
+      "llvm::StringRef":$importName,
+      "wasm::TableType":$type)>];
 }
 
 def Wasm_ReturnOp : Wasm_Op<"return", [Terminator]> {

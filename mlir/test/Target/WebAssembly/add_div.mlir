@@ -19,7 +19,7 @@
   (export "add" (func $add)))
 */
 
-// CHECK-LABEL:   wasm.import_func "twoTimes" from "env" as @func_0 {type = (i32) -> i32}
+// CHECK-LABEL:   wasm.import_func "twoTimes" from "env" as @func_0 {sym_visibility = "nested", type = (i32) -> i32}
 
 // CHECK-LABEL:   wasm.func nested @func_1(
 // CHECK-SAME:      %[[VAL_0:.*]]: i32,
