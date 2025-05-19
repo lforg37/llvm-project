@@ -27,6 +27,13 @@
 #define GET_TYPEDEF_CLASSES
 #include "mlir/Dialect/WebAssembly/IR/WebAssemblyOpsTypes.h.inc"
 
+
+//===----------------------------------------------------------------------===//
+// WebAssembly Interfaces
+//===----------------------------------------------------------------------===//
+
+#include "mlir/Dialect/WebAssembly/IR/WebAssemblyInterfaces.h"
+
 //===----------------------------------------------------------------------===//
 // WebAssembly Dialect Operations
 //===----------------------------------------------------------------------===//
