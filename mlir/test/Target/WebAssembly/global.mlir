@@ -31,8 +31,8 @@ call $log ;; log the result
 )
 */
 
-// CHECK-LABEL:   wasm.import_func "log" from "console" as @func_0 {type = (i32) -> ()}
-// CHECK:         wasm.import_global "from_js" from "env" as @global_0 {type = i32}
+// CHECK-LABEL:   wasm.import_func "log" from "console" as @func_0 {sym_visibility = "nested", type = (i32) -> ()}
+// CHECK:         wasm.import_global "from_js" from "env" as @global_0 {sym_visibility = "nested", type = i32}
 
 // CHECK-LABEL:   wasm.func nested @func_1() {
 // CHECK:           %[[VAL_0:.*]] = "wasm.global_get"() <{global = @global_0}> : () -> i32
@@ -44,19 +44,15 @@ call $log ;; log the result
 // CHECK:           %[[VAL_6:.*]] = wasm.add %[[VAL_2]] %[[VAL_5]] : i32
 // CHECK:           wasm.call @func_0(%[[VAL_6]]) : (i32) -> ()
 // CHECK:           wasm.return
-// CHECK:         }
 
 // CHECK-LABEL:   wasm.global @global_1 i32 : {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 10 : i32
 // CHECK:           wasm.return %[[VAL_0]] : i32
-// CHECK:         }
 
 // CHECK-LABEL:   wasm.global @global_2 i32 mutable : {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 10 : i32
 // CHECK:           wasm.return %[[VAL_0]] : i32
-// CHECK:         }
 
 // CHECK-LABEL:   wasm.global @global_3 i32 mutable : {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 10 : i32
 // CHECK:           wasm.return %[[VAL_0]] : i32
-// CHECK:         }
