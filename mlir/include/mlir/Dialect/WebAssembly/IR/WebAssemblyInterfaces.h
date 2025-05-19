@@ -14,8 +14,12 @@
 #define MLIR_DIALECT_WEBASSEMBLY_IR_WEBASSEMBLYINTERFACES_H_
 
 #include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/Operation.h"
+#include "mlir/IR/OpDefinition.h"
 
+namespace mlir {
+namespace wasm {
 #include "mlir/Dialect/WebAssembly/IR/WebAssemblyInterfaces.h.inc"
+} // namespace wasm
+} // namespace mlir
 
 #endif // MLIR_DIALECT_WEBASSEMBLY_IR_WEBASSEMBLYINTERFACES_H_
