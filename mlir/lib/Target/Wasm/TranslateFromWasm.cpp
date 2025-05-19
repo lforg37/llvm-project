@@ -258,37 +258,37 @@ struct WasmModuleSymbolTables {
 
 class ParserHead;
 
-/// Wrapper around SmallVector to only allow access as push and pop on the stack.
-/// Makes sure that there are no "free accesses" on the stack to preserve its state.
+/// Wrapper around SmallVector to only allow access as push and pop on the
+/// stack. Makes sure that there are no "free accesses" on the stack to preserve
+/// its state.
 class ValueStack {
 
-  public:
-    bool empty() const {
-      return values.empty();
-    }
+public:
+  bool empty() const { return values.empty(); }
 
-    size_t size() const {
-      return values.size();
-    }
+  size_t size() const { return values.size(); }
 
-    /// Pops values from the stack because they are being used in an operation.
-    /// @param operandTypes The list of expected types of the operation, used
-    ///   to know how many values to pop and check if the types match the
-    ///   expectation.
-    /// @param opLoc Location of the caller, used to report accurately the location
-    ///   if an error occurs.
-    /// @return Failure or the vector of popped values.
-    llvm::FailureOr<llvm::SmallVector<Value>> popOperands(TypeRange operandTypes, Location *opLoc);
+  /// Pops values from the stack because they are being used in an operation.
+  /// @param operandTypes The list of expected types of the operation, used
+  ///   to know how many values to pop and check if the types match the
+  ///   expectation.
+  /// @param opLoc Location of the caller, used to report accurately the
+  /// location
+  ///   if an error occurs.
+  /// @return Failure or the vector of popped values.
+  llvm::FailureOr<llvm::SmallVector<Value>> popOperands(TypeRange operandTypes,
+                                                        Location *opLoc);
 
-    /// Push the results of an operation to the stack so they can be used in a
-    /// following operation.
-    /// @param results The list of results of the operation
-    /// @param opLoc Location of the caller, used to report accurately the location
-    ///   if an error occurs.
-    LogicalResult pushResults(ValueRange results, Location *opLoc);
+  /// Push the results of an operation to the stack so they can be used in a
+  /// following operation.
+  /// @param results The list of results of the operation
+  /// @param opLoc Location of the caller, used to report accurately the
+  /// location
+  ///   if an error occurs.
+  LogicalResult pushResults(ValueRange results, Location *opLoc);
 
-  private:
-    llvm::SmallVector<Value> values;
+private:
+  llvm::SmallVector<Value> values;
 };
 
 class ExpressionParser {
@@ -349,7 +349,8 @@ public:
   parsed_inst_t parse(OpBuilder &builder, FilterType = {},
                       llvm::StringRef = "");
 
-  llvm::FailureOr<llvm::SmallVector<Value>> popOperands(TypeRange operandTypes) {
+  llvm::FailureOr<llvm::SmallVector<Value>>
+  popOperands(TypeRange operandTypes) {
     return valueStack.popOperands(operandTypes, &currentOpLoc.value());
   }
 
@@ -867,7 +868,9 @@ llvm::FailureOr<Value> ExpressionParser::parseSetOrTee() {
     return emitError(*currentOpLoc, "Invalid local index. Function has ")
            << locals.size() << " accessible locals, received index " << *id;
   if (valueStack.empty())
-    return emitError(*currentOpLoc, "Invalid stack access, trying to access a value on an empty stack.");
+    return emitError(
+        *currentOpLoc,
+        "Invalid stack access, trying to access a value on an empty stack.");
 
   parsed_inst_t poppedOp = popOperands(locals[*id].getType());
   if (failed(poppedOp))
@@ -881,7 +884,7 @@ inline parsed_inst_t
 ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::localSet>(
     OpBuilder &) {
   if (failed(parseSetOrTee()))
-      return failure();
+    return failure();
   return {{}};
 }
 
@@ -891,7 +894,7 @@ ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::localTee>(
     OpBuilder &) {
   llvm::FailureOr<Value> res = parseSetOrTee();
   if (failed(res))
-      return failure();
+    return failure();
   return {{*res}};
 }
 
