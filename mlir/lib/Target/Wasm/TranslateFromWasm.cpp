@@ -32,6 +32,8 @@
 #include <utility>
 #include <variant>
 
+#define DEBUG_TYPE "wasm-translate"
+
 static_assert(CHAR_BIT == 8, "This code expects std::byte to be exactly 8 bits");
 
 using namespace mlir;
@@ -1158,8 +1160,8 @@ private:
     if (failed(nElemsParsed))
       return failure();
     auto nElems = *nElemsParsed;
-    llvm::dbgs() << "Starting to parse " << nElems << " items for section "
-                 << secName << ".\n";
+    LLVM_DEBUG(llvm::dbgs() << "Starting to parse " << nElems
+                            << " items for section " << secName << ".\n");
     for (size_t i = 0; i < nElems; ++i) {
       if (failed(parseSectionItem<section>(ph, i)))
         return failure();
@@ -1401,7 +1403,8 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::TABLE>(ParserHead &ph, size_
   auto tableType = ph.parseTableType(ctx);
   if (failed(tableType))
     return failure();
-  llvm::dbgs() << "  Parsed table description: " << *tableType << '\n';
+  LLVM_DEBUG(llvm::dbgs() << "  Parsed table description: " << *tableType
+                          << '\n');
   auto symbol = builder.getStringAttr(symbols.getNewTableSymbolName());
   auto tableOp = builder.create<TableOp>(opLocation, symbol.strref(), *tableType);
   symbols.tableSymbols.push_back({SymbolRefAttr::get(tableOp)});
@@ -1436,7 +1439,7 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::TYPE>(ParserHead &ph, size_t
   auto funcType = ph.parseFunctionType(ctx);
   if (failed(funcType))
     return failure();
-  llvm::dbgs() << "Parsed function type " << *funcType << '\n';
+  LLVM_DEBUG(llvm::dbgs() << "Parsed function type " << *funcType << '\n');
   funcTypes.push_back(*funcType);
   return success();
 }
@@ -1449,7 +1452,7 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::MEMORY>(ParserHead &ph, size
   if (failed(memory))
     return failure();
 
-  llvm::dbgs() << "  Registering memory " << *memory << '\n';
+  LLVM_DEBUG(llvm::dbgs() << "  Registering memory " << *memory << '\n');
   auto symbol = symbols.getNewMemorySymbolName();
   auto memOp = builder.create<MemOp>(opLocation, symbol, *memory);
   symbols.memSymbols.push_back({SymbolRefAttr::get(memOp)});
