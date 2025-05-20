@@ -17,6 +17,7 @@
 #include "mlir/Target/Wasm/WasmImporter.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -290,6 +291,10 @@ public:
   /// location
   ///   if an error occurs.
   LogicalResult pushResults(ValueRange results, Location *opLoc);
+
+  /// A simple dump function for debugging.
+  /// Writes output to llvm::dbgs().
+  LLVM_DUMP_METHOD void dump() const;
 
 private:
   llvm::SmallVector<Value> values;
@@ -748,6 +753,23 @@ template <std::byte opCode>
 inline parsed_inst_t ExpressionParser::parseSpecificInstruction(OpBuilder &) {
   return emitError(*currentOpLoc, "Unknown instruction opcode: ")
          << static_cast<int>(opCode);
+}
+
+void ValueStack::dump() const {
+  llvm::dbgs() << "================= Wasm ValueStack =======================\n";
+  llvm::dbgs() << "size: " << size() << "\n";
+  llvm::dbgs() << "<Top>"
+               << "\n";
+  // Stack is pushed to via push_back. Therefore the top of the stack is the
+  // end of the vector. Iterate in reverse so that the first thing we print
+  // is the top of the stack.
+  for (const auto &val : llvm::reverse(values)) {
+    llvm::dbgs() << "  ";
+    val.dump();
+  }
+  llvm::dbgs() << "<Bottom>"
+               << "\n";
+  llvm::dbgs() << "=========================================================\n";
 }
 
 parsed_inst_t ValueStack::popOperands(TypeRange operandTypes, Location* opLoc) {
