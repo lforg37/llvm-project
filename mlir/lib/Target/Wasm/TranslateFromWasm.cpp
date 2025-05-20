@@ -106,23 +106,27 @@ struct WasmEncodings {
     static constexpr std::byte constFP64{0x44};
 
     // Numerical ops
+    static constexpr std::byte eqI32{0x46};
     static constexpr std::byte addI32{0x6A};
     static constexpr std::byte subI32{0x6B};
     static constexpr std::byte mulI32{0x6C};
     static constexpr std::byte divSI32{0x6d};
     static constexpr std::byte divUI32{0x6e};
 
+    static constexpr std::byte eqI64{0x51};
     static constexpr std::byte addI64{0x7C};
     static constexpr std::byte subI64{0x7D};
     static constexpr std::byte mulI64{0x7E};
     static constexpr std::byte divSI64{0x7F};
     static constexpr std::byte divUI64{0x80};
 
+    static constexpr std::byte eqF32{0x5B};
     static constexpr std::byte addF32{0x92};
     static constexpr std::byte subF32{0x93};
     static constexpr std::byte mulF32{0x94};
     static constexpr std::byte divF32{0x95};
 
+    static constexpr std::byte eqF64{0x61};
     static constexpr std::byte addF64{0xA0};
     static constexpr std::byte subF64{0xA1};
     static constexpr std::byte mulF64{0xA2};
@@ -1038,6 +1042,7 @@ inline parsed_inst_t ExpressionParser::buildBinNumOp(
 ImplementNumericalOpIntFP(AddOp, add)
 ImplementNumericalOpIntFP(MulOp, mul)
 ImplementNumericalOpIntFP(SubOp, sub)
+ImplementNumericalOpIntFP(EqOp, eq)
 
 #undef ImplementNumericalOpIntFP
 
