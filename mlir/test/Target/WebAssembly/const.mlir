@@ -22,8 +22,8 @@
 // CHECK:         }
 
 // CHECK-LABEL:   wasm.func nested @func_1() -> i64 {
-// CHECK:           %[[VAL_0:.*]] = wasm.const 3 : i32
-// CHECK:           wasm.return %[[VAL_0]] : i32
+// CHECK:           %[[VAL_0:.*]] = wasm.const 3 : i64
+// CHECK:           wasm.return %[[VAL_0]] : i64
 // CHECK:         }
 
 // CHECK-LABEL:   wasm.func nested @func_2() -> f32 {
