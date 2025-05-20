@@ -19,7 +19,10 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/WebAssembly/IR/WebAssembly.h"
 #include "mlir/IR/BuiltinDialect.h"
+#include "mlir/IR/ValueRange.h"
+#include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/Passes.h"
+#include "llvm/Support/LogicalResult.h"
 
 #include <optional>
 
@@ -128,6 +131,102 @@ struct WasmFuncOpConversion : OpConversionPattern<FuncOp> {
   }
 };
 
+struct WasmGlobalImportOpConverter : OpConversionPattern<GlobalImportOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(GlobalImportOp gIOp, GlobalImportOp::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto memrefGOp = rewriter.replaceOpWithNewOp<memref::GlobalOp>(
+        gIOp, gIOp.getSymNameAttr(), gIOp.getSymVisibilityAttr(),
+        TypeAttr::get(MemRefType::get({1}, gIOp.getType())), Attribute{},
+        /*constant*/ UnitAttr{},
+        /*alignment*/ IntegerAttr{});
+    memrefGOp.setConstant(!gIOp.getIsMutable());
+    return success();
+  }
+};
+
+template<typename CRTP, typename OriginOpType>
+struct GlobalOpConverter : OpConversionPattern<GlobalOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(GlobalOp globalOp, GlobalOp::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    ReturnOp rop;
+    globalOp->walk([&rop](ReturnOp op) { rop = op; });
+
+    if (rop->getNumOperands() != 1)
+      return rewriter.notifyMatchFailure(
+          globalOp, "GlobalOp initializer should return one value exactly");
+
+    auto initializerOp = dyn_cast<OriginOpType>(rop->getOperand(0).getDefiningOp());
+
+    if (!initializerOp)
+      return rewriter.notifyMatchFailure(
+          globalOp, "Invalid initializer op type for this pattern");
+
+    return static_cast<CRTP const *>(this)->handleInitializer(globalOp, rewriter,
+                                                       initializerOp);
+  }
+};
+
+struct WasmGlobalWithConstInitConversion
+    : GlobalOpConverter<WasmGlobalWithConstInitConversion, ConstOp> {
+  using GlobalOpConverter::GlobalOpConverter;
+  LogicalResult handleInitializer(GlobalOp globalOp,
+                                  ConversionPatternRewriter &rewriter,
+                                  ConstOp constInit) const {
+    auto initializer =
+        DenseElementsAttr::get(RankedTensorType::get({1}, globalOp.getType()),
+                               ArrayRef<Attribute>{constInit.getValueAttr()});
+    auto globalReplacement = rewriter.replaceOpWithNewOp<memref::GlobalOp>(
+        globalOp, globalOp.getSymNameAttr(), globalOp.getSymVisibilityAttr(),
+        TypeAttr::get(MemRefType::get({1}, globalOp.getType())), initializer,
+        /*constant*/ UnitAttr{},
+        /*alignment*/ IntegerAttr{});
+    globalReplacement.setConstant(!globalOp.getIsMutable());
+    return success();
+  }
+};
+
+struct WasmGlobalWithGetGlobalInitConversion
+    : GlobalOpConverter<WasmGlobalWithGetGlobalInitConversion, GlobalGetOp> {
+  using GlobalOpConverter::GlobalOpConverter;
+  LogicalResult handleInitializer(GlobalOp globalOp,
+                                  ConversionPatternRewriter &rewriter,
+                                  GlobalGetOp constInit) const {
+    auto globalReplacement = rewriter.replaceOpWithNewOp<memref::GlobalOp>(
+        globalOp, globalOp.getSymNameAttr(), globalOp.getSymVisibilityAttr(),
+        TypeAttr::get(MemRefType::get({1}, globalOp.getType())),
+        rewriter.getUnitAttr(),
+        /*constant*/ UnitAttr{},
+        /*alignment*/ IntegerAttr{});
+    globalReplacement.setConstant(!globalOp.getIsMutable());
+    auto loc = globalOp.getLoc();
+    auto initializerName = (globalOp.getSymName() + "::initializer").str();
+    auto globalInitializer = rewriter.create<func::FuncOp>(
+        loc, initializerName, FunctionType::get(getContext(), {}, {}));
+    globalInitializer->setAttr(rewriter.getStringAttr("initializer"),
+                               rewriter.getUnitAttr());
+    auto *initializerBody = globalInitializer.addEntryBlock();
+    auto sip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPointToStart(initializerBody);
+    auto srcGlobalPtr = rewriter.create<memref::GetGlobalOp>(
+        loc, MemRefType::get({1}, constInit.getType()), constInit.getGlobal());
+    auto destGlobalPtr = rewriter.create<memref::GetGlobalOp>(
+        loc, globalReplacement.getType(),
+        globalReplacement.getSymName());
+    auto idx = rewriter.create<arith::ConstantIndexOp>(loc, 0).getResult();
+    auto loadSrc =
+        rewriter.create<memref::LoadOp>(loc, srcGlobalPtr, ValueRange{idx});
+    rewriter.create<memref::StoreOp>(
+        loc, loadSrc.getResult(), destGlobalPtr.getResult(), ValueRange{idx});
+    rewriter.create<func::ReturnOp>(loc);
+    rewriter.restoreInsertionPoint(sip);
+    return success();
+  }
+};
+
 struct WasmMemoryOpConversion : OpConversionPattern<MemOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -139,7 +238,7 @@ struct WasmMemoryOpConversion : OpConversionPattern<MemOp> {
     auto bufferPtrType = MemRefType::get({1}, bufferType);
     auto memPtr = rewriter.replaceOpWithNewOp<memref::GlobalOp>(
         memOp, memOp.getSymNameAttr(), memOp.getSymVisibilityAttr(),
-        TypeAttr::get(bufferPtrType), /*initialValue*/ Attribute{},
+        TypeAttr::get(bufferPtrType), /*initialValue*/ rewriter.getUnitAttr(),
         /*constant*/ UnitAttr{}, /*alignment*/ IntegerAttr{});
     auto initializerName = (memPtr.getSymName() + "::initializer").str();
     auto memInitializer = rewriter.create<func::FuncOp>(
@@ -217,5 +316,7 @@ void mlir::populateWasmToStandardConversionPatterns(
       .add<WasmAddOpConversion, WasmCallOpConversion, WasmConstOpConversion,
            WasmDivFPOpConversion, WasmDivSIOpConversion, WasmDivUIOpConversion,
            WasmFuncImportOpConversion, WasmFuncOpConversion,
-           WasmMemoryOpConversion, WasmReturnOpConversion>(tc, ctx);
+           WasmGlobalImportOpConverter, WasmGlobalWithConstInitConversion,
+           WasmGlobalWithGetGlobalInitConversion, WasmMemoryOpConversion,
+           WasmReturnOpConversion>(tc, ctx);
 }
