@@ -276,4 +276,17 @@ def Wasm_SubOp : Wasm_BinaryNumericalOp<"sub",
     "Subtract two values from the stack and push the result",
     [Wasm_NumericType]>{}
 
+class Wasm_BinaryComparisonOp<string mnemonic, string summaryStr,
+                       list<Type> validOpTypes> :
+  Wasm_Op<mnemonic, [AllTypesMatch<["lhs", "rhs"]>]> {
+  let summary = summaryStr;
+  let arguments = (ins AnyTypeOf<validOpTypes>:$lhs, AnyTypeOf<validOpTypes>:$rhs);
+  let results = (outs I32:$result);
+  let assemblyFormat = "$lhs $rhs `:` type($lhs) `->` type($result) attr-dict";
+}
+
+def Wasm_EqOp : Wasm_BinaryComparisonOp<"eq",
+    "Check if two values from the stack are equal and push the result",
+    [Wasm_NumericType]>{}
+
 #endif // WEBASSEMBLY_OPS
