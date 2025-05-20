@@ -908,7 +908,7 @@ inline Type buildLiteralType<int32_t>(OpBuilder &builder) {
 
 template <>
 inline Type buildLiteralType<int64_t>(OpBuilder &builder) {
-  return builder.getI32Type();
+  return builder.getI64Type();
 }
 
 template <>
