@@ -272,4 +272,8 @@ def Wasm_MulOp : Wasm_BinaryNumericalOp<"mul",
     "Multiply two values from the stack and push the result",
     [Wasm_NumericType]>{}
 
+def Wasm_SubOp : Wasm_BinaryNumericalOp<"sub",
+    "Subtract two values from the stack and push the result",
+    [Wasm_NumericType]>{}
+
 #endif // WEBASSEMBLY_OPS
