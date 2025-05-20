@@ -175,7 +175,7 @@ template <std::byte... Bytes1, std::byte... Bytes2>
 constexpr ByteSequence<Bytes1..., Bytes2...>
 operator+(ByteSequence<Bytes1...>, ByteSequence<Bytes2...>) {
   return {};
-};
+}
 
 constexpr ByteSequence<
     WasmEncodings::OpCode::constI32, WasmEncodings::OpCode::constI64,
