@@ -57,4 +57,77 @@ def WasmImportOpInterface : OpInterface<"WasmImportOpInterface"> {
   ];
 }
 
+def WasmConstantExpressionInitializerInterface :
+          OpInterface<"WasmConstantExpressionInitializerInterface"> {
+  let description = [{
+    Operation that must be constant initialized. This
+    interface adds a verifier that checks that all ops
+    within the initializer region are "constant expressions"
+    as defined by the WASM standard.
+  }];
+
+  let verify = [{ return detail::verifyConstantExpressionInterface($_op); }];
+}
+
+def WasmConstantExprCheckInterface :
+          OpInterface<"WasmConstantExprCheckInterface"> {
+  let description = [{
+    Base interface for operations that can be used in a Wasm Constant Expression.
+    It shouldn't be used directly, use one of the derived instead.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/        [{
+        Returns success if the current operation is valid in a constant expression context.
+      }],
+      /*returnType=*/  "::mlir::LogicalResult",
+      /*methodName=*/  "isValidInConstantExpr",
+      /*args=*/        (ins),
+      /*methodBody=*/ [{
+        return $_op.verifyConstantExprValidity();
+      }]
+      >
+  ];
+}
+
+def WasmContextuallyConstantExprInterface :
+          OpInterface<"WasmContextuallyConstantExprInterface", [WasmConstantExprCheckInterface]> {
+  let description = [{
+    Base interface for operations that can be used in a Wasm Constant Expression
+    depending on the context.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/        [{
+        Returns success if the current operation is valid in a constant expression context.
+      }],
+      /*returnType=*/  "::mlir::LogicalResult",
+      /*methodName=*/  "verifyConstantExprValidity",
+      /*args=*/        (ins)
+      >
+  ];
+}
+
+def WasmConstantExprInterface :
+          OpInterface<"WasmConstantExprInterface", [WasmConstantExprCheckInterface]> {
+  let description = [{
+    Base interface for operations that can always be used in a Wasm Constant Expression.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/        [{
+        Returns success if the current operation is valid in a constant expression context.
+      }],
+      /*returnType=*/  "::mlir::LogicalResult",
+      /*methodName=*/  "verifyConstantExprValidity",
+      /*args=*/        (ins),
+      /*methodBody=*/ [{}],
+      /*DefaultImplementation=*/ [{ return success(); }]
+      >
+  ];
+}
+
 #endif // WEBASSEMBLY_INTERFACES

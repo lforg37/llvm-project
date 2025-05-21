@@ -18,6 +18,10 @@
 
 namespace mlir {
 namespace wasm {
+namespace detail {
+    LogicalResult verifyConstantExpressionInterface(Operation *op);
+} // namespace detail
+
 #include "mlir/Dialect/WebAssembly/IR/WebAssemblyInterfaces.h.inc"
 } // namespace wasm
 } // namespace mlir
