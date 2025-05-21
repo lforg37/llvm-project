@@ -164,6 +164,7 @@ def Wasm_GlobalGetOp : Wasm_Op<"global_get"> {
   let summary = "Returns the value of the global passed as argument.";
   let arguments = (ins SymbolRefAttr: $global);
   let results = (outs Wasm_ValType: $global_val);
+  let assemblyFormat = "$global attr-dict `:` type($global_val)";
 }
 
 def Wasm_ExportOp: Wasm_Op<"export", [Symbol]> {
