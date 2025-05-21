@@ -12,9 +12,29 @@
 
 #include "mlir/Dialect/WebAssembly/IR/WebAssemblyInterfaces.h"
 #include "mlir/Dialect/WebAssembly/IR/WebAssembly.h"
+#include "mlir/IR/Operation.h"
+#include "mlir/IR/Visitors.h"
 
 namespace mlir {
 namespace wasm {
 #include "mlir/Dialect/WebAssembly/IR/WebAssemblyInterfaces.cpp.inc"
+
+LogicalResult
+detail::verifyConstantExpressionInterface(Operation *op) {
+  Region &initializerRegion = op->getRegion(0);
+  auto resultState = initializerRegion.walk(
+      [&](Operation *currentOp) -> WalkResult {
+        if (isa<ReturnOp>(currentOp))
+            return WalkResult::advance();
+        if (auto interfaceOp = dyn_cast<WasmConstantExprCheckInterface>(currentOp)){
+            if(interfaceOp.isValidInConstantExpr().succeeded())
+                return WalkResult::advance();
+        }
+        op->emitError("Expected a constant initializer for this operator, got ") << currentOp;
+        return WalkResult::interrupt();
+      });
+  return success(!resultState.wasInterrupted());
+}
+
 } // namespace wasm
 } // namespace mlir

@@ -8,6 +8,7 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/FunctionImplementation.h"
+#include "llvm/Support/Casting.h"
 
 //===----------------------------------------------------------------------===//
 // TableGen'd op method definitions
@@ -23,8 +24,21 @@
 using namespace mlir;
 using namespace mlir::wasm;
 
-void ReturnOp::build(::mlir::OpBuilder &odsBuilder,
-                     ::mlir::OperationState &odsState) {}
+// Custom interface overrides
+
+LogicalResult GlobalGetOp::verifyConstantExprValidity() {
+  StringRef referencedSymbol = getGlobal();
+  Operation *symTableOp = getOperation()->getParentWithTrait<OpTrait::SymbolTable>();
+  Operation *definitionOp = SymbolTable::lookupSymbolIn(symTableOp, referencedSymbol);
+  if (!definitionOp)
+    return failure();
+  auto definitionImport = llvm::dyn_cast<GlobalImportOp>(definitionOp);
+  if (!definitionImport || definitionImport.getIsMutable()) {
+      return emitError("global.get op is considered constant if it's referring "
+                       "to a import.global symbol marked non-mutable.");
+  }
+  return success();
+}
 
 // Custom formats
 
@@ -78,6 +92,9 @@ void FuncOp::print(OpAsmPrinter &p) {
 }
 
 // Custom builders
+
+void ReturnOp::build(::mlir::OpBuilder &odsBuilder,
+                     ::mlir::OperationState &odsState) {}
 
 void mlir::wasm::FuncImportOp::build(::mlir::OpBuilder &odsBuilder,
                                      ::mlir::OperationState &odsState,

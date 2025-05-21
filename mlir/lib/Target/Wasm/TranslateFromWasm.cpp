@@ -228,14 +228,6 @@ operator+(ByteSequence<Bytes1...>, ByteSequence<Bytes2...>) {
   return {};
 }
 
-constexpr ByteSequence<
-    WasmEncodings::OpCode::constI32, WasmEncodings::OpCode::constI64,
-    WasmEncodings::OpCode::constFP32, WasmEncodings::OpCode::constFP64>
-    numericalConstantOps{};
-
-constexpr auto constantExprOps =
-    numericalConstantOps + ByteSequence<WasmEncodings::OpCode::globalGet>{};
-
 template <typename T, T... Values>
 constexpr ByteSequence<std::byte{Values}...>
 byteSeqFromIntSeq(std::integer_sequence<T, Values...>) {
@@ -407,9 +399,7 @@ private:
   }
 
 public:
-  template <typename FilterType = decltype(allOpCodes)>
-  parsed_inst_t parse(OpBuilder &builder, FilterType = {},
-                      llvm::StringRef = "");
+  parsed_inst_t parse(OpBuilder &builder);
 
   llvm::FailureOr<llvm::SmallVector<Value>>
   popOperands(TypeRange operandTypes) {
@@ -649,13 +639,6 @@ public:
     return eParser.parse(builder);
   }
 
-  parsed_inst_t parseConstantExpression(OpBuilder &builder,
-                                WasmModuleSymbolTables const &symbols,
-                                llvm::ArrayRef<Value> locals = {}) {
-    auto eParser = ExpressionParser{*this, symbols, locals};
-    return eParser.parse(builder, constantExprOps, "constant expression");
-  }
-
   llvm::LogicalResult parseCodeFor(FuncOp func,
                                    WasmModuleSymbolTables const &symbols) {
     llvm::SmallVector<Value> locals{};
@@ -878,9 +861,7 @@ LogicalResult ValueStack::pushResults(ValueRange results, Location *opLoc) {
   return success();
 }
 
-template <typename FilterType>
-parsed_inst_t ExpressionParser::parse(OpBuilder &builder, FilterType filter,
-                                      llvm::StringRef filterMessage) {
+parsed_inst_t ExpressionParser::parse(OpBuilder &builder) {
   llvm::SmallVector<Value> res;
   for (;;) {
     currentOpLoc = parser.getLocation();
@@ -890,15 +871,7 @@ parsed_inst_t ExpressionParser::parse(OpBuilder &builder, FilterType filter,
     if (*opCode == WasmEncodings::endByte)
       return res;
     parsed_inst_t resParsed;
-    if (isValueOneOf(*opCode, filter))
-      resParsed = dispatchToInstParser(*opCode, builder);
-    else {
-      emitError(*currentOpLoc,
-                llvm::formatv(
-                    "Op should be a {0} a constant expression, got opCode: {1}",
-                    filterMessage, std::to_integer<unsigned>(*opCode)));
-      return failure();
-    }
+    resParsed = dispatchToInstParser(*opCode, builder);
     if (failed(resParsed))
       return failure();
     std::swap(res, *resParsed);
@@ -1579,7 +1552,7 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::GLOBAL>(ParserHead &ph,
   auto ip = builder.saveInsertionPoint();
   auto *block = builder.createBlock(&globalOp.getInitializer());
   builder.setInsertionPointToStart(block);
-  auto expr = ph.parseConstantExpression(builder, symbols);
+  auto expr = ph.parseExpression(builder, symbols);
   if (failed(expr))
     return failure();
   if (block->empty())
