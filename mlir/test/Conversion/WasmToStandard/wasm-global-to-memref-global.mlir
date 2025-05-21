@@ -25,7 +25,7 @@ wasm.global @global_user0 i32 mutable : {
   wasm.return %0 : i32
 }
 
-wasm.import_global "extern_global_var" from "module" as @global_top_define {sym_visibility = "nested", type = i32}
+wasm.import_global "extern_global_var" from "module" as @global_top_define nested : i32
 
 // CHECK-LABEL:   memref.global @global_i32 : memref<1xi32> = dense<66560>
 // CHECK:         memref.global @global_i64 : memref<1xi64> = dense<37017>

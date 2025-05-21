@@ -1,7 +1,7 @@
 // RUN: mlir-opt %s | FileCheck %s
 
 module {
-  wasm.import_global "glob" from "my_module" as @global_0 {sym_visibility = "nested", type = i32}
+  wasm.import_global "from_js" from "env" as @global_0 nested : i32
 
   wasm.global @global_1 i32 : {
     %0 = wasm.const 10 : i32
@@ -21,7 +21,7 @@ module {
   }
 }
 
-// CHECK-LABEL:   wasm.import_global "glob" from "my_module" as @global_0 {sym_visibility = "nested", type = i32}
+// CHECK-LABEL:   wasm.import_global "from_js" from "env" as @global_0 nested : i32
 
 // CHECK-LABEL:   wasm.global @global_1 i32 : {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 10 : i32
