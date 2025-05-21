@@ -298,9 +298,11 @@ public:
   ///   if an error occurs.
   LogicalResult pushResults(ValueRange results, Location *opLoc);
 
+  #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   /// A simple dump function for debugging.
   /// Writes output to llvm::dbgs().
   LLVM_DUMP_METHOD void dump() const;
+  #endif
 
 private:
   llvm::SmallVector<Value> values;
@@ -766,6 +768,7 @@ inline parsed_inst_t ExpressionParser::parseSpecificInstruction(OpBuilder &) {
          << static_cast<int>(opCode);
 }
 
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 void ValueStack::dump() const {
   llvm::dbgs() << "================= Wasm ValueStack =======================\n";
   llvm::dbgs() << "size: " << size() << "\n";
@@ -782,6 +785,7 @@ void ValueStack::dump() const {
                << "\n";
   llvm::dbgs() << "=========================================================\n";
 }
+#endif
 
 parsed_inst_t ValueStack::popOperands(TypeRange operandTypes, Location* opLoc) {
   if (operandTypes.size() > values.size())
