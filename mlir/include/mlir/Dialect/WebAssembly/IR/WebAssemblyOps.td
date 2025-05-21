@@ -23,7 +23,7 @@ class Wasm_Op<string mnemonic, list<Trait> traits = []> :
     Op<Wasm_Dialect, mnemonic, traits>;
 
 def Wasm_ConstOp : Wasm_Op<"const", [
-    AllTypesMatch<["value", "result"]>]> {
+    AllTypesMatch<["value", "result"]>, WasmConstantExprInterface]> {
   let summary = "Push a constant to the stack";
   let arguments = (ins TypedAttrInterface: $value);
   let results = (outs Wasm_NumericType: $result);
@@ -111,7 +111,7 @@ def Wasm_FuncImportOp : Wasm_Op<"import_func", [
 
 def Wasm_GlobalOp : Wasm_Op<"global", [
   AffineScope, AutomaticAllocationScope,
-  IsolatedFromAbove, Symbol]> {
+  IsolatedFromAbove, Symbol, WasmConstantExpressionInitializerInterface]> {
   let summary= "WebAssembly global value";
   let arguments = (ins SymbolNameAttr: $sym_name,
                      Wasm_ValTypeAttr: $type,
@@ -154,17 +154,17 @@ def Wasm_GlobalImportOp : Wasm_Op<"import_global", [
   let assemblyFormat = "$importName `from` $moduleName `as` $sym_name attr-dict";
 }
 
-def Wasm_LocalOp : Wasm_Op<"local"> {
-  let summary = "Declaration of local variable";
-  let results = (outs Wasm_ValType: $result);
-  let assemblyFormat = "type($result) attr-dict";
-}
-
-def Wasm_GlobalGetOp : Wasm_Op<"global_get"> {
+def Wasm_GlobalGetOp : Wasm_Op<"global_get", [DeclareOpInterfaceMethods<WasmContextuallyConstantExprInterface>]> {
   let summary = "Returns the value of the global passed as argument.";
   let arguments = (ins FlatSymbolRefAttr: $global);
   let results = (outs Wasm_ValType: $global_val);
   let assemblyFormat = "$global attr-dict `:` type($global_val)";
+}
+
+def Wasm_LocalOp : Wasm_Op<"local"> {
+  let summary = "Declaration of local variable";
+  let results = (outs Wasm_ValType: $result);
+  let assemblyFormat = "type($result) attr-dict";
 }
 
 def Wasm_MemOp : Wasm_Op<"memory", [Symbol]> {
