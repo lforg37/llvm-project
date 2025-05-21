@@ -18,6 +18,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -33,6 +34,12 @@
 #include <variant>
 
 #define DEBUG_TYPE "wasm-translate"
+
+// Statistics.
+STATISTIC(numFunctionSectionItems, "Parsed functions");
+STATISTIC(numGlobalSectionItems, "Parsed globals");
+STATISTIC(numMemorySectionItems, "Parsed memories");
+STATISTIC(numTableSectionItems, "Parsed tables");
 
 static_assert(CHAR_BIT == 8, "This code expects std::byte to be exactly 8 bits");
 
@@ -1320,6 +1327,12 @@ public:
     auto parsingExports = parseSection<WasmSectionType::EXPORT>();
     if (failed(parsingExports))
       return;
+
+    // Copy over sizes of containers into statistics.
+    numFunctionSectionItems = symbols.funcSymbols.size();
+    numGlobalSectionItems = symbols.globalSymbols.size();
+    numMemorySectionItems = symbols.memSymbols.size();
+    numTableSectionItems = symbols.tableSymbols.size();
   }
 
   ModuleOp getModule() { return mOp; }
