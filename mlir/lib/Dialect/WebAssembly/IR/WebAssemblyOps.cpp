@@ -23,17 +23,6 @@
 using namespace mlir;
 using namespace mlir::wasm;
 
-LogicalResult ExportOp::verify() {
-  auto symbolName = getLocalName();
-  auto* symTableOp = getOperation()->getParentWithTrait<OpTrait::SymbolTable>();
-  auto* originalOp = SymbolTable::lookupSymbolIn(symTableOp, symbolName);
-  if (!originalOp || originalOp->getDialect() != this->getOperation()->getDialect()) {
-    emitError("Undefined symbol in export operation.");
-    return failure();
-  }
-  return success();
-}
-
 void ReturnOp::build(::mlir::OpBuilder &odsBuilder,
                      ::mlir::OperationState &odsState) {}
 
