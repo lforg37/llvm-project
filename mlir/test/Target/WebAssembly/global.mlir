@@ -29,7 +29,7 @@ i32.add
 )
 */
 
-// CHECK-LABEL:   wasm.import_global "from_js" from "env" as @global_0 {sym_visibility = "nested", type = i32}
+// CHECK-LABEL:   wasm.import_global "from_js" from "env" as @global_0 nested : i32
 
 // CHECK-LABEL:   wasm.func nested @func_0() -> i32 {
 // CHECK:           %[[VAL_0:.*]] = wasm.global_get @global_0 : i32
@@ -40,34 +40,27 @@ i32.add
 // CHECK:           %[[VAL_5:.*]] = wasm.add %[[VAL_3]] %[[VAL_4]] : i32
 // CHECK:           %[[VAL_6:.*]] = wasm.add %[[VAL_2]] %[[VAL_5]] : i32
 // CHECK:           wasm.return %[[VAL_6]] : i32
-// CHECK:         }
 
-// CHECK-LABEL:   wasm.global @global_1 i32 : {
+// CHECK-LABEL:   wasm.global @global_1 i32 nested : {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 10 : i32
 // CHECK:           wasm.return %[[VAL_0]] : i32
-// CHECK:         }
 
-// CHECK-LABEL:   wasm.global @global_2 i32 mutable : {
+// CHECK-LABEL:   wasm.global @global_2 i32 mutable nested : {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 10 : i32
 // CHECK:           wasm.return %[[VAL_0]] : i32
-// CHECK:         }
 
-// CHECK-LABEL:   wasm.global @global_3 i32 mutable : {
+// CHECK-LABEL:   wasm.global @global_3 i32 mutable nested : {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 10 : i32
 // CHECK:           wasm.return %[[VAL_0]] : i32
-// CHECK:         }
 
-// CHECK-LABEL:   wasm.global @global_4 i64 : {
+// CHECK-LABEL:   wasm.global @global_4 i64 nested : {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 11 : i64
 // CHECK:           wasm.return %[[VAL_0]] : i64
-// CHECK:         }
 
-// CHECK-LABEL:   wasm.global @global_5 f32 : {
+// CHECK-LABEL:   wasm.global @global_5 f32 nested : {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 1.200000e+01 : f32
 // CHECK:           wasm.return %[[VAL_0]] : f32
-// CHECK:         }
 
-// CHECK-LABEL:   wasm.global @global_6 f64 : {
+// CHECK-LABEL:   wasm.global @global_6 f64 nested : {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 1.300000e+01 : f64
 // CHECK:           wasm.return %[[VAL_0]] : f64
-// CHECK:         }

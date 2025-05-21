@@ -66,30 +66,38 @@ ParseResult GlobalOp::parse(OpAsmParser &parser, OperationState &result) {
   StringAttr symbolName;
   Type globalType;
   auto *ctx = parser.getContext();
-  auto res = parser.parseSymbolName(symbolName, SymbolTable::getSymbolAttrName(), result.attributes);
+  auto res = parser.parseSymbolName(
+      symbolName, SymbolTable::getSymbolAttrName(), result.attributes);
 
   res = parser.parseType(globalType);
   result.addAttribute(getTypeAttrName(result.name), TypeAttr::get(globalType));
   std::string mutableString;
   res = parser.parseOptionalKeywordOrString(&mutableString);
   if (res.succeeded() && mutableString == "mutable")
-      result.addAttribute("isMutable", UnitAttr::get(ctx));
+    result.addAttribute("isMutable", UnitAttr::get(ctx));
+  std::string visibilityString;
+  res = parser.parseOptionalKeywordOrString(&visibilityString);
+  if (res.succeeded())
+    result.addAttribute("sym_visibility",
+                        StringAttr::get(ctx, visibilityString));
   res = parser.parseColon();
   Region *globalInitRegion = result.addRegion();
   res = parser.parseRegion(*globalInitRegion);
   return res;
 }
 
-void GlobalOp::print(OpAsmPrinter & printer) {
+void GlobalOp::print(OpAsmPrinter &printer) {
   printer << " @" << getSymName().str() << " " << getType();
   if (getIsMutable())
     printer << " mutable";
+  if (auto vis = getSymVisibility())
+    printer << " " << *vis;
   printer << " :";
   Region &body = getRegion();
   if (!body.empty()) {
     printer << ' ';
     printer.printRegion(body, /*printEntryBlockArgs=*/false,
-                  /*printBlockTerminators=*/true);
+                        /*printBlockTerminators=*/true);
   }
 }
 
@@ -130,6 +138,67 @@ LogicalResult LocalTeeOp::inferReturnTypes(
     ValueRange operands, DictionaryAttr attributes, OpaqueProperties properties,
     RegionRange regions, ::llvm::SmallVectorImpl<Type> &inferredReturnTypes) {
   return inferTeeGetResType(operands, inferredReturnTypes);
+}
+
+ParseResult parseImportOp(OpAsmParser &parser, OperationState &result) {
+  std::string importName;
+  auto *ctx = parser.getContext();
+  ParseResult res = parser.parseString(&importName);
+  result.addAttribute("importName", StringAttr::get(ctx, importName));
+
+  std::string fromStr;
+  res = parser.parseKeywordOrString(&fromStr);
+  if (failed(res) || fromStr != "from")
+    return failure();
+
+  std::string moduleName;
+  res = parser.parseString(&moduleName);
+  if (failed(res))
+    return failure();
+  result.addAttribute("moduleName", StringAttr::get(ctx, moduleName));
+
+  std::string asStr;
+  res = parser.parseKeywordOrString(&asStr);
+  if (failed(res) || asStr != "as")
+    return failure ();
+
+  StringAttr symbolName;
+  res = parser.parseSymbolName(
+      symbolName, SymbolTable::getSymbolAttrName(), result.attributes);
+  return res;
+}
+
+ParseResult GlobalImportOp::parse(OpAsmParser &parser, OperationState &result) {
+  auto *ctx = parser.getContext();
+  ParseResult res = parseImportOp(parser, result);
+  if (res.failed())
+    return failure();
+  std::string mutableOrSymVisString;
+  res = parser.parseOptionalKeywordOrString(&mutableOrSymVisString);
+  if (res.succeeded() && mutableOrSymVisString == "mutable") {
+    result.addAttribute("isMutable", UnitAttr::get(ctx));
+    res = parser.parseOptionalKeywordOrString(&mutableOrSymVisString);
+  }
+
+  if (res.succeeded())
+    result.addAttribute("sym_visibility",
+                        StringAttr::get(ctx, mutableOrSymVisString));
+  res = parser.parseColon();
+
+  Type importedType;
+  res = parser.parseType(importedType);
+  if (res.succeeded())
+    result.addAttribute(getTypeAttrName(result.name), TypeAttr::get(importedType));
+  return res;
+}
+
+void GlobalImportOp::print(OpAsmPrinter &printer) {
+  printer << " \"" << getImportName() << "\" from \"" << getModuleName() << "\" as @" << getSymName();
+  if (getIsMutable())
+    printer << " mutable";
+  if (auto vis = getSymVisibility())
+    printer << " " << *vis;
+  printer << " : " << getType();
 }
 
 ParseResult FuncOp::parse(::mlir::OpAsmParser &parser, ::mlir::OperationState &result) {

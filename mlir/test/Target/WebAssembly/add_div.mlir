@@ -37,6 +37,6 @@
 // CHECK:         }
 // CHECK:         "wasm.memory"() <{limits = !wasm<limit[2:]>, sym_name = "memory"}> : () -> ()
 
-// CHECK-LABEL:   wasm.global @global_0 i32 mutable : {
+// CHECK-LABEL:   wasm.global @global_0 i32 mutable nested : {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 66560 : i32
 // CHECK:           wasm.return %[[VAL_0]] : i32
