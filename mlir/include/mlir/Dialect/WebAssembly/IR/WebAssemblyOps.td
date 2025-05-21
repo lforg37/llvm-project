@@ -162,7 +162,7 @@ def Wasm_GlobalImportOp : Wasm_Op<"import_global", [
                    "Type": $type,
                    "bool": $isMutable)>
   ];
-  let assemblyFormat = "$importName `from` $moduleName `as` $sym_name attr-dict";
+  let hasCustomAssemblyFormat = 1;
 }
 
 def Wasm_GlobalGetOp : Wasm_Op<"global_get", [DeclareOpInterfaceMethods<WasmContextuallyConstantExprInterface>]> {
