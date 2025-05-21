@@ -400,12 +400,17 @@ public:
   }
 
   llvm::FailureOr<llvm::StringRef> consumeNBytes(size_t nBytes) {
+    LLVM_DEBUG(llvm::dbgs() << "Consume " << nBytes << " bytes\n");
+    LLVM_DEBUG(llvm::dbgs() << "  Bytes remaining: " << size() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "  Current offset: " << offset << "\n");
     if (nBytes > size())
       return emitError(getLocation(), "trying to extract ")
              << nBytes << "bytes when only " << size() << "are avilables";
 
     auto res = head.slice(offset, offset + nBytes);
     offset += nBytes;
+    LLVM_DEBUG(llvm::dbgs()
+               << "  Updated offset (+" << nBytes << "): " << offset << "\n");
     return res;
   }
 
