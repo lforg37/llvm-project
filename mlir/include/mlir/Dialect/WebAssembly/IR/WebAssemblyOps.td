@@ -66,7 +66,7 @@ def Wasm_FuncOp : Wasm_Op<"func", [
 
 def Wasm_FuncCallOp : Wasm_Op<"call"> {
   let summary = "Calling a wasm function";
-  let arguments = (ins SymbolRefAttr: $callee,
+  let arguments = (ins FlatSymbolRefAttr: $callee,
                        Variadic<Wasm_ValType>:  $operands);
   let results = (outs Variadic<Wasm_ValType>: $results);
   let assemblyFormat = "$callee (`(`$operands^`)`)? attr-dict `:` functional-type($operands, $results)";
@@ -162,17 +162,9 @@ def Wasm_LocalOp : Wasm_Op<"local"> {
 
 def Wasm_GlobalGetOp : Wasm_Op<"global_get"> {
   let summary = "Returns the value of the global passed as argument.";
-  let arguments = (ins SymbolRefAttr: $global);
+  let arguments = (ins FlatSymbolRefAttr: $global);
   let results = (outs Wasm_ValType: $global_val);
   let assemblyFormat = "$global attr-dict `:` type($global_val)";
-}
-
-def Wasm_ExportOp: Wasm_Op<"export", [Symbol]> {
-  let summary = "Exports a symbol. Can be a function, a global, a memory or a table.";
-  let arguments = (ins SymbolNameAttr: $sym_name,
-                     SymbolRefAttr: $local_name);
-  let assemblyFormat = "$local_name `as` $sym_name attr-dict";
-  let hasVerifier = 1;
 }
 
 def Wasm_MemOp : Wasm_Op<"memory", [Symbol]> {
