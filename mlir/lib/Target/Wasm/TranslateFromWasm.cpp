@@ -787,7 +787,11 @@ void ValueStack::dump() const {
 }
 #endif
 
-parsed_inst_t ValueStack::popOperands(TypeRange operandTypes, Location* opLoc) {
+parsed_inst_t ValueStack::popOperands(TypeRange operandTypes, Location *opLoc) {
+  LLVM_DEBUG(llvm::dbgs() << "Popping from ValueStack\n");
+  LLVM_DEBUG(llvm::dbgs() << "  Elements(s) to pop: " << operandTypes.size()
+                          << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "  Current stack size: " << values.size() << "\n");
   if (operandTypes.size() > values.size())
     return emitError(*opLoc,
                      "Stack doesn't contain enough values. Trying to get ")
@@ -804,19 +808,28 @@ parsed_inst_t ValueStack::popOperands(TypeRange operandTypes, Location* opLoc) {
                        "Invalid operand type on stack. Expecting ")
              << operandTypes[i] << ", value on stack is of type " << stackType
              << ".";
+    LLVM_DEBUG(llvm::dbgs() << "    POP: " << operand << "\n");
     res.push_back(operand);
   }
   values.resize(values.size() - operandTypes.size());
+  LLVM_DEBUG(llvm::dbgs() << "  Updated stack size: " << values.size() << "\n");
   return res;
 }
 
 LogicalResult ValueStack::pushResults(ValueRange results, Location *opLoc) {
+  LLVM_DEBUG(llvm::dbgs() << "Pushing to ValueStack\n");
+  LLVM_DEBUG(llvm::dbgs() << "  Elements(s) to push: " << results.size()
+                          << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "  Current stack size: " << values.size() << "\n");
   for (auto val : results) {
     if (!isWasmValueType(val.getType()))
       return emitError(*opLoc, "Invalid value type on stack: ")
              << val.getType();
+    LLVM_DEBUG(llvm::dbgs() << "    PUSH: " << val << "\n");
     values.push_back(val);
   }
+
+  LLVM_DEBUG(llvm::dbgs() << "  Updated stack size: " << values.size() << "\n");
   return success();
 }
 
