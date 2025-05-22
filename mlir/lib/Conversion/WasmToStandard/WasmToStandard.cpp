@@ -80,6 +80,7 @@ using WasmDivUIOpConversion = BinaryOpConversion<DivUIOp, arith::DivUIOp>;
 using WasmOrOpConversion = BinaryOpConversion<OrOp, arith::OrIOp>;
 using WasmRemSIOpConversion = BinaryOpConversion<RemSIOp, arith::RemSIOp>;
 using WasmRemUIOpConversion = BinaryOpConversion<RemUIOp, arith::RemUIOp>;
+using WasmXOrOpConversion = BinaryOpConversion<XOrOp, arith::XOrIOp>;
 
 struct WasmCallOpConversion : OpConversionPattern<FuncCallOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -336,7 +337,8 @@ void mlir::populateWasmToStandardConversionPatterns(
            WasmOrOpConversion,
            WasmRemSIOpConversion,
            WasmRemUIOpConversion,
-           WasmReturnOpConversion
+           WasmReturnOpConversion,
+           WasmXOrOpConversion
            >(tc, ctx);
   // clang-format on
 }
