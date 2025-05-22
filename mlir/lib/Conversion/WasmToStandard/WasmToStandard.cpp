@@ -73,6 +73,7 @@ struct BinaryOpConversion : OpConversionPattern<SourceOp> {
   }
 };
 
+using WasmAndOpConversion = BinaryOpConversion<AndOp, arith::AndIOp>;
 using WasmDivFPOpConversion = BinaryOpConversion<DivOp, arith::DivFOp>;
 using WasmDivSIOpConversion = BinaryOpConversion<DivSIOp, arith::DivSIOp>;
 using WasmDivUIOpConversion = BinaryOpConversion<DivUIOp, arith::DivUIOp>;
@@ -319,6 +320,7 @@ void mlir::populateWasmToStandardConversionPatterns(
   patternSet
       .add<
            WasmAddOpConversion,
+           WasmAndOpConversion,
            WasmCallOpConversion,
            WasmConstOpConversion,
            WasmDivFPOpConversion,
