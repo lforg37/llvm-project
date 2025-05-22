@@ -122,6 +122,7 @@ struct WasmEncodings {
     static constexpr std::byte remSI32{0x6f};
     static constexpr std::byte remUI32{0x70};
     static constexpr std::byte andI32{0x71};
+    static constexpr std::byte orI32{0x72};
 
     static constexpr std::byte eqI64{0x51};
     static constexpr std::byte addI64{0x7C};
@@ -132,6 +133,7 @@ struct WasmEncodings {
     static constexpr std::byte remSI64{0x81};
     static constexpr std::byte remUI64{0x82};
     static constexpr std::byte andI64{0x83};
+    static constexpr std::byte orI64{0x84};
 
     static constexpr std::byte eqF32{0x5B};
     static constexpr std::byte addF32{0x92};
@@ -1088,10 +1090,11 @@ ImplementNumericalOpIntFP(EqOp, eq)
     ImplementNumericalOpPat(OP_NAME, PREFIX, I64, int64_t)
 
 ImplementNumericalOpInt(AndOp, and)
-ImplementNumericalOpInt(DivUIOp, divU)
 ImplementNumericalOpInt(DivSIOp, divS)
-ImplementNumericalOpInt(RemUIOp, remU)
+ImplementNumericalOpInt(DivUIOp, divU)
+ImplementNumericalOpInt(OrOp, or)
 ImplementNumericalOpInt(RemSIOp, remS)
+ImplementNumericalOpInt(RemUIOp, remU)
 
 #undef ImplementNumericalOpInt
 
