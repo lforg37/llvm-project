@@ -114,6 +114,15 @@ struct WasmEncodings {
 
     // Numerical ops
     static constexpr std::byte eqI32{0x46};
+    static constexpr std::byte neI32{0x47};
+    static constexpr std::byte ltSI32{0x48};
+    static constexpr std::byte ltUI32{0x49};
+    static constexpr std::byte gtSI32{0x4A};
+    static constexpr std::byte gtUI32{0x4B};
+    static constexpr std::byte leSI32{0x4C};
+    static constexpr std::byte leUI32{0x4D};
+    static constexpr std::byte geSI32{0x4E};
+    static constexpr std::byte geUI32{0x4F};
     static constexpr std::byte addI32{0x6A};
     static constexpr std::byte subI32{0x6B};
     static constexpr std::byte mulI32{0x6C};
@@ -126,6 +135,15 @@ struct WasmEncodings {
     static constexpr std::byte xorI32{0x73};
 
     static constexpr std::byte eqI64{0x51};
+    static constexpr std::byte neI64{0x52};
+    static constexpr std::byte ltSI64{0x53};
+    static constexpr std::byte ltUI64{0x54};
+    static constexpr std::byte gtSI64{0x55};
+    static constexpr std::byte gtUI64{0x56};
+    static constexpr std::byte leSI64{0x57};
+    static constexpr std::byte leUI64{0x58};
+    static constexpr std::byte geSI64{0x59};
+    static constexpr std::byte geUI64{0x5A};
     static constexpr std::byte addI64{0x7C};
     static constexpr std::byte subI64{0x7D};
     static constexpr std::byte mulI64{0x7E};
@@ -138,12 +156,22 @@ struct WasmEncodings {
     static constexpr std::byte xorI64{0x85};
 
     static constexpr std::byte eqF32{0x5B};
+    static constexpr std::byte neF32{0x5C};
+    static constexpr std::byte ltF32{0x5D};
+    static constexpr std::byte gtF32{0x5E};
+    static constexpr std::byte leF32{0x5F};
+    static constexpr std::byte geF32{0x60};
     static constexpr std::byte addF32{0x92};
     static constexpr std::byte subF32{0x93};
     static constexpr std::byte mulF32{0x94};
     static constexpr std::byte divF32{0x95};
 
     static constexpr std::byte eqF64{0x61};
+    static constexpr std::byte neF64{0x62};
+    static constexpr std::byte ltF64{0x63};
+    static constexpr std::byte gtF64{0x64};
+    static constexpr std::byte leF64{0x65};
+    static constexpr std::byte geF64{0x66};
     static constexpr std::byte addF64{0xA0};
     static constexpr std::byte subF64{0xA1};
     static constexpr std::byte mulF64{0xA2};
@@ -1082,6 +1110,7 @@ ImplementNumericalOpIntFP(AddOp, add)
 ImplementNumericalOpIntFP(MulOp, mul)
 ImplementNumericalOpIntFP(SubOp, sub)
 ImplementNumericalOpIntFP(EqOp, eq)
+ImplementNumericalOpIntFP(NeOp, ne)
 
 #undef ImplementNumericalOpIntFP
 
@@ -1098,6 +1127,14 @@ ImplementNumericalOpInt(OrOp, or)
 ImplementNumericalOpInt(RemSIOp, remS)
 ImplementNumericalOpInt(RemUIOp, remU)
 ImplementNumericalOpInt(XOrOp, xor)
+ImplementNumericalOpInt(LtSIOp, ltS)
+ImplementNumericalOpInt(LeSIOp, leS)
+ImplementNumericalOpInt(LtUIOp, ltU)
+ImplementNumericalOpInt(LeUIOp, leU)
+ImplementNumericalOpInt(GtSIOp, gtS)
+ImplementNumericalOpInt(GeSIOp, geS)
+ImplementNumericalOpInt(GtUIOp, gtU)
+ImplementNumericalOpInt(GeUIOp, geU)
 
 #undef ImplementNumericalOpInt
 
@@ -1106,6 +1143,10 @@ ImplementNumericalOpInt(XOrOp, xor)
     ImplementNumericalOpPat(OP_NAME, PREFIX, F64, double)
 
 ImplementNumericalOpFP(DivOp, div)
+ImplementNumericalOpFP(LtOp, lt)
+ImplementNumericalOpFP(LeOp, le)
+ImplementNumericalOpFP(GtOp, gt)
+ImplementNumericalOpFP(GeOp, ge)
 
 #undef ImplementNumericalOpFP
 
