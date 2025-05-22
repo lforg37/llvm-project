@@ -314,12 +314,25 @@ struct ConvertWasmToStandardPass
 void mlir::populateWasmToStandardConversionPatterns(
     TypeConverter &tc, RewritePatternSet &patternSet) {
   auto *ctx = patternSet.getContext();
+  // Disable clang-format in patternSet for readability + small diffs.
+  // clang-format off
   patternSet
-      .add<WasmAddOpConversion, WasmCallOpConversion, WasmConstOpConversion,
-           WasmDivFPOpConversion, WasmDivSIOpConversion, WasmDivUIOpConversion,
-           WasmFuncImportOpConversion, WasmFuncOpConversion,
-           WasmGlobalImportOpConverter, WasmGlobalWithConstInitConversion,
-           WasmGlobalWithGetGlobalInitConversion, WasmMemoryOpConversion,
-           WasmReturnOpConversion, WasmRemSIOpConversion,
-           WasmRemUIOpConversion>(tc, ctx);
+      .add<
+           WasmAddOpConversion,
+           WasmCallOpConversion,
+           WasmConstOpConversion,
+           WasmDivFPOpConversion,
+           WasmDivSIOpConversion,
+           WasmDivUIOpConversion,
+           WasmFuncImportOpConversion,
+           WasmFuncOpConversion,
+           WasmGlobalImportOpConverter,
+           WasmGlobalWithConstInitConversion,
+           WasmGlobalWithGetGlobalInitConversion,
+           WasmMemoryOpConversion,
+           WasmRemSIOpConversion,
+           WasmRemUIOpConversion,
+           WasmReturnOpConversion
+           >(tc, ctx);
+  // clang-format on
 }
