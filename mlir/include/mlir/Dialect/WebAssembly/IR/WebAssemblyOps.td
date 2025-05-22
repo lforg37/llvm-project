@@ -307,4 +307,56 @@ def Wasm_EqOp : Wasm_BinaryComparisonOp<"eq",
     "Check if two values from the stack are equal and push the result",
     [Wasm_NumericType]>{}
 
+def Wasm_NeOp : Wasm_BinaryComparisonOp<"ne",
+    "Check if two values from the stack are different and push the result",
+    [Wasm_NumericType]>{}
+
+def Wasm_LtSIOp : Wasm_BinaryComparisonOp<"lt_si",
+    "Check if a signed integer value is less than another and push the result",
+    [Wasm_IntegerType]>{}
+
+def Wasm_LtUIOp : Wasm_BinaryComparisonOp<"lt_ui",
+    "Check if an unsigned integer value is less than another and push the result",
+    [Wasm_IntegerType]>{}
+
+def Wasm_LeSIOp : Wasm_BinaryComparisonOp<"le_si",
+    "Check if a signed integer value is less or equal to another and push the result",
+    [Wasm_IntegerType]>{}
+
+def Wasm_LeUIOp : Wasm_BinaryComparisonOp<"le_ui",
+    "Check if an unsigned integer value is less or equal to another and push the result",
+    [Wasm_IntegerType]>{}
+
+def Wasm_GtSIOp : Wasm_BinaryComparisonOp<"gt_si",
+    "Check if a signed integer value is greater than another and push the result",
+    [Wasm_IntegerType]>{}
+
+def Wasm_GtUIOp : Wasm_BinaryComparisonOp<"gt_ui",
+    "Check if an unsigned integer value is greater than another and push the result",
+    [Wasm_IntegerType]>{}
+
+def Wasm_GeSIOp : Wasm_BinaryComparisonOp<"ge_si",
+    "Check if a signed integer value is greater or equal to another and push the result",
+    [Wasm_IntegerType]>{}
+
+def Wasm_GeUIOp : Wasm_BinaryComparisonOp<"ge_ui",
+    "Check if an unsigned integer value is greater or equal to another and push the result",
+    [Wasm_IntegerType]>{}
+
+def Wasm_LtOp : Wasm_BinaryComparisonOp<"lt",
+    "Check if a float value is less than another and push the result",
+    [Wasm_FPType]>{}
+
+def Wasm_LeOp : Wasm_BinaryComparisonOp<"le",
+    "Check if a float value is less or equal to another and push the result",
+    [Wasm_FPType]>{}
+
+def Wasm_GtOp : Wasm_BinaryComparisonOp<"gt",
+    "Check if a float value is greater than another and push the result",
+    [Wasm_FPType]>{}
+
+def Wasm_GeOp : Wasm_BinaryComparisonOp<"ge",
+    "Check if a float value is greater or equal to another and push the result",
+    [Wasm_FPType]>{}
+
 #endif // WEBASSEMBLY_OPS
