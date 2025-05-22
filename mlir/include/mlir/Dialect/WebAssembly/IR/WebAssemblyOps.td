@@ -270,6 +270,11 @@ def Wasm_MulOp : Wasm_BinaryNumericalOp<"mul",
     "Multiply two values from the stack and push the result",
     [Wasm_NumericType]>{}
 
+def Wasm_OrOp : Wasm_BinaryNumericalOp<"or",
+    [{Consume two integers from the stack, compute the bitwise OR, and push the
+    result.}],
+    [Wasm_NumericType]>{}
+
 def Wasm_SubOp : Wasm_BinaryNumericalOp<"sub",
     "Subtract two values from the stack and push the result",
     [Wasm_NumericType]>{}

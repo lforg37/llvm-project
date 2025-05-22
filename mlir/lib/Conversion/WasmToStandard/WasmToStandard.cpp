@@ -77,6 +77,7 @@ using WasmAndOpConversion = BinaryOpConversion<AndOp, arith::AndIOp>;
 using WasmDivFPOpConversion = BinaryOpConversion<DivOp, arith::DivFOp>;
 using WasmDivSIOpConversion = BinaryOpConversion<DivSIOp, arith::DivSIOp>;
 using WasmDivUIOpConversion = BinaryOpConversion<DivUIOp, arith::DivUIOp>;
+using WasmOrOpConversion = BinaryOpConversion<OrOp, arith::OrIOp>;
 using WasmRemSIOpConversion = BinaryOpConversion<RemSIOp, arith::RemSIOp>;
 using WasmRemUIOpConversion = BinaryOpConversion<RemUIOp, arith::RemUIOp>;
 
@@ -332,6 +333,7 @@ void mlir::populateWasmToStandardConversionPatterns(
            WasmGlobalWithConstInitConversion,
            WasmGlobalWithGetGlobalInitConversion,
            WasmMemoryOpConversion,
+           WasmOrOpConversion,
            WasmRemSIOpConversion,
            WasmRemUIOpConversion,
            WasmReturnOpConversion
