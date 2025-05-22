@@ -119,6 +119,8 @@ struct WasmEncodings {
     static constexpr std::byte mulI32{0x6C};
     static constexpr std::byte divSI32{0x6d};
     static constexpr std::byte divUI32{0x6e};
+    static constexpr std::byte remSI32{0x6f};
+    static constexpr std::byte remUI32{0x70};
 
     static constexpr std::byte eqI64{0x51};
     static constexpr std::byte addI64{0x7C};
@@ -126,6 +128,8 @@ struct WasmEncodings {
     static constexpr std::byte mulI64{0x7E};
     static constexpr std::byte divSI64{0x7F};
     static constexpr std::byte divUI64{0x80};
+    static constexpr std::byte remSI64{0x81};
+    static constexpr std::byte remUI64{0x82};
 
     static constexpr std::byte eqF32{0x5B};
     static constexpr std::byte addF32{0x92};
@@ -1083,6 +1087,8 @@ ImplementNumericalOpIntFP(EqOp, eq)
 
 ImplementNumericalOpInt(DivUIOp, divU)
 ImplementNumericalOpInt(DivSIOp, divS)
+ImplementNumericalOpInt(RemUIOp, remU)
+ImplementNumericalOpInt(RemSIOp, remS)
 
 #undef ImplementNumericalOpInt
 

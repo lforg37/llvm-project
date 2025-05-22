@@ -269,6 +269,16 @@ def Wasm_SubOp : Wasm_BinaryNumericalOp<"sub",
     "Subtract two values from the stack and push the result",
     [Wasm_NumericType]>{}
 
+def Wasm_RemUIOp : Wasm_BinaryNumericalOp<"rem_ui",
+    [{Calculate the remainder of dividing two integer values from the stack as
+    an unsigned integer, and push the result.}],
+    [Wasm_IntegerType]>{}
+
+def Wasm_RemSIOp : Wasm_BinaryNumericalOp<"rem_si",
+    [{Calculate the remainder of dividing two integer values from the stack as a
+    signed integer, and push the result.}],
+    [Wasm_IntegerType]>{}
+
 class Wasm_BinaryComparisonOp<string mnemonic, string summaryStr,
                        list<Type> validOpTypes> :
   Wasm_Op<mnemonic, [AllTypesMatch<["lhs", "rhs"]>]> {
