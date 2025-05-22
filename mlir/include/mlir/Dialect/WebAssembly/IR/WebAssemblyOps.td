@@ -289,6 +289,11 @@ def Wasm_RemSIOp : Wasm_BinaryNumericalOp<"rem_si",
     signed integer, and push the result.}],
     [Wasm_IntegerType]>{}
 
+def Wasm_XOrOp : Wasm_BinaryNumericalOp<"xor",
+    [{Consume two integers from the stack, compute the bitwise XOR, and push the
+    result.}],
+    [Wasm_NumericType]>{}
+
 class Wasm_BinaryComparisonOp<string mnemonic, string summaryStr,
                        list<Type> validOpTypes> :
   Wasm_Op<mnemonic, [AllTypesMatch<["lhs", "rhs"]>]> {
