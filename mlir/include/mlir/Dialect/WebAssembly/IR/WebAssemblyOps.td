@@ -249,6 +249,11 @@ def Wasm_AddOp : Wasm_BinaryNumericalOp<"add",
     "Sum two values from the stack and push the result",
     [Wasm_NumericType]>{}
 
+def Wasm_AndOp : Wasm_BinaryNumericalOp<"and",
+    [{Consume two integers from the stack, compute the bitwise AND, and push the
+    result.}],
+    [Wasm_NumericType]>{}
+
 def Wasm_DivOp : Wasm_BinaryNumericalOp<"div",
     "Divide floating point values from the stack and push the result",
     [Wasm_FPType]>{}
