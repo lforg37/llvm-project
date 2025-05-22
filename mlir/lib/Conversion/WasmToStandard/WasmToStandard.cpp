@@ -76,6 +76,8 @@ struct BinaryOpConversion : OpConversionPattern<SourceOp> {
 using WasmDivFPOpConversion = BinaryOpConversion<DivOp, arith::DivFOp>;
 using WasmDivSIOpConversion = BinaryOpConversion<DivSIOp, arith::DivSIOp>;
 using WasmDivUIOpConversion = BinaryOpConversion<DivUIOp, arith::DivUIOp>;
+using WasmRemSIOpConversion = BinaryOpConversion<RemSIOp, arith::RemSIOp>;
+using WasmRemUIOpConversion = BinaryOpConversion<RemUIOp, arith::RemUIOp>;
 
 struct WasmCallOpConversion : OpConversionPattern<FuncCallOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -318,5 +320,6 @@ void mlir::populateWasmToStandardConversionPatterns(
            WasmFuncImportOpConversion, WasmFuncOpConversion,
            WasmGlobalImportOpConverter, WasmGlobalWithConstInitConversion,
            WasmGlobalWithGetGlobalInitConversion, WasmMemoryOpConversion,
-           WasmReturnOpConversion>(tc, ctx);
+           WasmReturnOpConversion, WasmRemSIOpConversion,
+           WasmRemUIOpConversion>(tc, ctx);
 }
