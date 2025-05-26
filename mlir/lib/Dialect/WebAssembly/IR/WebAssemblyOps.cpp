@@ -37,6 +37,13 @@ inline LogicalResult inferTeeGetResType(ValueRange operands, ::llvm::SmallVector
 }
 } // namespace
 
+Block* BlockOp::createBlock() {
+  auto &block = getBody().emplaceBlock();
+  for (auto input : getInputs())
+    block.addArgument(input.getType(), input.getLoc());
+  return &block;
+}
+
 // Custom interface overrides
 
 LogicalResult GlobalGetOp::verifyConstantExprValidity() {

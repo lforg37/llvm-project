@@ -16,6 +16,13 @@
 include "mlir/IR/OpBase.td"
 include "mlir/IR/BuiltinAttributes.td"
 
+def WasmLabelLevelInterface : OpInterface<"WasmLabelLevelInterface"> {
+  let description = [{
+    Operation that defines one level of nesting for wasm branching.
+    These operation region can be targeted by branch instructions.
+  }];
+}
+
 def WasmImportOpInterface : OpInterface<"WasmImportOpInterface"> {
   let description = [{
     Operation that imports a symbol from an external wasm module;
