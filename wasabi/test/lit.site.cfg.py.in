@@ -1,0 +1,31 @@
+@LIT_SITE_CFG_IN_HEADER@
+
+import sys
+
+config.target_triple = "@LLVM_TARGET_TRIPLE@"
+config.llvm_src_root = "@LLVM_SOURCE_DIR@"
+config.llvm_tools_dir = lit_config.substitute("@LLVM_TOOLS_DIR@")
+config.llvm_shlib_ext = "@SHLIBEXT@"
+config.llvm_shlib_dir = lit_config.substitute(path(r"@SHLIBDIR@"))
+config.python_executable = "@Python3_EXECUTABLE@"
+config.enable_assertions = @ENABLE_ASSERTIONS@
+config.native_target = "@LLVM_NATIVE_ARCH@"
+config.host_os = "@HOST_OS@"
+config.host_cc = "@HOST_CC@"
+config.host_cxx = "@HOST_CXX@"
+config.enable_libcxx = "@LLVM_ENABLE_LIBCXX@"
+config.host_cmake = "@CMAKE_COMMAND@"
+config.host_cmake_generator = "@CMAKE_GENERATOR@"
+config.llvm_use_linker = "@LLVM_USE_LINKER@"
+config.llvm_use_sanitizer = "@LLVM_USE_SANITIZER@"
+config.host_arch = "@HOST_ARCH@"
+config.wasabi_obj_root = "@WASABI_TOOLS_DIR@"
+config.wasabi_bin_dir = "@WASABI_BINARY_DIR@"
+config.wasabi_source_dir = "@WASABI_SOURCE_DIR@"
+config.wasabi_test_dir = "@WASABI_TEST_SRC_DIR@"
+
+import lit.llvm
+lit.llvm.initialize(lit_config, config)
+
+# Let the main config do the real work.
+lit_config.load_config(config, "@WASABI_SOURCE_DIR@/test/lit.cfg.py")
