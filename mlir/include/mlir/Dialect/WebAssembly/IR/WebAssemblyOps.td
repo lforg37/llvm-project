@@ -374,4 +374,14 @@ def Wasm_ShLOp : Wasm_ShiftOp<"shl",
     integer. The result will then be pushed to the stack.}]
     >{}
 
+def Wasm_ShRSOp : Wasm_ShiftOp<"shr_s",
+    [{Arithmetic right shift.
+
+    Consume an integer, and an integer shift amount from the stack. The first
+    integer shall be shifted right by N bits, where N is the value of the
+    second integer.
+
+    Vacated bits on the left shall be filled with the sign bit.}]
+    >{}
+
 #endif // WEBASSEMBLY_OPS
