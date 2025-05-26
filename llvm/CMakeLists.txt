@@ -109,7 +109,7 @@ endif()
 # This allows an easy way of setting up a build directory for llvm and another
 # one for llvm+clang+... using the same sources.
 # These projects will be included when "all" is included in LLVM_ENABLE_PROJECTS.
-set(LLVM_ALL_PROJECTS "bolt;clang;clang-tools-extra;compiler-rt;cross-project-tests;libclc;lld;lldb;mlir;openmp;polly")
+set(LLVM_ALL_PROJECTS "bolt;clang;clang-tools-extra;compiler-rt;cross-project-tests;libclc;lld;lldb;mlir;openmp;polly;wasabi")
 if (${CMAKE_SYSTEM_NAME} MATCHES "AIX")
   # Disallow 'openmp' as a LLVM PROJECT on AIX as the supported way is to use
   # LLVM_ENABLE_RUNTIMES.
@@ -661,7 +661,7 @@ if(LLVM_EXPERIMENTAL_TARGETS_TO_BUILD STREQUAL "all")
   set(LLVM_EXPERIMENTAL_TARGETS_TO_BUILD ${LLVM_ALL_EXPERIMENTAL_TARGETS})
 endif()
 
-if("flang" IN_LIST LLVM_ENABLE_PROJECTS AND 
+if("flang" IN_LIST LLVM_ENABLE_PROJECTS AND
    "AArch64" IN_LIST LLVM_TARGETS_TO_BUILD AND
    NOT ("compiler-rt" IN_LIST LLVM_ENABLE_RUNTIMES OR "compiler-rt" IN_LIST LLVM_ENABLE_PROJECTS))
   message(STATUS "Enabling compiler-rt as a dependency of Flang")

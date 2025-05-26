@@ -731,3 +731,7 @@ void mlir::populateWasmToStandardConversionPatterns(
            >(tc, ctx);
   // clang-format on
 }
+
+std::unique_ptr<Pass> mlir::createConvertWasmToStandardPass() {
+  return std::make_unique<ConvertWasmToStandardPass>();
+}
