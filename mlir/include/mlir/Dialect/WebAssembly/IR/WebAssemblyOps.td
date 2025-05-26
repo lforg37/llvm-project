@@ -359,4 +359,19 @@ def Wasm_GeOp : Wasm_BinaryComparisonOp<"ge",
     "Check if a float value is greater or equal to another and push the result",
     [Wasm_FPType]>{}
 
+// Integer shift operations.
+class Wasm_ShiftOp<string mnemonic, string summaryStr> :
+  Wasm_Op<mnemonic, [AllTypesMatch<["val", "bits", "result"]>]> {
+  let summary = summaryStr;
+  let arguments = (ins Wasm_IntegerType:$val, Wasm_IntegerType:$bits);
+  let results = (outs Wasm_IntegerType:$result);
+  let assemblyFormat = "$val `by` $bits `bits` `:` type($val) attr-dict";
+}
+
+def Wasm_ShLOp : Wasm_ShiftOp<"shl",
+    [{Consume an integer, and an integer shift amount from the stack. The first
+    integer shall be shifted left by N bits, where N is the value of the second
+    integer. The result will then be pushed to the stack.}]
+    >{}
+
 #endif // WEBASSEMBLY_OPS
