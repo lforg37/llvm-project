@@ -24,9 +24,6 @@
 #include "llvm/Support/LEB128.h"
 #include "llvm/Support/LogicalResult.h"
 
-#include <climits>
-#include <cstddef>
-#include <cstdint>
 #include <optional>
 #include <type_traits>
 #include <utility>
@@ -97,6 +94,7 @@ constexpr bool sectionShouldBeUnique(WasmSectionType secType) {
 struct WasmEncodings {
   struct OpCode {
     // Control instructions
+    static constexpr std::byte block{0x02};
     static constexpr std::byte call{0x10};
 
     // Variable instructions
@@ -195,6 +193,7 @@ struct WasmEncodings {
     static constexpr std::byte funcRef{0x70};
     static constexpr std::byte externRef{0x6F};
     static constexpr std::byte funcType{0x60};
+    static constexpr std::byte emptyBlockType{0x40};
   };
 
   struct ImportType {
@@ -242,6 +241,12 @@ byteSeqFromIntSeq(std::integer_sequence<T, Values...>) {
 constexpr auto allOpCodes =
     byteSeqFromIntSeq(std::make_integer_sequence<int, 256>());
 
+constexpr ByteSequence<
+    WasmEncodings::TypeEncoding::i32, WasmEncodings::TypeEncoding::i64,
+    WasmEncodings::TypeEncoding::f32, WasmEncodings::TypeEncoding::f64,
+    WasmEncodings::TypeEncoding::v128>
+    valueTypesEncodings{};
+
 template<std::byte... allowedFlags>
 constexpr bool isValueOneOf(std::byte value, ByteSequence<allowedFlags...> = {}) {
   return  ((value == allowedFlags) | ... | false);
@@ -277,12 +282,15 @@ using ImportDesc = std::variant<TypeIdxRecord, TableType, LimitType, GlobalTypeR
 
 using parsed_inst_t = llvm::FailureOr<llvm::SmallVector<Value>>;
 
+struct EmptyBlockMarker{};
+using BlockTypeParseResult = std::variant<EmptyBlockMarker, TypeIdxRecord, Type>;
 
 struct WasmModuleSymbolTables {
   llvm::SmallVector<FunctionSymbolRefContainer> funcSymbols;
   llvm::SmallVector<GlobalSymbolRefContainer> globalSymbols;
   llvm::SmallVector<SymbolRefContainer> memSymbols;
   llvm::SmallVector<SymbolRefContainer> tableSymbols;
+  llvm::SmallVector<FunctionType> moduleFuncTypes;
 
   std::string getNewSymbolName(llvm::StringRef prefix, size_t id) const {
     return (prefix + llvm::Twine{id}).str();
@@ -315,7 +323,6 @@ class ParserHead;
 /// stack. Makes sure that there are no "free accesses" on the stack to preserve
 /// its state.
 class ValueStack {
-
 public:
   bool empty() const { return values.empty(); }
 
@@ -340,20 +347,33 @@ public:
   ///   if an error occurs.
   LogicalResult pushResults(ValueRange results, Location *opLoc);
 
-  #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  void addFrame() {
+    frameIndexes.push_back(values.size());
+    LLVM_DEBUG(llvm::dbgs() << "Adding a new frame context to ValueStack");
+  }
+
+  void dropFrame() {
+    assert(!frameIndexes.empty() && "Trying to drop a frame from empty context");
+    auto newSize = frameIndexes.pop_back_val();
+    values.truncate(newSize);
+  }
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   /// A simple dump function for debugging.
   /// Writes output to llvm::dbgs().
   LLVM_DUMP_METHOD void dump() const;
-  #endif
+#endif
 
 private:
   llvm::SmallVector<Value> values;
+  llvm::SmallVector<size_t> frameIndexes;
 };
 
 using local_val_t = TypedValue<MemRefType>;
 
 class ExpressionParser {
 public:
+  using locals_t = llvm::SmallVector<local_val_t>;
   ExpressionParser(ParserHead &parser, WasmModuleSymbolTables const &symbols,
                    llvm::ArrayRef<local_val_t> initLocal)
       : parser{parser}, symbols{symbols}, locals{initLocal} {}
@@ -405,8 +425,55 @@ private:
     }
   }
 
+
+  struct NestingContext {
+    NestingContext(ExpressionParser& parser):parser{parser}{
+      parser.addNestingContextLevel();
+    }
+    NestingContext(NestingContext&& other):parser{other.parser}{
+      other.shouldDropOnDestruct = false;
+    }
+    NestingContext(NestingContext const &) = delete;
+    ~NestingContext() {
+      if (shouldDropOnDestruct)
+        parser.dropNestingContextLevel();
+    }
+    ExpressionParser& parser;
+    bool shouldDropOnDestruct = true;
+  };
+
+  void addNestingContextLevel() {
+    valueStack.addFrame();
+  }
+
+  void dropNestingContextLevel() {
+    // Should always succeed as we are droping the frame that was previously created.
+    valueStack.dropFrame();
+  }
+
+  llvm::FailureOr<FunctionType> getFuncTypeFor(OpBuilder & builder, EmptyBlockMarker) {
+    return builder.getFunctionType({}, {});
+  }
+
+  llvm::FailureOr<FunctionType> getFuncTypeFor(OpBuilder & builder, TypeIdxRecord type) {
+    if (type.id > symbols.moduleFuncTypes.size())
+      return emitError(*currentOpLoc, "Type index references nonexistent type: ")
+             << type.id << ". Only " << symbols.moduleFuncTypes.size()
+             << " types are registered.";
+    return symbols.moduleFuncTypes[type.id];
+  }
+
+  llvm::FailureOr<FunctionType> getFuncTypeFor(OpBuilder & builder, Type valType) {
+    return builder.getFunctionType({}, {valType});
+  }
+
 public:
-  parsed_inst_t parse(OpBuilder &builder);
+  parsed_inst_t parse(OpBuilder &builder,
+                      std::byte endByte = WasmEncodings::endByte);
+
+  NestingContext addNesting() {
+    return NestingContext{*this};
+  }
 
   llvm::FailureOr<llvm::SmallVector<Value>>
   popOperands(TypeRange operandTypes) {
@@ -427,7 +494,7 @@ private:
   std::optional<Location> currentOpLoc;
   ParserHead &parser;
   WasmModuleSymbolTables const &symbols;
-  llvm::SmallVector<local_val_t> locals;
+  locals_t locals;
   ValueStack valueStack;
 };
 
@@ -476,6 +543,7 @@ private:
   // if parseLiteral specialisation were moved here, but default GCC on Ubuntu
   // 22.04 has bug with template specialisation in class declaration
   inline llvm::FailureOr<uint32_t> parseUI32();
+  inline llvm::FailureOr<int64_t> parseI64();
 
 public:
   llvm::FailureOr<llvm::StringRef> parseName() {
@@ -702,6 +770,29 @@ public:
     return success();
   }
 
+  llvm::FailureOr<BlockTypeParseResult> parseBlockType(MLIRContext *ctx) {
+    auto loc = getLocation();
+    auto blockIndicator = peek();
+    if (failed(blockIndicator))
+      return failure();
+    if (*blockIndicator == WasmEncodings::TypeEncoding::emptyBlockType) {
+      offset += 1;
+      return {EmptyBlockMarker{}};
+    }
+    if (isValueOneOf(*blockIndicator, valueTypesEncodings))
+      return parseValueType(ctx);
+    /// Block type idx is a 32 bit positive integer encoded as a 33 bit signed
+    /// value
+    auto typeIdx = parseI64();
+    if (failed(typeIdx))
+      return failure();
+    if (*typeIdx < 0 || *typeIdx > std::numeric_limits<uint32_t>::max())
+      return emitError(loc, "type ID should be representable with an unsigned "
+                            "32 bits integer. Got ")
+             << *typeIdx;
+    return {TypeIdxRecord{static_cast<uint32_t>(*typeIdx)}};
+  }
+
   bool end() const { return curHead().empty(); }
 
   ParserHead copy() const {
@@ -710,6 +801,14 @@ public:
 
 private:
   llvm::StringRef curHead() const { return head.drop_front(offset); }
+
+  llvm::FailureOr<std::byte> peek() const {
+    if (end())
+      return emitError(
+          getLocation(),
+          "trying to peek at next byte, but input stream is empty");
+    return static_cast<std::byte>(curHead().front());
+  }
 
   size_t size() const { return head.size() - offset; }
 
@@ -799,6 +898,10 @@ inline llvm::FailureOr<uint32_t> ParserHead::parseUI32() {
   return parseLiteral<uint32_t>();
 }
 
+inline llvm::FailureOr<int64_t> ParserHead::parseI64() {
+  return parseLiteral<int64_t>();
+}
+
 template <std::byte opCode>
 inline parsed_inst_t ExpressionParser::parseSpecificInstruction(OpBuilder &) {
   return emitError(*currentOpLoc, "Unknown instruction opcode: ")
@@ -809,14 +912,38 @@ inline parsed_inst_t ExpressionParser::parseSpecificInstruction(OpBuilder &) {
 void ValueStack::dump() const {
   llvm::dbgs() << "================= Wasm ValueStack =======================\n";
   llvm::dbgs() << "size: " << size() << "\n";
+  llvm::dbgs() << "nbFrames: " << frameIndexes.size() << '\n';
   llvm::dbgs() << "<Top>"
                << "\n";
   // Stack is pushed to via push_back. Therefore the top of the stack is the
   // end of the vector. Iterate in reverse so that the first thing we print
   // is the top of the stack.
-  for (const auto &val : llvm::reverse(values)) {
+  auto indexGetter = [this](){
+    size_t idx = frameIndexes.size();
+    return [this, idx]() mutable-> std::optional<std::pair<size_t, size_t>> {
+      llvm::dbgs() << "IDX: " << idx << '\n';
+      if (idx == 0)
+        return std::nullopt;
+      auto frameId = idx - 1;
+      auto frameLimit = frameIndexes[frameId];
+      idx -= 1;
+      return {{frameId, frameLimit}};
+    };
+  };
+  auto getNextFrameIndex = indexGetter();
+  auto nextFrameIdx = getNextFrameIndex();
+  for (size_t idx = 0 ; idx < size() ;) {
+    size_t actualIdx = size() - 1 - idx;
+    while (nextFrameIdx && (nextFrameIdx->second > actualIdx)) {
+      llvm::dbgs() << "  --------------- Frame ("<< nextFrameIdx->first <<")\n";
+      nextFrameIdx = getNextFrameIndex();
+    }
     llvm::dbgs() << "  ";
-    val.dump();
+    values[actualIdx].dump();
+  }
+  while (nextFrameIdx) {
+    llvm::dbgs() << "  --------------- Frame ("<< nextFrameIdx->first <<")\n";
+      nextFrameIdx = getNextFrameIndex();
   }
   llvm::dbgs() << "<Bottom>"
                << "\n";
@@ -870,14 +997,14 @@ LogicalResult ValueStack::pushResults(ValueRange results, Location *opLoc) {
   return success();
 }
 
-parsed_inst_t ExpressionParser::parse(OpBuilder &builder) {
+parsed_inst_t ExpressionParser::parse(OpBuilder &builder, std::byte endByte) {
   llvm::SmallVector<Value> res;
   for (;;) {
     currentOpLoc = parser.getLocation();
     auto opCode = parser.consumeByte();
     if (failed(opCode))
       return failure();
-    if (*opCode == WasmEncodings::endByte)
+    if (*opCode == endByte)
       return res;
     parsed_inst_t resParsed;
     resParsed = dispatchToInstParser(*opCode, builder);
@@ -887,6 +1014,48 @@ parsed_inst_t ExpressionParser::parse(OpBuilder &builder) {
     if (failed(pushResults(res)))
       return failure();
   }
+}
+
+template <>
+inline parsed_inst_t
+ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::block>(
+    OpBuilder &builder) {
+  auto opLoc = currentOpLoc;
+  auto blockType = parser.parseBlockType(builder.getContext());
+  if (failed(blockType))
+    return failure();
+  auto funcType = std::visit(
+      [this, &builder](auto parseResult) {
+        return getFuncTypeFor(builder, parseResult);
+      },
+      *blockType);
+  if (failed(funcType))
+    return failure();
+
+  LLVM_DEBUG(llvm::dbgs() << "Parsing a block of type " << *funcType);
+  auto inputTypes = funcType->getInputs();
+  auto inputOps = popOperands(inputTypes);
+  if (failed(inputOps))
+    return failure();
+
+  auto resTypes = funcType->getResults();
+  auto blockOp = builder.create<BlockOp>(*currentOpLoc, resTypes, *inputOps);
+  auto *blockBody = blockOp.createBlock();
+  auto sip = builder.saveInsertionPoint();
+  builder.setInsertionPointToStart(blockBody);
+  {
+    auto nC = addNesting();
+    if (failed(pushResults(blockBody->getArguments())))
+      return failure();
+    auto bodyParsingRes = parse(builder);
+    if (failed(bodyParsingRes))
+      return failure();
+    auto resVals = popOperands(resTypes);
+    builder.create<ReturnOp>(*opLoc, *resVals);
+  }
+  builder.restoreInsertionPoint(sip);
+  LLVM_DEBUG(llvm::dbgs() << "End of parsing of a block of type " << *funcType);
+  return {blockOp->getResults()};
 }
 
 template <>
@@ -1249,11 +1418,11 @@ private:
   LogicalResult visitImport(Location loc, llvm::StringRef moduleName,
                             llvm::StringRef importName, TypeIdxRecord tid) {
     using llvm::Twine;
-    if (tid.id >= funcTypes.size())
+    if (tid.id >= symbols.moduleFuncTypes.size())
       return emitError(loc, "Invalid type id: ")
-             << tid.id << ". Only " << funcTypes.size()
+             << tid.id << ". Only " << symbols.moduleFuncTypes.size()
              << " type registration.";
-    auto type = funcTypes[tid.id];
+    auto type = symbols.moduleFuncTypes[tid.id];
     auto symbol = symbols.getNewFuncSymbolName();
     auto funcOp = builder.create<FuncImportOp>(
         loc, symbol, moduleName, importName, type);
@@ -1378,7 +1547,6 @@ public:
 private:
   mlir::StringAttr srcName;
   OpBuilder builder;
-  llvm::SmallVector<FunctionType> funcTypes;
   WasmModuleSymbolTables symbols;
   MLIRContext *ctx;
   ModuleOp mOp;
@@ -1496,35 +1664,38 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::TABLE>(ParserHead &ph, size_
 
 template <>
 LogicalResult
-WasmBinaryParser::parseSectionItem<WasmSectionType::FUNCTION>(ParserHead &ph, size_t) {
+WasmBinaryParser::parseSectionItem<WasmSectionType::FUNCTION>(ParserHead &ph,
+                                                              size_t) {
   auto opLoc = ph.getLocation();
   auto typeIdxParsed = ph.parseLiteral<uint32_t>();
   if (failed(typeIdxParsed))
     return failure();
   auto typeIdx = *typeIdxParsed;
-  if (typeIdx >= funcTypes.size())
+  if (typeIdx >= symbols.moduleFuncTypes.size())
     return emitError(getLocation(), "Invalid type index: ") << typeIdx;
   auto symbol = symbols.getNewFuncSymbolName();
-  auto funcOp = builder.create<FuncOp>(
-      opLoc, symbol, funcTypes[typeIdx]);
-  auto* block = funcOp.addEntryBlock();
+  auto funcOp =
+      builder.create<FuncOp>(opLoc, symbol, symbols.moduleFuncTypes[typeIdx]);
+  auto *block = funcOp.addEntryBlock();
   auto ip = builder.saveInsertionPoint();
   builder.setInsertionPointToEnd(block);
   builder.create<ReturnOp>(opLoc);
   builder.restoreInsertionPoint(ip);
   symbols.funcSymbols.push_back(
-      {{FlatSymbolRefAttr::get(funcOp.getSymNameAttr())}, funcTypes[typeIdx]});
+      {{FlatSymbolRefAttr::get(funcOp.getSymNameAttr())},
+       symbols.moduleFuncTypes[typeIdx]});
   return funcOp.verify();
 }
 
 template <>
 LogicalResult
-WasmBinaryParser::parseSectionItem<WasmSectionType::TYPE>(ParserHead &ph, size_t) {
+WasmBinaryParser::parseSectionItem<WasmSectionType::TYPE>(ParserHead &ph,
+                                                          size_t) {
   auto funcType = ph.parseFunctionType(ctx);
   if (failed(funcType))
     return failure();
   LLVM_DEBUG(llvm::dbgs() << "Parsed function type " << *funcType << '\n');
-  funcTypes.push_back(*funcType);
+  symbols.moduleFuncTypes.push_back(*funcType);
   return success();
 }
 
