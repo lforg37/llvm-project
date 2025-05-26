@@ -81,6 +81,7 @@ using WasmOrOpConversion = BinaryOpConversion<OrOp, arith::OrIOp>;
 using WasmRemSIOpConversion = BinaryOpConversion<RemSIOp, arith::RemSIOp>;
 using WasmRemUIOpConversion = BinaryOpConversion<RemUIOp, arith::RemUIOp>;
 using WasmShLOpConversion = BinaryOpConversion<ShLOp, arith::ShLIOp>;
+using WasmShRSOpConversion = BinaryOpConversion<ShRSOp, arith::ShRSIOp>;
 using WasmXOrOpConversion = BinaryOpConversion<XOrOp, arith::XOrIOp>;
 
 template <typename SourceOp, typename TargetOp, typename AttrType,
@@ -436,6 +437,7 @@ void mlir::populateWasmToStandardConversionPatterns(
            WasmRemUIOpConversion,
            WasmReturnOpConversion,
            WasmShLOpConversion,
+           WasmShRSOpConversion,
            WasmXOrOpConversion
            >(tc, ctx);
   // clang-format on
