@@ -15,7 +15,11 @@
 #include "mlir/Conversion/ConvertToLLVM/ToLLVMPass.h"
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
+<<<<<<< HEAD
 #include "mlir/Conversion/RaiseWasm/RaiseWasmMLIR.h"
+=======
+#include "mlir/Conversion/WasmToStandard/WasmToStandard.h"
+>>>>>>> 5ea2a423fe94 ([mlir][wasm] Introduce wasabi binary driver for wasm to llvm ir translation)
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
