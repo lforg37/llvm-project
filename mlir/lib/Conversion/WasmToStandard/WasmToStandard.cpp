@@ -59,6 +59,8 @@ struct BinaryIntFPOpConversionPattern : OpConversionPattern<SourceOp> {
 
 using WasmAddOpConversion =
     BinaryIntFPOpConversionPattern<AddOp, arith::AddIOp, arith::AddFOp>;
+using WasmSubOpConversion =
+    BinaryIntFPOpConversionPattern<SubOp, arith::SubIOp, arith::SubFOp>;
 
 template <typename SourceOp, typename TargetOp>
 struct BinaryOpConversion : OpConversionPattern<SourceOp> {
@@ -440,6 +442,7 @@ void mlir::populateWasmToStandardConversionPatterns(
            WasmShLOpConversion,
            WasmShRSOpConversion,
            WasmShRUOpConversion,
+           WasmSubOpConversion,
            WasmXOrOpConversion
            >(tc, ctx);
   // clang-format on
