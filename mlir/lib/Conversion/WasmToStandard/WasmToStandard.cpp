@@ -356,6 +356,84 @@ struct WasmMemoryOpConversion : OpConversionPattern<MemOp> {
   }
 };
 
+inline TypedAttr getInitializerAttr(Type t) {
+  if (t.isInteger())
+    return IntegerAttr::get(t, 0);
+  if (t.isFloat())
+    return FloatAttr::get(t, 0.);
+  llvm_unreachable(
+      "This helper function should only be used with Integer of Float type");
+  return TypedAttr{};
+}
+
+struct WasmLocalConversion : OpConversionPattern<LocalOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(LocalOp localOp, LocalOp::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto alloca = rewriter.replaceOpWithNewOp<memref::AllocaOp>(
+        localOp, MemRefType::get({}, localOp.getResult().getType().getElementType()));
+    auto initializer = rewriter.create<arith::ConstantOp>(
+        localOp->getLoc(), getInitializerAttr(localOp.getResult().getType().getElementType()));
+    rewriter.create<memref::StoreOp>(localOp->getLoc(), initializer.getResult(),
+                                     alloca.getResult());
+    return success();
+  }
+};
+
+struct WasmLocalFromArgConversion : OpConversionPattern<LocalFromArgOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(LocalFromArgOp localFromArgOp,
+                  LocalFromArgOp::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto alloca = rewriter.replaceOpWithNewOp<memref::AllocaOp>(
+        localFromArgOp,
+        MemRefType::get({}, localFromArgOp.getBlockInput().getType()));
+    rewriter.create<memref::StoreOp>(localFromArgOp->getLoc(),
+                                     adaptor.getBlockInput(),
+                                     alloca.getResult());
+    return success();
+  }
+};
+
+struct WasmLocalGetConversion : OpConversionPattern<LocalGetOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(LocalGetOp localGetOp, LocalGetOp::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<memref::LoadOp>(localGetOp,
+                                                localGetOp.getResult().getType(),
+                                                adaptor.getLocalVar(),
+                                              ValueRange{});
+    return success();
+  }
+};
+
+struct WasmLocalSetConversion : OpConversionPattern<LocalSetOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(LocalSetOp localSetOp, LocalSetOp::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<memref::StoreOp>(localSetOp, adaptor.getValue(),
+                                                 adaptor.getLocalVar(),
+                                                 ValueRange{});
+    return success();
+  }
+};
+
+struct WasmLocalTeeConversion : OpConversionPattern<LocalTeeOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(LocalTeeOp localTeeOp, LocalTeeOp::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.create<memref::StoreOp>(localTeeOp->getLoc(), adaptor.getValue(),
+                                                 adaptor.getLocalVar());
+    rewriter.replaceOp(localTeeOp, adaptor.getValue());
+    return success();
+  }
+};
+
 struct WasmReturnOpConversion : OpConversionPattern<ReturnOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -430,6 +508,11 @@ void mlir::populateWasmToStandardConversionPatterns(
            WasmLeOpConversion,
            WasmLeSIOpConversion,
            WasmLeUIOpConversion,
+           WasmLocalConversion,
+           WasmLocalFromArgConversion,
+           WasmLocalGetConversion,
+           WasmLocalSetConversion,
+           WasmLocalTeeConversion,
            WasmLtOpConversion,
            WasmLtSIOpConversion,
            WasmLtUIOpConversion,
