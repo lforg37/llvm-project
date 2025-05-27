@@ -20,7 +20,6 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/Error.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/LEB128.h"
 #include "llvm/Support/LogicalResult.h"
@@ -351,10 +350,12 @@ private:
   llvm::SmallVector<Value> values;
 };
 
+using local_val_t = TypedValue<MemRefType>;
+
 class ExpressionParser {
 public:
   ExpressionParser(ParserHead &parser, WasmModuleSymbolTables const &symbols,
-                   llvm::ArrayRef<Value> initLocal)
+                   llvm::ArrayRef<local_val_t> initLocal)
       : parser{parser}, symbols{symbols}, locals{initLocal} {}
 
 private:
@@ -419,13 +420,14 @@ public:
   /// The local.set and local.tee operations behave similarly and only differ
   /// on their return value. This function factorizes the behavior of the two
   /// operations in one place.
-  llvm::FailureOr<Value> parseSetOrTee();
+  template<typename OpToCreate>
+  parsed_inst_t parseSetOrTee(OpBuilder &);
 
 private:
   std::optional<Location> currentOpLoc;
   ParserHead &parser;
   WasmModuleSymbolTables const &symbols;
-  llvm::SmallVector<Value> locals;
+  llvm::SmallVector<local_val_t> locals;
   ValueStack valueStack;
 };
 
@@ -640,14 +642,14 @@ public:
 
   parsed_inst_t parseExpression(OpBuilder &builder,
                                 WasmModuleSymbolTables const &symbols,
-                                llvm::ArrayRef<Value> locals = {}) {
+                                llvm::ArrayRef<local_val_t> locals = {}) {
     auto eParser = ExpressionParser{*this, symbols, locals};
     return eParser.parse(builder);
   }
 
   llvm::LogicalResult parseCodeFor(FuncOp func,
                                    WasmModuleSymbolTables const &symbols) {
-    llvm::SmallVector<Value> locals{};
+    llvm::SmallVector<local_val_t> locals{};
     // Populating locals with function argument
     auto &block = func.getBody().front();
     // Delete temporary return argument which was only created for IR validity
@@ -657,8 +659,6 @@ public:
            "Only the placeholder return op should be present at this point");
     auto returnOp = cast<ReturnOp>(&block.back());
     assert(returnOp);
-    for (auto arg : block.getArguments())
-      locals.push_back(arg);
 
     auto codeSizeInBytes = parseUI32();
     if (failed(codeSizeInBytes))
@@ -673,6 +673,9 @@ public:
     if (failed(localVecSize))
       return failure();
     OpBuilder builder{&func.getBody().front().back()};
+    for (auto arg : block.getArguments())
+      locals.push_back(
+          builder.create<LocalFromArgOp>(func->getLoc(), arg).getResult());
     // Declare the local ops
     auto nVarVec = *localVecSize;
     for (size_t i = 0; i < nVarVec; ++i) {
@@ -918,7 +921,7 @@ ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::localGet>(
   if (*id >= locals.size())
     return emitError(instLoc, "Invalid local index. Function has ")
            << locals.size() << " accessible locals, received index " << *id;
-  return {{locals[*id]}};
+  return {{builder.create<LocalGetOp>(instLoc, locals[*id]).getResult()}};
 }
 
 template <>
@@ -938,7 +941,8 @@ ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::globalGet>(
   return {{globalOp.getResult()}};
 }
 
-llvm::FailureOr<Value> ExpressionParser::parseSetOrTee() {
+template <typename OpToCreate>
+parsed_inst_t ExpressionParser::parseSetOrTee(OpBuilder &builder) {
   auto id = parser.parseLiteral<uint32_t>();
   if (failed(id))
     return failure();
@@ -950,30 +954,26 @@ llvm::FailureOr<Value> ExpressionParser::parseSetOrTee() {
         *currentOpLoc,
         "Invalid stack access, trying to access a value on an empty stack.");
 
-  parsed_inst_t poppedOp = popOperands(locals[*id].getType());
+  parsed_inst_t poppedOp = popOperands(locals[*id].getType().getElementType());
   if (failed(poppedOp))
     return failure();
-  locals[*id] = poppedOp->front();
-  return locals[*id];
+  return {
+      builder.create<OpToCreate>(*currentOpLoc, locals[*id], poppedOp->front())
+          ->getResults()};
 }
 
 template <>
 inline parsed_inst_t
 ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::localSet>(
-    OpBuilder &) {
-  if (failed(parseSetOrTee()))
-    return failure();
-  return {{}};
+    OpBuilder &builder) {
+  return parseSetOrTee<LocalSetOp>(builder);
 }
 
 template <>
 inline parsed_inst_t
 ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::localTee>(
-    OpBuilder &) {
-  llvm::FailureOr<Value> res = parseSetOrTee();
-  if (failed(res))
-    return failure();
-  return {{*res}};
+    OpBuilder & builder) {
+  return parseSetOrTee<LocalTeeOp>(builder);
 }
 
 template <typename T>

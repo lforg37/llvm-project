@@ -24,6 +24,19 @@
 using namespace mlir;
 using namespace mlir::wasm;
 
+
+namespace {
+inline LogicalResult inferTeeGetResType(ValueRange operands, ::llvm::SmallVectorImpl<Type> &inferredReturnTypes) {
+  if (operands.empty())
+    return failure();
+  auto opType = llvm::dyn_cast<MemRefType>(operands.front().getType());
+  if (!opType)
+    return failure();
+  inferredReturnTypes.push_back(opType.getElementType());
+  return success();
+}
+} // namespace
+
 // Custom interface overrides
 
 LogicalResult GlobalGetOp::verifyConstantExprValidity() {
@@ -71,6 +84,45 @@ void GlobalOp::print(OpAsmPrinter & printer) {
     printer.printRegion(body, /*printEntryBlockArgs=*/false,
                   /*printBlockTerminators=*/true);
   }
+}
+
+LogicalResult LocalOp::inferReturnTypes(
+    MLIRContext *context, ::std::optional<Location> location,
+    ValueRange operands, DictionaryAttr attributes, OpaqueProperties properties,
+    RegionRange regions, ::llvm::SmallVectorImpl<Type> &inferredReturnTypes) {
+  LocalOp::GenericAdaptor<ValueRange> adaptor{operands, attributes, properties,
+                                              regions};
+  auto type = adaptor.getTypeAttr();
+  if (!type)
+      return failure();
+  inferredReturnTypes.push_back(MemRefType::get({}, type.getValue()));
+  return success();
+}
+
+LogicalResult LocalFromArgOp::inferReturnTypes(
+    MLIRContext *context, ::std::optional<Location> location,
+    ValueRange operands, DictionaryAttr attributes, OpaqueProperties properties,
+    RegionRange regions, ::llvm::SmallVectorImpl<Type> &inferredReturnTypes) {
+  if (operands.empty())
+    return failure();
+  Type opType = operands.front().getType();
+  auto resType = MemRefType::get({}, opType);
+  inferredReturnTypes.push_back(resType);
+  return success();
+}
+
+LogicalResult LocalGetOp::inferReturnTypes(
+    MLIRContext *context, ::std::optional<Location> location,
+    ValueRange operands, DictionaryAttr attributes, OpaqueProperties properties,
+    RegionRange regions, ::llvm::SmallVectorImpl<Type> &inferredReturnTypes) {
+  return inferTeeGetResType(operands, inferredReturnTypes);
+}
+
+LogicalResult LocalTeeOp::inferReturnTypes(
+    MLIRContext *context, ::std::optional<Location> location,
+    ValueRange operands, DictionaryAttr attributes, OpaqueProperties properties,
+    RegionRange regions, ::llvm::SmallVectorImpl<Type> &inferredReturnTypes) {
+  return inferTeeGetResType(operands, inferredReturnTypes);
 }
 
 ParseResult FuncOp::parse(::mlir::OpAsmParser &parser, ::mlir::OperationState &result) {

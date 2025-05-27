@@ -63,6 +63,7 @@ def Wasm_TableType : Wasm_Type<"Table", "tabletype"> {
   let assemblyFormat = "$reference $limit";
 }
 
+def Wasm_LocalRef : MemRefRankOf<[Wasm_ValType], [0]>;
 
 def Wasm_FuncTypeAttr : TypeAttrOf<Wasm_FuncType>;
 def Wasm_LimitTypeAttr : TypeAttrOf<Wasm_LimitType>;
