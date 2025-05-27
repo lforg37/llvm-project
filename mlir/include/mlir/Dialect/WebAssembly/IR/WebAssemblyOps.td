@@ -384,4 +384,14 @@ def Wasm_ShRSOp : Wasm_ShiftOp<"shr_s",
     Vacated bits on the left shall be filled with the sign bit.}]
     >{}
 
+def Wasm_ShRUOp : Wasm_ShiftOp<"shr_u",
+    [{Logical right shift.
+
+    Consume an integer, and an integer shift amount from the stack. The first
+    integer shall be shifted right by N bits, where N is the value of the
+    second integer.
+
+    Vacated bits on the left shall be filled with zeroes.}]
+    >{}
+
 #endif // WEBASSEMBLY_OPS
