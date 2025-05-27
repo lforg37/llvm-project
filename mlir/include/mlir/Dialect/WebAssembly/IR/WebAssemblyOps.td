@@ -161,10 +161,54 @@ def Wasm_GlobalGetOp : Wasm_Op<"global_get", [DeclareOpInterfaceMethods<WasmCont
   let assemblyFormat = "$global attr-dict `:` type($global_val)";
 }
 
-def Wasm_LocalOp : Wasm_Op<"local"> {
+def Wasm_LocalOp : Wasm_Op<"local", [
+    DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
   let summary = "Declaration of local variable";
+  let arguments = (ins Wasm_ValTypeAttr: $type);
+  let results = (outs Wasm_LocalRef: $result);
+  let assemblyFormat = "$type attr-dict";
+}
+
+def Wasm_LocalFromArgOp : Wasm_Op<"local_from_arg", [
+    ParentOneOf<["FuncOp"]>,
+    SameOperandsAndResultElementType,
+    DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
+  let summary = "Declaration of local variable storage from block argument";
+  let description = [{
+    Wasm locals includes the function arguments.
+    As they can be overriden in different path, they should be converted to memref.
+    This op is not a counterpart to any Wasm existing op.
+  }];
+  let arguments = (ins Wasm_ValType: $blockInput);
+  let results = (outs Wasm_LocalRef: $result);
+  let assemblyFormat = "$blockInput `:` type($blockInput) attr-dict";
+}
+
+def Wasm_LocalGetOp : Wasm_Op<"local_get", [
+    SameOperandsAndResultElementType,
+    DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
+  let summary = "Set local to value and return the operand.";
+  let arguments = (ins Wasm_LocalRef: $localVar);
   let results = (outs Wasm_ValType: $result);
-  let assemblyFormat = "type($result) attr-dict";
+  let assemblyFormat = "$localVar `:` type($localVar) attr-dict";
+}
+
+def Wasm_LocalSetOp : Wasm_Op<"local_set",[
+    SameOperandsElementType]> {
+  let summary = "Set local to given value";
+  let arguments = (ins Wasm_LocalRef: $localVar,
+                       Wasm_ValType: $value);
+  let assemblyFormat = "$localVar `:` type($localVar) `to` $value `:` type($value) attr-dict";
+}
+
+def Wasm_LocalTeeOp : Wasm_Op<"local_tee", [
+    SameOperandsAndResultElementType,
+    DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
+  let summary = "Set local to value and return the operand.";
+  let arguments = (ins Wasm_LocalRef: $localVar,
+                       Wasm_ValType: $value);
+  let results = (outs Wasm_ValType: $result);
+  let assemblyFormat = "$localVar `:` type($localVar) `to` $value `:` type($value) attr-dict";
 }
 
 def Wasm_MemOp : Wasm_Op<"memory", [Symbol]> {
