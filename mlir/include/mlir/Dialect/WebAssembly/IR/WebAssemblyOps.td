@@ -414,8 +414,8 @@ def Wasm_GeOp : Wasm_BinaryComparisonOp<"ge",
     "Check if a float value is greater or equal to another and push the result",
     [Wasm_FPType]>{}
 
-// Integer shift operations.
-class Wasm_ShiftOp<string mnemonic, string summaryStr> :
+// Integer shift and rotate operations.
+class Wasm_ShiftRotateOp<string mnemonic, string summaryStr> :
   Wasm_Op<mnemonic, [AllTypesMatch<["val", "bits", "result"]>]> {
   let summary = summaryStr;
   let arguments = (ins Wasm_IntegerType:$val, Wasm_IntegerType:$bits);
@@ -423,13 +423,13 @@ class Wasm_ShiftOp<string mnemonic, string summaryStr> :
   let assemblyFormat = "$val `by` $bits `bits` `:` type($val) attr-dict";
 }
 
-def Wasm_ShLOp : Wasm_ShiftOp<"shl",
+def Wasm_ShLOp : Wasm_ShiftRotateOp<"shl",
     [{Consume an integer, and an integer shift amount from the stack. The first
     integer shall be shifted left by N bits, where N is the value of the second
     integer. The result will then be pushed to the stack.}]
     >{}
 
-def Wasm_ShRSOp : Wasm_ShiftOp<"shr_s",
+def Wasm_ShRSOp : Wasm_ShiftRotateOp<"shr_s",
     [{Arithmetic right shift.
 
     Consume an integer, and an integer shift amount from the stack. The first
@@ -439,7 +439,7 @@ def Wasm_ShRSOp : Wasm_ShiftOp<"shr_s",
     Vacated bits on the left shall be filled with the sign bit.}]
     >{}
 
-def Wasm_ShRUOp : Wasm_ShiftOp<"shr_u",
+def Wasm_ShRUOp : Wasm_ShiftRotateOp<"shr_u",
     [{Logical right shift.
 
     Consume an integer, and an integer shift amount from the stack. The first
@@ -447,6 +447,14 @@ def Wasm_ShRUOp : Wasm_ShiftOp<"shr_u",
     second integer.
 
     Vacated bits on the left shall be filled with zeroes.}]
+    >{}
+
+def Wasm_RotrOp : Wasm_ShiftRotateOp<"rotr",
+    [{Rotate right.
+
+    Consume an integer, and an integer rotate amount from the stack. The first
+    integer shall be rotated right by N bits, where N is the value of the
+    second integer. The result shall be pushed to the stack.}]
     >{}
 
 #endif // WEBASSEMBLY_OPS
