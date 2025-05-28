@@ -357,12 +357,12 @@ struct WasmMemoryOpConversion : OpConversionPattern<MemOp> {
 };
 
 inline TypedAttr getInitializerAttr(Type t) {
+  assert(t.isIntOrFloat() &&
+         "This helper is intended to use with int and float types");
   if (t.isInteger())
     return IntegerAttr::get(t, 0);
   if (t.isFloat())
     return FloatAttr::get(t, 0.);
-  llvm_unreachable(
-      "This helper function should only be used with Integer of Float type");
   return TypedAttr{};
 }
 
