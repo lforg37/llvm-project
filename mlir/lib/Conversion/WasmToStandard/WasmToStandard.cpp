@@ -14,6 +14,7 @@
 
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -223,6 +224,36 @@ struct IntFpComparisonOpConversion : OpConversionPattern<SourceOp> {
 
 using WasmEqOpConversion = IntFpComparisonOpConversion<EqOp, arith::CmpIPredicate::eq, arith::CmpFPredicate::OEQ>;
 using WasmNeOpConversion = IntFpComparisonOpConversion<NeOp, arith::CmpIPredicate::ne, arith::CmpFPredicate::ONE>;
+
+struct WasmBlockOpConversion : OpConversionPattern<BlockOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(BlockOp blockOp, BlockOp::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    /// Split current block before the blockOp and inline the BlockOp's block at
+    /// the place of the BlockOp.
+    auto *curBlock = blockOp->getBlock();
+    Block *blockOpBlock = &blockOp.getBody().front();
+    Block *newBlock =
+        rewriter.splitBlock(curBlock, rewriter.getInsertionPoint());
+    rewriter.moveBlockBefore(blockOpBlock, newBlock);
+    auto sip = rewriter.saveInsertionPoint();
+    Operation* terminator = blockOpBlock->getTerminator();
+    rewriter.setInsertionPoint(terminator);
+    rewriter.replaceOpWithNewOp<cf::BranchOp>(terminator, newBlock, terminator->getOperands());
+    rewriter.setInsertionPointToEnd(curBlock);
+    rewriter.create<cf::BranchOp>(blockOp->getLoc(), blockOpBlock,
+                                  adaptor.getInputs());
+    rewriter.restoreInsertionPoint(sip);
+    for (auto res : blockOp.getResults()) {
+      auto arg = newBlock->addArgument(res.getType(), res.getLoc());
+      rewriter.replaceAllUsesWith(res, arg);
+    }
+    rewriter.eraseOp(blockOp);
+    return success();
+  }
+};
 
 struct WasmCallOpConversion : OpConversionPattern<FuncCallOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -505,7 +536,7 @@ struct ConvertWasmToStandardPass
   void runOnOperation() override {
     ConversionTarget target{getContext()};
     target.addIllegalDialect<WasmDialect>();
-    target.addLegalDialect<arith::ArithDialect, BuiltinDialect,
+    target.addLegalDialect<arith::ArithDialect, BuiltinDialect, cf::ControlFlowDialect,
                            func::FuncDialect, memref::MemRefDialect>();
     RewritePatternSet patterns(&getContext());
     TypeConverter tc{};
@@ -543,6 +574,7 @@ void mlir::populateWasmToStandardConversionPatterns(
       .add<
            WasmAddOpConversion,
            WasmAndOpConversion,
+           WasmBlockOpConversion,
            WasmCallOpConversion,
            WasmConstOpConversion,
            WasmDivFPOpConversion,
