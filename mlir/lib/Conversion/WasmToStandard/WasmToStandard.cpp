@@ -87,6 +87,61 @@ using WasmShRSOpConversion = BinaryOpConversion<ShRSOp, arith::ShRSIOp>;
 using WasmShRUOpConversion = BinaryOpConversion<ShRUOp, arith::ShRUIOp>;
 using WasmXOrOpConversion = BinaryOpConversion<XOrOp, arith::XOrIOp>;
 
+/// Lower a right rotate to a series of bitwise operations. Intended for us
+/// in dialects that do not support a "native" right rotate.
+///
+/// Result stays in the wasm dialect. It will then subsequently be lowered to
+/// the target dialect.
+struct WasmRotrOpConversion : OpConversionPattern<RotrOp> {
+  using OpConversionPattern<RotrOp>::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(RotrOp srcOp, typename RotrOp::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // Given a rotate like this:
+    //
+    // %res = wasm.rotr %val by %bits bits : iwidth
+    //
+    // Construct:
+    // res = (val >> (bits & (width - 1))) | (val << (-bits & (width - 1)))
+    //
+    // We'll use this pattern to ensure that the shifts do not introduce UB
+    // in the target dialect (e.g. we don't shift 0)
+    const Type ty = srcOp->getResultTypes()[0];
+    const Location loc = srcOp->getLoc();
+    const Value val = adaptor.getVal();
+    const Value bits = adaptor.getBits();
+    const unsigned width = ty.getIntOrFloatBitWidth();
+
+    // Materialize (width - 1) for use in both sides of the expression.
+    auto cstWidthMinusOne =
+        rewriter.create<wasm::ConstOp>(loc, IntegerAttr::get(ty, width - 1));
+
+    // Form the left-hand side of the OR:
+    // (val >> (bits & (width - 1)))
+    auto orLHS = rewriter.create<wasm::ShRUOp>(
+        loc, val, rewriter.create<wasm::AndOp>(loc, bits, cstWidthMinusOne));
+
+    // Form the right-hand side of the OR:
+    // (val << (-bits & (width - 1)))
+    auto orRHS = rewriter.create<wasm::ShLOp>(
+        loc, val,
+        // (-bits & (width - 1))
+        rewriter.create<wasm::AndOp>(
+            loc,
+            // 0 - bits == -bits
+            rewriter.create<wasm::SubOp>(
+                loc,
+                rewriter.create<wasm::ConstOp>(loc, IntegerAttr::get(ty, 0)),
+                bits),
+            cstWidthMinusOne));
+
+    // OR together the two shifts and replace the rotate with the new
+    // expression.
+    rewriter.replaceOpWithNewOp<wasm::OrOp>(srcOp, orLHS, orRHS);
+    return success();
+  }
+};
+
 template <typename SourceOp, typename TargetOp, typename AttrType,
           typename ValType, ValType flag>
 struct ComparisonOpConversion : OpConversionPattern<SourceOp> {
@@ -522,6 +577,7 @@ void mlir::populateWasmToStandardConversionPatterns(
            WasmRemSIOpConversion,
            WasmRemUIOpConversion,
            WasmReturnOpConversion,
+           WasmRotrOpConversion,
            WasmShLOpConversion,
            WasmShRSOpConversion,
            WasmShRUOpConversion,
