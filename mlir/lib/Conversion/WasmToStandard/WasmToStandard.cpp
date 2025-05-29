@@ -60,6 +60,8 @@ struct BinaryIntFPOpConversionPattern : OpConversionPattern<SourceOp> {
 
 using WasmAddOpConversion =
     BinaryIntFPOpConversionPattern<AddOp, arith::AddIOp, arith::AddFOp>;
+using WasmMulOpConversion =
+    BinaryIntFPOpConversionPattern<MulOp, arith::MulIOp, arith::MulFOp>;
 using WasmSubOpConversion =
     BinaryIntFPOpConversionPattern<SubOp, arith::SubIOp, arith::SubFOp>;
 
@@ -604,6 +606,7 @@ void mlir::populateWasmToStandardConversionPatterns(
            WasmLtSIOpConversion,
            WasmLtUIOpConversion,
            WasmMemoryOpConversion,
+           WasmMulOpConversion,
            WasmNeOpConversion,
            WasmOrOpConversion,
            WasmRemSIOpConversion,
