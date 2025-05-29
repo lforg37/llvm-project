@@ -90,25 +90,33 @@ using WasmShRSOpConversion = BinaryOpConversion<ShRSOp, arith::ShRSIOp>;
 using WasmShRUOpConversion = BinaryOpConversion<ShRUOp, arith::ShRUIOp>;
 using WasmXOrOpConversion = BinaryOpConversion<XOrOp, arith::XOrIOp>;
 
-/// Lower a right rotate to a series of bitwise operations. Intended for us
-/// in dialects that do not support a "native" right rotate.
+/// Lower a rotate to a series of bitwise operations. Intended for us
+/// in dialects that do not natively support rotate operations.
 ///
 /// Result stays in the wasm dialect. It will then subsequently be lowered to
 /// the target dialect.
-struct WasmRotrOpConversion : OpConversionPattern<RotrOp> {
-  using OpConversionPattern<RotrOp>::OpConversionPattern;
+///
+/// The rotate will be lowered to a pattern like so:
+///
+/// (val LHSShiftOp (bits & (width-1))) | (val RHSShiftOp (-bits & (width-1)))
+///
+/// Where LHSShiftOp and RHSShiftOp are shift operations. Concretely,
+///
+/// rotr = (val >> (bits & (width - 1))) | (val << (-bits & (width - 1)))
+/// rotl = (val << (bits & (width - 1))) | (val >> (-bits & (width - 1)))
+///
+/// Using this variant ensures that our rotate is defined in the target dialect.
+///
+/// \p SourceOp - Rotate operation to replace.
+/// \p LHSShiftOp - Shift operation to use on the left-hand side of the OR.
+/// \p RHSShiftOp - Shift operation to use on the right-hand side of the OR.
+template <typename SourceOp, typename LHSShiftOp, typename RHSShiftOp>
+struct RotateOpConversion : OpConversionPattern<SourceOp> {
+  using OpConversionPattern<SourceOp>::OpConversionPattern;
+
   LogicalResult
-  matchAndRewrite(RotrOp srcOp, typename RotrOp::Adaptor adaptor,
+  matchAndRewrite(SourceOp srcOp, typename SourceOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // Given a rotate like this:
-    //
-    // %res = wasm.rotr %val by %bits bits : iwidth
-    //
-    // Construct:
-    // res = (val >> (bits & (width - 1))) | (val << (-bits & (width - 1)))
-    //
-    // We'll use this pattern to ensure that the shifts do not introduce UB
-    // in the target dialect (e.g. we don't shift 0)
     const Type ty = srcOp->getResultTypes()[0];
     const Location loc = srcOp->getLoc();
     const Value val = adaptor.getVal();
@@ -120,13 +128,13 @@ struct WasmRotrOpConversion : OpConversionPattern<RotrOp> {
         rewriter.create<wasm::ConstOp>(loc, IntegerAttr::get(ty, width - 1));
 
     // Form the left-hand side of the OR:
-    // (val >> (bits & (width - 1)))
-    auto orLHS = rewriter.create<wasm::ShRUOp>(
+    // (val (lhs shift op) (bits & (width - 1)))
+    auto orLHS = rewriter.create<LHSShiftOp>(
         loc, val, rewriter.create<wasm::AndOp>(loc, bits, cstWidthMinusOne));
 
     // Form the right-hand side of the OR:
-    // (val << (-bits & (width - 1)))
-    auto orRHS = rewriter.create<wasm::ShLOp>(
+    // (val (rhs shift op) (-bits & (width - 1)))
+    auto orRHS = rewriter.create<RHSShiftOp>(
         loc, val,
         // (-bits & (width - 1))
         rewriter.create<wasm::AndOp>(
@@ -144,6 +152,9 @@ struct WasmRotrOpConversion : OpConversionPattern<RotrOp> {
     return success();
   }
 };
+
+using WasmRotrOpConversion = RotateOpConversion<RotrOp, ShRUOp, ShLOp>;
+using WasmRotlOpConversion = RotateOpConversion<RotlOp, ShLOp, ShRUOp>;
 
 template <typename SourceOp, typename TargetOp, typename AttrType,
           typename ValType, ValType flag>
@@ -612,6 +623,7 @@ void mlir::populateWasmToStandardConversionPatterns(
            WasmRemSIOpConversion,
            WasmRemUIOpConversion,
            WasmReturnOpConversion,
+           WasmRotlOpConversion,
            WasmRotrOpConversion,
            WasmShLOpConversion,
            WasmShRSOpConversion,

@@ -133,6 +133,7 @@ struct WasmEncodings {
     static constexpr std::byte shlI32{0x74};
     static constexpr std::byte shr_sI32{0x75};
     static constexpr std::byte shr_uI32{0x76};
+    static constexpr std::byte rotlI32{0x77};
     static constexpr std::byte rotrI32{0x78};
 
     static constexpr std::byte eqI64{0x51};
@@ -158,6 +159,7 @@ struct WasmEncodings {
     static constexpr std::byte shlI64{0x86};
     static constexpr std::byte shr_sI64{0x87};
     static constexpr std::byte shr_uI64{0x88};
+    static constexpr std::byte rotlI64{0x89};
     static constexpr std::byte rotrI64{0x8A};
 
     static constexpr std::byte eqF32{0x5B};
@@ -1276,6 +1278,7 @@ ImplementNumericalOpInt(DivUIOp, divU)
 ImplementNumericalOpInt(OrOp, or)
 ImplementNumericalOpInt(RemSIOp, remS)
 ImplementNumericalOpInt(RemUIOp, remU)
+ImplementNumericalOpInt(RotlOp, rotl)
 ImplementNumericalOpInt(RotrOp, rotr)
 ImplementNumericalOpInt(ShLOp, shl)
 ImplementNumericalOpInt(ShRSOp, shr_s)
