@@ -449,6 +449,14 @@ def Wasm_ShRUOp : Wasm_ShiftRotateOp<"shr_u",
     Vacated bits on the left shall be filled with zeroes.}]
     >{}
 
+def Wasm_RotlOp : Wasm_ShiftRotateOp<"rotl",
+    [{Rotate left.
+
+    Consume an integer, and an integer rotate amount from the stack. The first
+    integer shall be rotated left by N bits, where N is the value of the
+    second integer. The result shall be pushed to the stack.}]
+    >{}
+
 def Wasm_RotrOp : Wasm_ShiftRotateOp<"rotr",
     [{Rotate right.
 
