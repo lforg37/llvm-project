@@ -27,6 +27,9 @@
 
 #include <optional>
 
+
+#define DEBUG_TYPE "wasm-convert"
+
 namespace mlir {
 #define GEN_PASS_DEF_CONVERTWASMTOSTANDARD
 #include "mlir/Conversion/Passes.h.inc"
@@ -243,36 +246,6 @@ struct IntFpComparisonOpConversion : OpConversionPattern<SourceOp> {
 using WasmEqOpConversion = IntFpComparisonOpConversion<EqOp, arith::CmpIPredicate::eq, arith::CmpFPredicate::OEQ>;
 using WasmNeOpConversion = IntFpComparisonOpConversion<NeOp, arith::CmpIPredicate::ne, arith::CmpFPredicate::ONE>;
 
-struct WasmBlockOpConversion : OpConversionPattern<BlockOp> {
-  using OpConversionPattern::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(BlockOp blockOp, BlockOp::Adaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    /// Split current block before the blockOp and inline the BlockOp's block at
-    /// the place of the BlockOp.
-    auto *curBlock = blockOp->getBlock();
-    Block *blockOpBlock = &blockOp.getBody().front();
-    Block *newBlock =
-        rewriter.splitBlock(curBlock, rewriter.getInsertionPoint());
-    rewriter.moveBlockBefore(blockOpBlock, newBlock);
-    auto sip = rewriter.saveInsertionPoint();
-    Operation* terminator = blockOpBlock->getTerminator();
-    rewriter.setInsertionPoint(terminator);
-    rewriter.replaceOpWithNewOp<cf::BranchOp>(terminator, newBlock, terminator->getOperands());
-    rewriter.setInsertionPointToEnd(curBlock);
-    rewriter.create<cf::BranchOp>(blockOp->getLoc(), blockOpBlock,
-                                  adaptor.getInputs());
-    rewriter.restoreInsertionPoint(sip);
-    for (auto res : blockOp.getResults()) {
-      auto arg = newBlock->addArgument(res.getType(), res.getLoc());
-      rewriter.replaceAllUsesWith(res, arg);
-    }
-    rewriter.eraseOp(blockOp);
-    return success();
-  }
-};
-
 struct WasmCallOpConversion : OpConversionPattern<FuncCallOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -314,6 +287,123 @@ struct WasmFuncImportOpConversion : OpConversionPattern<FuncImportOp> {
 
 struct WasmFuncOpConversion : OpConversionPattern<FuncOp> {
   using OpConversionPattern::OpConversionPattern;
+  ///
+  /// Control flow conversion needs shared state for tracking which block
+  /// corresponds to which operation at which level.
+  ///
+  /// This class handles such tracking and performs the conversion of control
+  /// flow related ops contained in a function.
+  class CFRewriterVisitor {
+  private:
+    using branch_op_map_t =
+        llvm::DenseMap<WasmLabelBranchingInterface, WasmLabelLevelInterface>;
+    using nest_block_map_t = llvm::DenseMap<WasmLabelLevelInterface, Block *>;
+
+    /// Take a nesting level defining op and inline it in the parent region.
+    void inlineBlocks(WasmLabelLevelInterface nestingOp,
+                      ConversionPatternRewriter &rewriter) {
+      Block *opFirstBlock = nestingOp.getEntryBlock();
+      Block *blockSuccessor = nestingOp->getSuccessor(0);
+      LLVM_DEBUG(llvm::dbgs()
+                     << "Starting inlining blocks for " << nestingOp << "\n";);
+      for (auto &region : nestingOp->getRegions()) {
+        /// Inline blocks of nested ops
+        llvm::SmallVector<WasmLabelLevelInterface> nestedOps{
+            region.getOps<WasmLabelLevelInterface>()};
+        for (auto nestedOp : nestedOps) {
+          LLVM_DEBUG(llvm::dbgs() << " Found nested op: " << nestedOp);
+          inlineBlocks(nestedOp, rewriter);
+        }
+        rewriter.inlineRegionBefore(region, blockSuccessor);
+      }
+      auto sip = rewriter.saveInsertionPoint();
+      rewriter.setInsertionPoint(nestingOp);
+      rewriter.replaceOpWithNewOp<cf::BranchOp>(nestingOp, opFirstBlock,
+                                                nestingOp->getOperands());
+      LLVM_DEBUG(llvm::dbgs() << "End of inlining for blocks\n");
+      LLVM_DEBUG(func->dumpPretty());
+      rewriter.restoreInsertionPoint(sip);
+    }
+
+    llvm::FailureOr<Block *> getBlockFor(WasmLabelBranchingInterface branchOp) {
+      auto nestIter = branchToOp.find(branchOp);
+      if (nestIter == branchToOp.end())
+        return branchOp->emitError("No indexed label op for this operation: ")
+               << branchOp;
+      auto dest = cFGOpToDest.find(nestIter->second);
+      if (dest == cFGOpToDest.end())
+        return branchOp->emitError("Unknown destination for op ") << branchOp;
+      return dest->second;
+    }
+
+    inline LogicalResult convertBranch(BlockReturnOp brOp, Block *dest,
+                                       ConversionPatternRewriter &rewriter) {
+      rewriter.replaceOpWithNewOp<cf::BranchOp>(brOp, dest, brOp.getInputs());
+      return success();
+    }
+
+    template <typename LevelInterfaceT>
+    inline LogicalResult
+    convertBranchDispatch(WasmLabelBranchingInterface branchOp, Block *dest,
+                           ConversionPatternRewriter &rewriter) {
+      auto cast = dyn_cast<LevelInterfaceT>(branchOp.getOperation());
+      if (!cast)
+        return failure();
+      auto sip = rewriter.saveInsertionPoint();
+      rewriter.setInsertionPoint(branchOp);
+      auto res = convertBranch(cast, dest, rewriter);
+      rewriter.restoreInsertionPoint(sip);
+      return res;
+    }
+
+    template <typename... BranchInterfaceT>
+    LogicalResult convertBranchWrapper(WasmLabelBranchingInterface branchOp,
+                                       ConversionPatternRewriter &rewriter) {
+      auto dest = getBlockFor(branchOp);
+      if (failed(dest))
+        return failure();
+      auto res =
+          success((... || succeeded(convertBranchDispatch<BranchInterfaceT>(
+                              branchOp, *dest, rewriter))));
+      if (failed(res))
+        return emitError(branchOp->getLoc(), "No known converter for op ")
+               << branchOp;
+      return res;
+    }
+
+    LogicalResult convertBranch(WasmLabelBranchingInterface branchOp,
+                                ConversionPatternRewriter &rewriter) {
+      return convertBranchWrapper<BlockReturnOp>(branchOp, rewriter);
+    }
+
+    branch_op_map_t branchToOp;
+    nest_block_map_t cFGOpToDest;
+    func::FuncOp func;
+
+  public:
+    CFRewriterVisitor(func::FuncOp func) : func{func} {
+      func.walk([this](WasmLabelBranchingInterface branchOp) {
+        branchToOp.insert({branchOp, branchOp.getLabelBranchingInterface()});
+      });
+      func.walk([this](WasmLabelLevelInterface nestingLvlOp) {
+        cFGOpToDest.insert({nestingLvlOp, nestingLvlOp.getLabelTarget()});
+      });
+    }
+    LogicalResult rewrite(ConversionPatternRewriter &rewriter) {
+      llvm::SmallVector<WasmLabelLevelInterface> nestingOps{
+          func.getOps<WasmLabelLevelInterface>()};
+      for (auto nestingOp : nestingOps)
+        inlineBlocks(nestingOp, rewriter);
+
+      auto res =
+          func->walk([this, &rewriter](WasmLabelBranchingInterface branchOp) {
+            if (failed(convertBranch(branchOp, rewriter)))
+              return WalkResult::interrupt();
+            return WalkResult::advance();
+          });
+      return failure(res.wasInterrupted());
+    }
+  };
 
   LogicalResult
   matchAndRewrite(FuncOp funcOp, FuncOp::Adaptor adaptor,
@@ -323,7 +413,8 @@ struct WasmFuncOpConversion : OpConversionPattern<FuncOp> {
     rewriter.cloneRegionBefore(funcOp.getBody(), newFunc.getBody(),
                                newFunc.getBody().end());
     rewriter.replaceOp(funcOp, newFunc);
-    return success();
+    CFRewriterVisitor cfRewriter{newFunc};
+    return cfRewriter.rewrite(rewriter);
   }
 };
 
@@ -592,7 +683,6 @@ void mlir::populateWasmToStandardConversionPatterns(
       .add<
            WasmAddOpConversion,
            WasmAndOpConversion,
-           WasmBlockOpConversion,
            WasmCallOpConversion,
            WasmConstOpConversion,
            WasmDivFPOpConversion,

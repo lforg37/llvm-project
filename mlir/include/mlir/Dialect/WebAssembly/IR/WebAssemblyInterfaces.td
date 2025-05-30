@@ -21,6 +21,38 @@ def WasmLabelLevelInterface : OpInterface<"WasmLabelLevelInterface"> {
     Operation that defines one level of nesting for wasm branching.
     These operation region can be targeted by branch instructions.
   }];
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/        "Returns the target block address",
+      /*returnType=*/  "Block*",
+      /*methodName=*/  "getLabelTarget",
+      /*args=*/        (ins)
+    >,
+    InterfaceMethod<
+      /*desc=*/        "Returns the first block to be executed by this op",
+      /*returnType=*/  "Block*",
+      /*methodName=*/  "getEntryBlock",
+      /*args=*/        (ins)
+    >
+  ];
+}
+
+def WasmLabelBranchingInterface : OpInterface<"WasmLabelBranchingInterface"> {
+  let description = [{
+    Wasm operation that targets a label for a jump.
+  }];
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/        "Returns the number of context to break from",
+      /*returnType=*/  "size_t",
+      /*methodName=*/  "getExitLevel",
+      /*args=*/        (ins)
+    >
+  ];
+  let extraClassDeclaration = [{
+    WasmLabelLevelInterface getLabelBranchingInterface();
+  }];
+  let verify = [{return verifyWasmLabelBranchingInterface($_op);}];
 }
 
 def WasmImportOpInterface : OpInterface<"WasmImportOpInterface"> {

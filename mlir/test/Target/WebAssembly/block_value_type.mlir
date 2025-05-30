@@ -9,9 +9,11 @@
     end))
 */
 
+
 // CHECK-LABEL:   wasm.func nested @func_0() -> i32 {
-// CHECK:           %[[VAL_0:.*]] = wasm.block : () -> i32 {
-// CHECK:             %[[VAL_1:.*]] = wasm.const 17 : i32
-// CHECK:             wasm.return %[[VAL_1]] : i32
-// CHECK:           }
-// CHECK:           wasm.return %[[VAL_0]] : i32
+// CHECK:           wasm.block : {
+// CHECK:             %[[VAL_0:.*]] = wasm.const 17 : i32
+// CHECK:             wasm.block_return %[[VAL_0]] : i32
+// CHECK:           }> ^bb1
+// CHECK:         ^bb1(%[[VAL_1:.*]]: i32):
+// CHECK:           wasm.return %[[VAL_1]] : i32

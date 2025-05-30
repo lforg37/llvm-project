@@ -333,6 +333,11 @@ class ParserHead;
 /// stack. Makes sure that there are no "free accesses" on the stack to preserve
 /// its state.
 class ValueStack {
+private:
+  struct LabelLevel {
+    size_t stackIdx;
+    WasmLabelLevelInterface levelOp;
+  };
 public:
   bool empty() const { return values.empty(); }
 
@@ -357,14 +362,14 @@ public:
   ///   if an error occurs.
   LogicalResult pushResults(ValueRange results, Location *opLoc);
 
-  void addFrame() {
-    frameIndexes.push_back(values.size());
+  void addLabelLevel(WasmLabelLevelInterface levelOp) {
+    labelLevel.push_back({values.size(), levelOp});
     LLVM_DEBUG(llvm::dbgs() << "Adding a new frame context to ValueStack");
   }
 
-  void dropFrame() {
-    assert(!frameIndexes.empty() && "Trying to drop a frame from empty context");
-    auto newSize = frameIndexes.pop_back_val();
+  void dropLabelLevel() {
+    assert(!labelLevel.empty() && "Trying to drop a frame from empty context");
+    auto newSize = labelLevel.pop_back_val().stackIdx;
     values.truncate(newSize);
   }
 
@@ -376,7 +381,7 @@ public:
 
 private:
   llvm::SmallVector<Value> values;
-  llvm::SmallVector<size_t> frameIndexes;
+  llvm::SmallVector<LabelLevel> labelLevel;
 };
 
 using local_val_t = TypedValue<MemRefType>;
@@ -442,12 +447,12 @@ private:
     }
   }
 
-
   struct NestingContext {
-    NestingContext(ExpressionParser& parser):parser{parser}{
-      parser.addNestingContextLevel();
+    NestingContext(ExpressionParser &parser, WasmLabelLevelInterface levelOp)
+        : parser{parser} {
+      parser.addNestingContextLevel(levelOp);
     }
-    NestingContext(NestingContext&& other):parser{other.parser}{
+    NestingContext(NestingContext &&other) : parser{other.parser} {
       other.shouldDropOnDestruct = false;
     }
     NestingContext(NestingContext const &) = delete;
@@ -455,17 +460,18 @@ private:
       if (shouldDropOnDestruct)
         parser.dropNestingContextLevel();
     }
-    ExpressionParser& parser;
+    ExpressionParser &parser;
     bool shouldDropOnDestruct = true;
   };
 
-  void addNestingContextLevel() {
-    valueStack.addFrame();
+  void addNestingContextLevel(WasmLabelLevelInterface levelOp) {
+    valueStack.addLabelLevel(levelOp);
   }
 
   void dropNestingContextLevel() {
-    // Should always succeed as we are droping the frame that was previously created.
-    valueStack.dropFrame();
+    // Should always succeed as we are droping the frame that was previously
+    // created.
+    valueStack.dropLabelLevel();
   }
 
   llvm::FailureOr<FunctionType> getFuncTypeFor(OpBuilder & builder, EmptyBlockMarker) {
@@ -484,12 +490,33 @@ private:
     return builder.getFunctionType({}, {valType});
   }
 
+  /// @param blockToFill: the block which content will be populated
+  /// @param resType: the type that this block is supposed to return
+  LogicalResult parseBlockContent(OpBuilder &builder, Block *blockToFill,
+                                  TypeRange resTypes, Location opLoc,
+                                  WasmLabelLevelInterface levelOp) {
+    auto sip = builder.saveInsertionPoint();
+    builder.setInsertionPointToStart(blockToFill);
+    auto nC = addNesting(levelOp);
+    if (failed(pushResults(blockToFill->getArguments())))
+      return failure();
+    auto bodyParsingRes = parse(builder);
+    if (failed(bodyParsingRes))
+      return failure();
+    auto returnOperands = popOperands(resTypes);
+    if (failed(returnOperands))
+      return failure();
+    builder.create<BlockReturnOp>(opLoc, *returnOperands);
+    builder.restoreInsertionPoint(sip);
+    return success();
+  }
+
 public:
   parsed_inst_t parse(OpBuilder &builder,
                       std::byte endByte = WasmEncodings::endByte);
 
-  NestingContext addNesting() {
-    return NestingContext{*this};
+  NestingContext addNesting(WasmLabelLevelInterface levelOp) {
+    return NestingContext{*this, levelOp};
   }
 
   llvm::FailureOr<llvm::SmallVector<Value>>
@@ -929,20 +956,20 @@ inline parsed_inst_t ExpressionParser::parseSpecificInstruction(OpBuilder &) {
 void ValueStack::dump() const {
   llvm::dbgs() << "================= Wasm ValueStack =======================\n";
   llvm::dbgs() << "size: " << size() << "\n";
-  llvm::dbgs() << "nbFrames: " << frameIndexes.size() << '\n';
+  llvm::dbgs() << "nbFrames: " << labelLevel.size() << '\n';
   llvm::dbgs() << "<Top>"
                << "\n";
   // Stack is pushed to via push_back. Therefore the top of the stack is the
   // end of the vector. Iterate in reverse so that the first thing we print
   // is the top of the stack.
   auto indexGetter = [this](){
-    size_t idx = frameIndexes.size();
+    size_t idx = labelLevel.size();
     return [this, idx]() mutable-> std::optional<std::pair<size_t, size_t>> {
       llvm::dbgs() << "IDX: " << idx << '\n';
       if (idx == 0)
         return std::nullopt;
       auto frameId = idx - 1;
-      auto frameLimit = frameIndexes[frameId];
+      auto frameLimit = labelLevel[frameId].stackIdx;
       idx -= 1;
       return {{frameId, frameLimit}};
     };
@@ -1055,24 +1082,21 @@ ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::block>(
   if (failed(inputOps))
     return failure();
 
+  Block *curBlock = builder.getBlock();
+  Region *curRegion = curBlock->getParent();
   auto resTypes = funcType->getResults();
-  auto blockOp = builder.create<BlockOp>(*currentOpLoc, resTypes, *inputOps);
+  llvm::SmallVector<Location> locations{};
+  locations.resize(resTypes.size(), *currentOpLoc);
+  auto *successor =
+      builder.createBlock(curRegion, curRegion->end(), resTypes, locations);
+  builder.setInsertionPointToEnd(curBlock);
+  auto blockOp = builder.create<BlockOp>(*currentOpLoc, *inputOps, successor);
   auto *blockBody = blockOp.createBlock();
-  auto sip = builder.saveInsertionPoint();
-  builder.setInsertionPointToStart(blockBody);
-  {
-    auto nC = addNesting();
-    if (failed(pushResults(blockBody->getArguments())))
-      return failure();
-    auto bodyParsingRes = parse(builder);
-    if (failed(bodyParsingRes))
-      return failure();
-    auto resVals = popOperands(resTypes);
-    builder.create<ReturnOp>(*opLoc, *resVals);
-  }
-  builder.restoreInsertionPoint(sip);
+  if (failed(parseBlockContent(builder, blockBody, resTypes, *opLoc, blockOp)))
+    return failure();
   LLVM_DEBUG(llvm::dbgs() << "End of parsing of a block of type " << *funcType);
-  return {blockOp->getResults()};
+  builder.setInsertionPointToStart(successor);
+  return {ValueRange{successor->getArguments()}};
 }
 
 template <>
