@@ -14,11 +14,11 @@
 
 // CHECK-LABEL:   wasm.func nested @func_0() -> i32 {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 14 : i32
-// CHECK:           %[[VAL_1:.*]] = wasm.block(%[[VAL_0]]) : (i32) -> i32 {
-// CHECK:           ^bb0(%[[VAL_2:.*]]: i32):
-// CHECK:             %[[VAL_3:.*]] = wasm.const 1 : i32
-// CHECK:             %[[VAL_4:.*]] = wasm.add %[[VAL_2]] %[[VAL_3]] : i32
-// CHECK:             wasm.return %[[VAL_4]] : i32
-// CHECK:           }
-// CHECK:           wasm.return %[[VAL_1]] : i32
-// CHECK:         }
+// CHECK:           wasm.block(%[[VAL_0]]) : i32 : {
+// CHECK:           ^bb0(%[[VAL_1:.*]]: i32):
+// CHECK:             %[[VAL_2:.*]] = wasm.const 1 : i32
+// CHECK:             %[[VAL_3:.*]] = wasm.add %[[VAL_1]] %[[VAL_2]] : i32
+// CHECK:             wasm.block_return %[[VAL_3]] : i32
+// CHECK:           }> ^bb1
+// CHECK:         ^bb1(%[[VAL_4:.*]]: i32):
+// CHECK:           wasm.return %[[VAL_4]] : i32

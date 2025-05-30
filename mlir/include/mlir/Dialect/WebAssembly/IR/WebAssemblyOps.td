@@ -22,16 +22,25 @@ include "mlir/IR/SymbolInterfaces.td"
 class Wasm_Op<string mnemonic, list<Trait> traits = []> :
     Op<Wasm_Dialect, mnemonic, traits>;
 
-def Wasm_BlockOp : Wasm_Op<"block", [WasmLabelLevelInterface]> {
+def Wasm_BlockOp : Wasm_Op<"block", [Terminator,
+    DeclareOpInterfaceMethods<WasmLabelLevelInterface>]> {
   let summary = "Create a nesting level";
   let arguments = (ins Variadic<Wasm_ValType>: $inputs);
-  let results = (outs Variadic<Wasm_ValType>: $results);
   let regions = (region AnyRegion: $body);
+  let successors = (successor AnySuccessor: $target);
   let extraClassDeclaration = [{
     ::mlir::Block* createBlock();
   }];
-  let assemblyFormat = "(`(`$inputs^`)`)? attr-dict  `:` functional-type($inputs, $results) $body";
+  let assemblyFormat = "(`(`$inputs^`)` `:` type($inputs))? attr-dict  `:` $body `>` $target";
 }
+
+def Wasm_BlockReturnOp : Wasm_Op<"block_return", [Terminator,
+    DeclareOpInterfaceMethods<WasmLabelBranchingInterface>]> {
+  let summary = "Return from the current block";
+  let arguments = (ins Variadic<Wasm_ValType>: $inputs);
+  let assemblyFormat = "($inputs^ `:` type($inputs))? attr-dict";
+}
+
 
 def Wasm_ConstOp : Wasm_Op<"const", [
     AllTypesMatch<["value", "result"]>, WasmConstantExprInterface]> {

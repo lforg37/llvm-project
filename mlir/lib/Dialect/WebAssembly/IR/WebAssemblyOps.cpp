@@ -37,11 +37,23 @@ inline LogicalResult inferTeeGetResType(ValueRange operands, ::llvm::SmallVector
 }
 } // namespace
 
+Block* BlockOp::getEntryBlock() {
+  return &getBody().front();
+}
+
+Block* BlockOp::getLabelTarget() {
+  return getTarget();
+}
+
 Block* BlockOp::createBlock() {
   auto &block = getBody().emplaceBlock();
   for (auto input : getInputs())
     block.addArgument(input.getType(), input.getLoc());
   return &block;
+}
+
+std::size_t BlockReturnOp::getExitLevel() {
+  return 0;
 }
 
 // Custom interface overrides
