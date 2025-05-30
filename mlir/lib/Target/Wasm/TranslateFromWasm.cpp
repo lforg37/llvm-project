@@ -1257,10 +1257,8 @@ inline parsed_inst_t ExpressionParser::buildNumericOp(
   if (failed(operands))
     return failure();
   auto op = builder.create<opcode>(*currentOpLoc, *operands).getResult();
-#ifndef NDEBUG
-  llvm::dbgs() << "Built: ";
-  op.dump();
-#endif
+  LLVM_DEBUG(llvm::dbgs() << "Built: ");
+  LLVM_DEBUG(op.dump());
   return {{op}};
 }
 
