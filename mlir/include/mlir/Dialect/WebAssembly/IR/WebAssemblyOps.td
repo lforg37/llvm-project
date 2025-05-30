@@ -469,4 +469,18 @@ def Wasm_RotrOp : Wasm_ShiftRotateOp<"rotr",
     second integer. The result shall be pushed to the stack.}]
     >{}
 
+class Wasm_UnaryNumericalOp<string mnemonic,
+                            string summaryStr,
+                            list<Type> validOpTypes> :
+  Wasm_Op<mnemonic, [AllTypesMatch<["src", "result"]>]> {
+    let summary = summaryStr;
+    let arguments = (ins AnyTypeOf<validOpTypes>:$src);
+    let results = (outs AnyTypeOf<validOpTypes>:$result);
+    let assemblyFormat = "$src`:` type($src) attr-dict";
+}
+
+def Wasm_NegOp : Wasm_UnaryNumericalOp<"neg",
+                                       "Floating point negation",
+                                       [Wasm_FPType]>{}
+
 #endif // WEBASSEMBLY_OPS

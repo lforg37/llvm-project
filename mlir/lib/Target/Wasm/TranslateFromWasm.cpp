@@ -135,6 +135,7 @@ struct WasmEncodings {
     static constexpr std::byte shr_uI32{0x76};
     static constexpr std::byte rotlI32{0x77};
     static constexpr std::byte rotrI32{0x78};
+    static constexpr std::byte negF32{0x8C};
     static constexpr std::byte minF32{0x96};
 
     static constexpr std::byte eqI64{0x51};
@@ -162,6 +163,7 @@ struct WasmEncodings {
     static constexpr std::byte shr_uI64{0x88};
     static constexpr std::byte rotlI64{0x89};
     static constexpr std::byte rotrI64{0x8A};
+    static constexpr std::byte negF64{0x9A};
 
     static constexpr std::byte eqF32{0x5B};
     static constexpr std::byte neF32{0x5C};
@@ -1326,6 +1328,15 @@ ImplementNumericalBinOpFP(GeOp, ge)
 ImplementNumericalBinOpFP(MinOp, min)
 
 #undef ImplementNumericalBinOpFP
+
+// Unary floating-point operations.
+#define ImplementNumericalUnaryOpFP(OP_NAME, PREFIX)                             \
+    ImplementNumericalOpPat(OP_NAME, 1, PREFIX, F32, float)                    \
+    ImplementNumericalOpPat(OP_NAME, 1, PREFIX, F64, double)
+
+ImplementNumericalUnaryOpFP(NegOp, neg)
+
+#undef ImplementNumericalUnaryOpFP
 
 #undef ImplementNumericalOpPat
 
