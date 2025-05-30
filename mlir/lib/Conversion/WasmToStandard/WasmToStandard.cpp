@@ -38,7 +38,7 @@ using namespace mlir::wasm;
 namespace {
 
 template <typename SourceOp, typename TargetIntOp, typename TargetFPOp>
-struct BinaryIntFPOpConversionPattern : OpConversionPattern<SourceOp> {
+struct IntFPDispatchMappingConversion : OpConversionPattern<SourceOp> {
   using OpConversionPattern<SourceOp>::OpConversionPattern;
 
   LogicalResult
@@ -59,14 +59,16 @@ struct BinaryIntFPOpConversionPattern : OpConversionPattern<SourceOp> {
 };
 
 using WasmAddOpConversion =
-    BinaryIntFPOpConversionPattern<AddOp, arith::AddIOp, arith::AddFOp>;
+    IntFPDispatchMappingConversion<AddOp, arith::AddIOp, arith::AddFOp>;
 using WasmMulOpConversion =
-    BinaryIntFPOpConversionPattern<MulOp, arith::MulIOp, arith::MulFOp>;
+    IntFPDispatchMappingConversion<MulOp, arith::MulIOp, arith::MulFOp>;
 using WasmSubOpConversion =
-    BinaryIntFPOpConversionPattern<SubOp, arith::SubIOp, arith::SubFOp>;
+    IntFPDispatchMappingConversion<SubOp, arith::SubIOp, arith::SubFOp>;
 
+/// Convert a k-ary source operation \p SourceOp into an operation \p TargetOp.
+/// Both \p SourceOp and \p TargetOp must have the same number of operands.
 template <typename SourceOp, typename TargetOp>
-struct BinaryOpConversion : OpConversionPattern<SourceOp> {
+struct OpMappingConversion : OpConversionPattern<SourceOp> {
   using OpConversionPattern<SourceOp>::OpConversionPattern;
 
   LogicalResult
@@ -78,17 +80,17 @@ struct BinaryOpConversion : OpConversionPattern<SourceOp> {
   }
 };
 
-using WasmAndOpConversion = BinaryOpConversion<AndOp, arith::AndIOp>;
-using WasmDivFPOpConversion = BinaryOpConversion<DivOp, arith::DivFOp>;
-using WasmDivSIOpConversion = BinaryOpConversion<DivSIOp, arith::DivSIOp>;
-using WasmDivUIOpConversion = BinaryOpConversion<DivUIOp, arith::DivUIOp>;
-using WasmOrOpConversion = BinaryOpConversion<OrOp, arith::OrIOp>;
-using WasmRemSIOpConversion = BinaryOpConversion<RemSIOp, arith::RemSIOp>;
-using WasmRemUIOpConversion = BinaryOpConversion<RemUIOp, arith::RemUIOp>;
-using WasmShLOpConversion = BinaryOpConversion<ShLOp, arith::ShLIOp>;
-using WasmShRSOpConversion = BinaryOpConversion<ShRSOp, arith::ShRSIOp>;
-using WasmShRUOpConversion = BinaryOpConversion<ShRUOp, arith::ShRUIOp>;
-using WasmXOrOpConversion = BinaryOpConversion<XOrOp, arith::XOrIOp>;
+using WasmAndOpConversion = OpMappingConversion<AndOp, arith::AndIOp>;
+using WasmDivFPOpConversion = OpMappingConversion<DivOp, arith::DivFOp>;
+using WasmDivSIOpConversion = OpMappingConversion<DivSIOp, arith::DivSIOp>;
+using WasmDivUIOpConversion = OpMappingConversion<DivUIOp, arith::DivUIOp>;
+using WasmOrOpConversion = OpMappingConversion<OrOp, arith::OrIOp>;
+using WasmRemSIOpConversion = OpMappingConversion<RemSIOp, arith::RemSIOp>;
+using WasmRemUIOpConversion = OpMappingConversion<RemUIOp, arith::RemUIOp>;
+using WasmShLOpConversion = OpMappingConversion<ShLOp, arith::ShLIOp>;
+using WasmShRSOpConversion = OpMappingConversion<ShRSOp, arith::ShRSIOp>;
+using WasmShRUOpConversion = OpMappingConversion<ShRUOp, arith::ShRUIOp>;
+using WasmXOrOpConversion = OpMappingConversion<XOrOp, arith::XOrIOp>;
 
 /// Lower a rotate to a series of bitwise operations. Intended for us
 /// in dialects that do not natively support rotate operations.
