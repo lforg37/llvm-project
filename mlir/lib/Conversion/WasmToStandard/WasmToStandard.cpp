@@ -84,6 +84,7 @@ using WasmAndOpConversion = OpMappingConversion<AndOp, arith::AndIOp>;
 using WasmDivFPOpConversion = OpMappingConversion<DivOp, arith::DivFOp>;
 using WasmDivSIOpConversion = OpMappingConversion<DivSIOp, arith::DivSIOp>;
 using WasmDivUIOpConversion = OpMappingConversion<DivUIOp, arith::DivUIOp>;
+using WasmMaxOpConversion = OpMappingConversion<MaxOp, arith::MaximumFOp>;
 using WasmMinOpConversion = OpMappingConversion<MinOp, arith::MinimumFOp>;
 using WasmOrOpConversion = OpMappingConversion<OrOp, arith::OrIOp>;
 using WasmRemSIOpConversion = OpMappingConversion<RemSIOp, arith::RemSIOp>;
@@ -620,6 +621,7 @@ void mlir::populateWasmToStandardConversionPatterns(
            WasmLtOpConversion,
            WasmLtSIOpConversion,
            WasmLtUIOpConversion,
+           WasmMaxOpConversion,
            WasmMemoryOpConversion,
            WasmMinOpConversion,
            WasmMulOpConversion,
