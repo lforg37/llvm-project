@@ -135,6 +135,7 @@ struct WasmEncodings {
     static constexpr std::byte shr_uI32{0x76};
     static constexpr std::byte rotlI32{0x77};
     static constexpr std::byte rotrI32{0x78};
+    static constexpr std::byte minF32{0x96};
 
     static constexpr std::byte eqI64{0x51};
     static constexpr std::byte neI64{0x52};
@@ -183,6 +184,7 @@ struct WasmEncodings {
     static constexpr std::byte subF64{0xA1};
     static constexpr std::byte mulF64{0xA2};
     static constexpr std::byte divF64{0xA3};
+    static constexpr std::byte minF64{0xA4};
   };
 
   /// Byte encodings of types in wasm binaries
@@ -1321,6 +1323,7 @@ ImplementNumericalBinOpFP(LtOp, lt)
 ImplementNumericalBinOpFP(LeOp, le)
 ImplementNumericalBinOpFP(GtOp, gt)
 ImplementNumericalBinOpFP(GeOp, ge)
+ImplementNumericalBinOpFP(MinOp, min)
 
 #undef ImplementNumericalBinOpFP
 
