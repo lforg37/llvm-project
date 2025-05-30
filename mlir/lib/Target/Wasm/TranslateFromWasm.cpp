@@ -391,12 +391,19 @@ private:
   parseConstInst(OpBuilder &builder,
                  std::enable_if_t<std::is_arithmetic_v<valueT>> * = nullptr);
 
-  /// Operation builder helper for binary numerical ops that reduces two
-  /// operands of type T to one value of type T
-  template <typename OpType, typename valueType>
+  /// Construct an operation with \p numOperands operands and a single result.
+  /// Each operand must have the same type. Suitable for e.g. binops, unary
+  /// ops, etc.
+  ///
+  /// \p opcode - The WASM opcode to build.
+  /// \p valueType - The operand and result type for the built instruction.
+  /// \p numOperands - The number of operands for the built operation.
+  ///
+  /// \returns The parsed instruction, or failure.
+  template <typename opcode, typename valueType, unsigned int numOperands>
   inline parsed_inst_t
-  buildBinNumOp(OpBuilder &builder,
-                std::enable_if_t<std::is_arithmetic_v<valueType>> * = 0);
+  buildNumericOp(OpBuilder &builder,
+                 std::enable_if_t<std::is_arithmetic_v<valueType>> * = nullptr);
 
   /// This function generates a dispatch tree to associate an opcode with a
   /// parser. Parsers are registered by specialising the
@@ -1233,79 +1240,89 @@ ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::constFP64>(
   return parseConstInst<double>(builder);
 }
 
-template <typename OpType, typename valueType>
-inline parsed_inst_t ExpressionParser::buildBinNumOp(
+template <typename opcode, typename valueType, unsigned int numOperands>
+inline parsed_inst_t ExpressionParser::buildNumericOp(
     OpBuilder &builder, std::enable_if_t<std::is_arithmetic_v<valueType>> *) {
-  auto opType = buildLiteralType<valueType>(builder);
-  auto operands = popOperands({opType, opType});
+  auto ty = buildLiteralType<valueType>(builder);
+  LLVM_DEBUG(llvm::dbgs() << "*** buildNumericOp: numOperands = " << numOperands
+                          << ", type = " << ty << " ***\n");
+  auto tysToPop = llvm::SmallVector<Type, numOperands>();
+  tysToPop.resize(numOperands);
+  std::fill(tysToPop.begin(), tysToPop.end(), ty);
+  auto operands = popOperands(tysToPop);
   if (failed(operands))
     return failure();
-  return {{builder.create<OpType>(*currentOpLoc, *operands).getResult()}};
+  auto op = builder.create<opcode>(*currentOpLoc, *operands).getResult();
+#ifndef NDEBUG
+  llvm::dbgs() << "Built: ";
+  op.dump();
+#endif
+  return {{op}};
 }
 
-#define ImplementNumericalOpPat(OP_NAME, PREFIX, SUFFIX, TYPE)               \
+#define ImplementNumericalOpPat(OP_NAME, N_ARGS, PREFIX, SUFFIX, TYPE)         \
     template <>                                                                \
     inline parsed_inst_t ExpressionParser::parseSpecificInstruction<           \
         WasmEncodings::OpCode::PREFIX##SUFFIX>(OpBuilder & builder) {          \
-      return buildBinNumOp<OP_NAME, TYPE>(builder);                            \
+      return buildNumericOp<OP_NAME, TYPE, N_ARGS>(builder);                   \
     }
 
 // Ops that exists for all numerical types
 
-#define ImplementNumericalOpIntFP(OP_NAME, PREFIX)                           \
-    ImplementNumericalOpPat(OP_NAME, PREFIX, I32, int32_t)                   \
-    ImplementNumericalOpPat(OP_NAME, PREFIX, I64, int64_t)                   \
-    ImplementNumericalOpPat(OP_NAME, PREFIX, F32, float)                     \
-    ImplementNumericalOpPat(OP_NAME, PREFIX, F64, double)
+#define ImplementNumericalBinOpIntFP(OP_NAME, PREFIX)                          \
+    ImplementNumericalOpPat(OP_NAME, 2, PREFIX, I32, int32_t)                  \
+    ImplementNumericalOpPat(OP_NAME, 2, PREFIX, I64, int64_t)                  \
+    ImplementNumericalOpPat(OP_NAME, 2, PREFIX, F32, float)                    \
+    ImplementNumericalOpPat(OP_NAME, 2, PREFIX, F64, double)
 
-ImplementNumericalOpIntFP(AddOp, add)
-ImplementNumericalOpIntFP(MulOp, mul)
-ImplementNumericalOpIntFP(SubOp, sub)
-ImplementNumericalOpIntFP(EqOp, eq)
-ImplementNumericalOpIntFP(NeOp, ne)
+ImplementNumericalBinOpIntFP(AddOp, add)
+ImplementNumericalBinOpIntFP(MulOp, mul)
+ImplementNumericalBinOpIntFP(SubOp, sub)
+ImplementNumericalBinOpIntFP(EqOp, eq)
+ImplementNumericalBinOpIntFP(NeOp, ne)
 
-#undef ImplementNumericalOpIntFP
+#undef ImplementNumericalBinOpIntFP
 
 // Ops that exists for integer types
 
-#define ImplementNumericalOpInt(OP_NAME, PREFIX)                                \
-    ImplementNumericalOpPat(OP_NAME, PREFIX, I32, int32_t)                      \
-    ImplementNumericalOpPat(OP_NAME, PREFIX, I64, int64_t)
+#define ImplementNumericalBinOpInt(OP_NAME, PREFIX)                                \
+    ImplementNumericalOpPat(OP_NAME, 2, PREFIX, I32, int32_t)                      \
+    ImplementNumericalOpPat(OP_NAME, 2, PREFIX, I64, int64_t)
 
-ImplementNumericalOpInt(AndOp, and)
-ImplementNumericalOpInt(DivSIOp, divS)
-ImplementNumericalOpInt(DivUIOp, divU)
-ImplementNumericalOpInt(OrOp, or)
-ImplementNumericalOpInt(RemSIOp, remS)
-ImplementNumericalOpInt(RemUIOp, remU)
-ImplementNumericalOpInt(RotlOp, rotl)
-ImplementNumericalOpInt(RotrOp, rotr)
-ImplementNumericalOpInt(ShLOp, shl)
-ImplementNumericalOpInt(ShRSOp, shr_s)
-ImplementNumericalOpInt(ShRUOp, shr_u)
-ImplementNumericalOpInt(XOrOp, xor)
-ImplementNumericalOpInt(LtSIOp, ltS)
-ImplementNumericalOpInt(LeSIOp, leS)
-ImplementNumericalOpInt(LtUIOp, ltU)
-ImplementNumericalOpInt(LeUIOp, leU)
-ImplementNumericalOpInt(GtSIOp, gtS)
-ImplementNumericalOpInt(GeSIOp, geS)
-ImplementNumericalOpInt(GtUIOp, gtU)
-ImplementNumericalOpInt(GeUIOp, geU)
+ImplementNumericalBinOpInt(AndOp, and)
+ImplementNumericalBinOpInt(DivSIOp, divS)
+ImplementNumericalBinOpInt(DivUIOp, divU)
+ImplementNumericalBinOpInt(OrOp, or)
+ImplementNumericalBinOpInt(RemSIOp, remS)
+ImplementNumericalBinOpInt(RemUIOp, remU)
+ImplementNumericalBinOpInt(RotlOp, rotl)
+ImplementNumericalBinOpInt(RotrOp, rotr)
+ImplementNumericalBinOpInt(ShLOp, shl)
+ImplementNumericalBinOpInt(ShRSOp, shr_s)
+ImplementNumericalBinOpInt(ShRUOp, shr_u)
+ImplementNumericalBinOpInt(XOrOp, xor)
+ImplementNumericalBinOpInt(LtSIOp, ltS)
+ImplementNumericalBinOpInt(LeSIOp, leS)
+ImplementNumericalBinOpInt(LtUIOp, ltU)
+ImplementNumericalBinOpInt(LeUIOp, leU)
+ImplementNumericalBinOpInt(GtSIOp, gtS)
+ImplementNumericalBinOpInt(GeSIOp, geS)
+ImplementNumericalBinOpInt(GtUIOp, gtU)
+ImplementNumericalBinOpInt(GeUIOp, geU)
 
-#undef ImplementNumericalOpInt
+#undef ImplementNumericalBinOpInt
 
-#define ImplementNumericalOpFP(OP_NAME, PREFIX)                                \
-    ImplementNumericalOpPat(OP_NAME, PREFIX, F32, float)                       \
-    ImplementNumericalOpPat(OP_NAME, PREFIX, F64, double)
+#define ImplementNumericalBinOpFP(OP_NAME, PREFIX)                             \
+    ImplementNumericalOpPat(OP_NAME, 2, PREFIX, F32, float)                    \
+    ImplementNumericalOpPat(OP_NAME, 2, PREFIX, F64, double)
 
-ImplementNumericalOpFP(DivOp, div)
-ImplementNumericalOpFP(LtOp, lt)
-ImplementNumericalOpFP(LeOp, le)
-ImplementNumericalOpFP(GtOp, gt)
-ImplementNumericalOpFP(GeOp, ge)
+ImplementNumericalBinOpFP(DivOp, div)
+ImplementNumericalBinOpFP(LtOp, lt)
+ImplementNumericalBinOpFP(LeOp, le)
+ImplementNumericalBinOpFP(GtOp, gt)
+ImplementNumericalBinOpFP(GeOp, ge)
 
-#undef ImplementNumericalOpFP
+#undef ImplementNumericalBinOpFP
 
 #undef ImplementNumericalOpPat
 
