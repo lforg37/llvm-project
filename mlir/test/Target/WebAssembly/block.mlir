@@ -9,7 +9,8 @@
 */
 
 // CHECK-LABEL:   wasm.func @i_am_a_block() {
-// CHECK:           wasm.block : () -> () {
-// CHECK:             wasm.return
-// CHECK:           }
+// CHECK:           wasm.block : {
+// CHECK:             wasm.block_return
+// CHECK:           }> ^bb1
+// CHECK:         ^bb1:
 // CHECK:           wasm.return

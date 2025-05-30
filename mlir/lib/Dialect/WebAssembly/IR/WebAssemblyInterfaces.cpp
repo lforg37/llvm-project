@@ -14,13 +14,37 @@
 #include "mlir/Dialect/WebAssembly/IR/WebAssembly.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Visitors.h"
+#include "mlir/Support/LLVM.h"
+
+namespace {
+using namespace mlir;
+using namespace mlir::wasm;
+llvm::FailureOr<WasmLabelLevelInterface> tryGetOperand(Operation *op,
+                                                       size_t breakLevel) {
+  WasmLabelLevelInterface res{};
+  for (size_t curLevel{0}; curLevel <= breakLevel; curLevel++) {
+    auto *parentOp = op->getParentOp();
+    if (!parentOp || !isa<WasmLabelLevelInterface>(parentOp))
+      return failure();
+    op = parentOp;
+  }
+  return llvm::cast<WasmLabelLevelInterface>(op);
+}
+} // namespace
 
 namespace mlir {
 namespace wasm {
 #include "mlir/Dialect/WebAssembly/IR/WebAssemblyInterfaces.cpp.inc"
 
+namespace detail{
+LogicalResult verifyWasmLabelBranchingInterface(Operation *op) {
+  auto branchInterface = dyn_cast<WasmLabelBranchingInterface>(op);
+  auto res = tryGetOperand(op, branchInterface.getExitLevel());
+  return success(succeeded(res));
+}
+
 LogicalResult
-detail::verifyConstantExpressionInterface(Operation *op) {
+verifyConstantExpressionInterface(Operation *op) {
   Region &initializerRegion = op->getRegion(0);
   auto resultState = initializerRegion.walk(
       [&](Operation *currentOp) -> WalkResult {
@@ -35,6 +59,11 @@ detail::verifyConstantExpressionInterface(Operation *op) {
       });
   return success(!resultState.wasInterrupted());
 }
+} // namespace detail
 
+WasmLabelLevelInterface
+WasmLabelBranchingInterface::getLabelBranchingInterface() {
+  return *tryGetOperand(getOperation(), getExitLevel());
+}
 } // namespace wasm
 } // namespace mlir
