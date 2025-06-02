@@ -318,9 +318,18 @@ struct WasmFuncOpConversion : OpConversionPattern<FuncOp> {
       return flag;
     }
 
-    void replaceNestLevelWithBranch(BlockOp blockOp, llvm::ArrayRef<Block*> regionsToEntry, ConversionPatternRewriter& rewriter) {
+    void replaceNestLevelWithBranch(BlockOp blockOp,
+                                    llvm::ArrayRef<Block *> regionsToEntry,
+                                    ConversionPatternRewriter &rewriter) {
       rewriter.replaceOpWithNewOp<cf::BranchOp>(blockOp, regionsToEntry[0],
                                                 blockOp->getOperands());
+    }
+
+    void replaceNestLevelWithBranch(LoopOp loopOp,
+                                    llvm::ArrayRef<Block *> regionsToEntry,
+                                    ConversionPatternRewriter &rewriter) {
+      rewriter.replaceOpWithNewOp<cf::BranchOp>(loopOp, regionsToEntry[0],
+                                                loopOp->getOperands());
     }
 
     void replaceNestLevelWithBranch(IfOp ifOp,
@@ -380,7 +389,7 @@ struct WasmFuncOpConversion : OpConversionPattern<FuncOp> {
     /// Take a nesting level defining op and inline it in the parent region.
     LogicalResult inlineBlocks(WasmLabelLevelInterface nestingOp,
                       ConversionPatternRewriter &rewriter) {
-      return inlineNestDispatcher<BlockOp, IfOp>(nestingOp, rewriter);
+      return inlineNestDispatcher<BlockOp, IfOp, LoopOp>(nestingOp, rewriter);
     }
 
     llvm::FailureOr<Block *> getBlockFor(WasmLabelBranchingInterface branchOp) {

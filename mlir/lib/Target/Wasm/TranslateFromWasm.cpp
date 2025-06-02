@@ -95,6 +95,7 @@ struct WasmEncodings {
   struct OpCode {
     // Control instructions
     static constexpr std::byte block{0x02};
+    static constexpr std::byte loop{0x03};
     static constexpr std::byte ifOpCode{0x04};
     static constexpr std::byte elseOpCode{0x05};
     static constexpr std::byte branchIf{0x0D};
@@ -583,6 +584,11 @@ public:
   /// operations in one place.
   template<typename OpToCreate>
   parsed_inst_t parseSetOrTee(OpBuilder &);
+
+  /// Blocks and Loops have a similar format and differ only in how their exit
+  /// is handled which doesn´t matter at parsing time. Factorizes in one function.
+  template<typename OpToCreate>
+  parsed_inst_t parseBlockLikeOp(OpBuilder &);
 
 private:
   std::optional<Location> currentOpLoc;
@@ -1126,10 +1132,8 @@ ExpressionParser::parseBlockFuncType(OpBuilder &builder) {
   return getFuncTypeFor(builder, parser.parseBlockType(builder.getContext()));
 }
 
-template <>
-inline parsed_inst_t
-ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::block>(
-    OpBuilder &builder) {
+template <typename OpToCreate>
+parsed_inst_t ExpressionParser::parseBlockLikeOp(OpBuilder &builder) {
   auto opLoc = currentOpLoc;
   auto funcType = parseBlockFuncType(builder);
   if (failed(funcType))
@@ -1149,12 +1153,26 @@ ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::block>(
   auto *successor =
       builder.createBlock(curRegion, curRegion->end(), resTypes, locations);
   builder.setInsertionPointToEnd(curBlock);
-  auto blockOp = builder.create<BlockOp>(*currentOpLoc, *inputOps, successor);
+  auto blockOp = builder.create<OpToCreate>(*currentOpLoc, *inputOps, successor);
   auto *blockBody = blockOp.createBlock();
   if (failed(parseBlockContent(builder, blockBody, resTypes, *opLoc, blockOp)))
     return failure();
   builder.setInsertionPointToStart(successor);
   return {ValueRange{successor->getArguments()}};
+}
+
+template <>
+inline parsed_inst_t
+ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::block>(
+    OpBuilder &builder) {
+  return parseBlockLikeOp<BlockOp>(builder);
+}
+
+template <>
+inline parsed_inst_t
+ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::loop>(
+    OpBuilder &builder) {
+  return parseBlockLikeOp<LoopOp>(builder);
 }
 
 template <>

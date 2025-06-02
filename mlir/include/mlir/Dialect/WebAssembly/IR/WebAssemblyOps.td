@@ -22,17 +22,26 @@ include "mlir/IR/SymbolInterfaces.td"
 class Wasm_Op<string mnemonic, list<Trait> traits = []> :
     Op<Wasm_Dialect, mnemonic, traits>;
 
-def Wasm_BlockOp : Wasm_Op<"block", [Terminator,
-    DeclareOpInterfaceMethods<WasmLabelLevelInterface>]> {
-  let summary = "Create a nesting level";
+class Wasm_BlockLikeOp<string mnemonic, string summaryStr> :
+  Wasm_Op<mnemonic, [Terminator, DeclareOpInterfaceMethods<WasmLabelLevelInterface>]> {
+  let summary = summaryStr;
   let arguments = (ins Variadic<Wasm_ValType>: $inputs);
   let regions = (region AnyRegion: $body);
   let successors = (successor AnySuccessor: $target);
   let extraClassDeclaration = [{
-    ::mlir::Block* createBlock();
+    ::mlir::Block* createBlock() {
+      auto &block = getBody().emplaceBlock();
+      for (auto input : getInputs())
+        block.addArgument(input.getType(), input.getLoc());
+      return &block;
+    }
   }];
   let assemblyFormat = "(`(`$inputs^`)` `:` type($inputs))? attr-dict  `:` $body `>` $target";
 }
+
+def Wasm_BlockOp : Wasm_BlockLikeOp<"block", "Create a nesting level"> {}
+
+def Wasm_LoopOp : Wasm_BlockLikeOp<"loop", "Create a nesting level similar to Block Op, except that it has itself as a successor."> {}
 
 def Wasm_BlockReturnOp : Wasm_Op<"block_return", [Terminator,
     DeclareOpInterfaceMethods<WasmLabelBranchingInterface>]> {
