@@ -1,0 +1,29 @@
+// RUN: mlir-translate --import-wasm %S/inputs/branch_if.wasm | FileCheck %s
+
+/* Source code used to create this test:
+(module
+  (type $produce_i32 (func (result i32)))
+  (func (type $produce_i32)
+    (block $my_block (type $produce_i32)
+      i32.const 1
+      i32.const 2
+      br_if $my_block
+      i32.const 1
+      i32.add
+    )
+  )
+)
+*/
+
+// CHECK-LABEL:   wasm.func nested @func_0() -> i32 {
+// CHECK:           wasm.block : {
+// CHECK:             %[[VAL_0:.*]] = wasm.const 1 : i32
+// CHECK:             %[[VAL_1:.*]] = wasm.const 2 : i32
+// CHECK:             wasm.branch_if %[[VAL_1]] to level 0 with args(%[[VAL_0]] : i32) else ^bb1
+// CHECK:           ^bb1:
+// CHECK:             %[[VAL_2:.*]] = wasm.const 1 : i32
+// CHECK:             %[[VAL_3:.*]] = wasm.add %[[VAL_0]] %[[VAL_2]] : i32
+// CHECK:             wasm.block_return %[[VAL_3]] : i32
+// CHECK:           }> ^bb1
+// CHECK:         ^bb1(%[[VAL_4:.*]]: i32):
+// CHECK:           wasm.return %[[VAL_4]] : i32

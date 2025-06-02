@@ -95,6 +95,9 @@ struct WasmEncodings {
   struct OpCode {
     // Control instructions
     static constexpr std::byte block{0x02};
+    static constexpr std::byte ifOpCode{0x04};
+    static constexpr std::byte elseOpCode{0x05};
+    static constexpr std::byte branchIf{0x0D};
     static constexpr std::byte call{0x10};
 
     // Variable instructions
@@ -251,6 +254,10 @@ constexpr ByteSequence<Bytes1..., Bytes2...>
 operator+(ByteSequence<Bytes1...>, ByteSequence<Bytes2...>) {
   return {};
 }
+
+/// Template class for representing a byte sequence of only one byte
+template<std::byte Byte>
+struct UniqueByte : ByteSequence<Byte> {};
 
 template <typename T, T... Values>
 constexpr ByteSequence<std::byte{Values}...>
@@ -500,30 +507,63 @@ private:
     return builder.getFunctionType({}, {valType});
   }
 
+  llvm::FailureOr<FunctionType>
+  getFuncTypeFor(OpBuilder &builder, BlockTypeParseResult parseResult) {
+    return std::visit(
+        [this, &builder](auto value) { return getFuncTypeFor(builder, value); },
+        parseResult);
+  }
+
+  llvm::FailureOr<FunctionType>
+  getFuncTypeFor(OpBuilder &builder, llvm::FailureOr<BlockTypeParseResult> parseResult) {
+    if (llvm::failed(parseResult))
+      return failure();
+    return getFuncTypeFor(builder, *parseResult);
+  }
+
+  llvm::FailureOr<FunctionType> parseBlockFuncType(OpBuilder &builder);
+
+    struct ParseResultWithInfo {
+    llvm::SmallVector<Value> opResults;
+    std::byte endingByte;
+  };
+
+  template<typename FilterT = ByteSequence<WasmEncodings::endByte>>
   /// @param blockToFill: the block which content will be populated
   /// @param resType: the type that this block is supposed to return
-  LogicalResult parseBlockContent(OpBuilder &builder, Block *blockToFill,
+  llvm::FailureOr<std::byte> parseBlockContent(OpBuilder &builder, Block *blockToFill,
                                   TypeRange resTypes, Location opLoc,
-                                  WasmLabelLevelInterface levelOp) {
+                                  WasmLabelLevelInterface levelOp, FilterT parseEndBytes = {}) {
     auto sip = builder.saveInsertionPoint();
     builder.setInsertionPointToStart(blockToFill);
+    LLVM_DEBUG(llvm::dbgs() << "Parsing a block of type "
+                            << builder.getFunctionType(
+                                   blockToFill->getArgumentTypes(), resTypes));
     auto nC = addNesting(levelOp);
+
     if (failed(pushResults(blockToFill->getArguments())))
       return failure();
-    auto bodyParsingRes = parse(builder);
+    auto bodyParsingRes = parse(builder, parseEndBytes);
     if (failed(bodyParsingRes))
       return failure();
     auto returnOperands = popOperands(resTypes);
     if (failed(returnOperands))
       return failure();
     builder.create<BlockReturnOp>(opLoc, *returnOperands);
+    LLVM_DEBUG(llvm::dbgs() << "End of parsing of a block\n");
     builder.restoreInsertionPoint(sip);
-    return success();
+    return bodyParsingRes->endingByte;
   }
 
 public:
+  template<std::byte ParseEndByte = WasmEncodings::endByte>
   parsed_inst_t parse(OpBuilder &builder,
-                      std::byte endByte = WasmEncodings::endByte);
+                      UniqueByte<ParseEndByte> = {});
+
+  template <std::byte... ExpressionParseEnd>
+  llvm::FailureOr<ParseResultWithInfo>
+  parse(OpBuilder &builder,
+        ByteSequence<ExpressionParseEnd...> parsingEndFilters);
 
   NestingContext addNesting(WasmLabelLevelInterface levelOp) {
     return NestingContext{*this, levelOp};
@@ -1051,15 +1091,26 @@ LogicalResult ValueStack::pushResults(ValueRange results, Location *opLoc) {
   return success();
 }
 
-parsed_inst_t ExpressionParser::parse(OpBuilder &builder, std::byte endByte) {
+template<std::byte EndParseByte>
+parsed_inst_t ExpressionParser::parse(OpBuilder &builder, UniqueByte<EndParseByte> endByte) {
+  auto res = parse(builder, ByteSequence<EndParseByte>{});
+  if (failed(res))
+    return failure();
+  return res->opResults;
+}
+
+template <std::byte... ExpressionParseEnd>
+llvm::FailureOr<ExpressionParser::ParseResultWithInfo>
+ExpressionParser::parse(OpBuilder &builder,
+                        ByteSequence<ExpressionParseEnd...> parsingEndFilters) {
   llvm::SmallVector<Value> res;
   for (;;) {
     currentOpLoc = parser.getLocation();
     auto opCode = parser.consumeByte();
     if (failed(opCode))
       return failure();
-    if (*opCode == endByte)
-      return res;
+    if (isValueOneOf(*opCode, parsingEndFilters))
+      return {{res, *opCode}};
     parsed_inst_t resParsed;
     resParsed = dispatchToInstParser(*opCode, builder);
     if (failed(resParsed))
@@ -1070,23 +1121,21 @@ parsed_inst_t ExpressionParser::parse(OpBuilder &builder, std::byte endByte) {
   }
 }
 
+llvm::FailureOr<FunctionType>
+ExpressionParser::parseBlockFuncType(OpBuilder &builder) {
+  return getFuncTypeFor(builder, parser.parseBlockType(builder.getContext()));
+}
+
 template <>
 inline parsed_inst_t
 ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::block>(
     OpBuilder &builder) {
   auto opLoc = currentOpLoc;
-  auto blockType = parser.parseBlockType(builder.getContext());
-  if (failed(blockType))
-    return failure();
-  auto funcType = std::visit(
-      [this, &builder](auto parseResult) {
-        return getFuncTypeFor(builder, parseResult);
-      },
-      *blockType);
+  auto funcType = parseBlockFuncType(builder);
   if (failed(funcType))
     return failure();
 
-  LLVM_DEBUG(llvm::dbgs() << "Parsing a block of type " << *funcType);
+
   auto inputTypes = funcType->getInputs();
   auto inputOps = popOperands(inputTypes);
   if (failed(inputOps))
@@ -1104,9 +1153,87 @@ ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::block>(
   auto *blockBody = blockOp.createBlock();
   if (failed(parseBlockContent(builder, blockBody, resTypes, *opLoc, blockOp)))
     return failure();
-  LLVM_DEBUG(llvm::dbgs() << "End of parsing of a block of type " << *funcType);
   builder.setInsertionPointToStart(successor);
   return {ValueRange{successor->getArguments()}};
+}
+
+template <>
+inline parsed_inst_t
+ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::ifOpCode>(
+    OpBuilder &builder) {
+  auto opLoc = currentOpLoc;
+  auto funcType = parseBlockFuncType(builder);
+  if (failed(funcType))
+    return failure();
+
+  LLVM_DEBUG(llvm::dbgs() << "Parsing an if instruction of type " << *funcType);
+  auto inputTypes = funcType->getInputs();
+  auto conditionValue = popOperands(builder.getI32Type());
+  if (failed(conditionValue))
+    return failure();
+  auto inputOps = popOperands(inputTypes);
+  if (failed(inputOps))
+    return failure();
+
+  Block *curBlock = builder.getBlock();
+  Region *curRegion = curBlock->getParent();
+  auto resTypes = funcType->getResults();
+  llvm::SmallVector<Location> locations{};
+  locations.resize(resTypes.size(), *currentOpLoc);
+  auto *successor =
+      builder.createBlock(curRegion, curRegion->end(), resTypes, locations);
+  builder.setInsertionPointToEnd(curBlock);
+  auto ifOp = builder.create<IfOp>(*currentOpLoc, conditionValue->front(),
+                                   *inputOps, successor);
+  auto *ifEntryBlock = ifOp.createIfBlock();
+  constexpr auto ifElseFilter =
+      ByteSequence<WasmEncodings::endByte, WasmEncodings::OpCode::elseOpCode>{};
+  auto parseIfRes = parseBlockContent(builder, ifEntryBlock, resTypes, *opLoc,
+                                      ifOp, ifElseFilter);
+  if (failed(parseIfRes))
+    return failure();
+  if (*parseIfRes == WasmEncodings::OpCode::elseOpCode) {
+    LLVM_DEBUG(
+        llvm::dbgs()
+        << "  else block is present.\n");
+    Block *elseEntryBlock = ifOp.createElseBlock();
+    auto parseElseRes =
+        parseBlockContent(builder, elseEntryBlock, resTypes, *opLoc, ifOp);
+    if (failed(parseElseRes))
+      return failure();
+  }
+  builder.setInsertionPointToStart(successor);
+  return {ValueRange{successor->getArguments()}};
+}
+
+template <>
+inline parsed_inst_t
+ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::branchIf>(
+    OpBuilder &builder) {
+  auto level = parser.parseLiteral<uint32_t>();
+  if (failed(level))
+    return failure();
+  Block *curBlock = builder.getBlock();
+  Region *curRegion = curBlock->getParent();
+  auto sip = builder.saveInsertionPoint();
+  Block *elseBlock = builder.createBlock(curRegion, curRegion->end());
+  auto condition = popOperands(builder.getI32Type());
+  if (failed(condition))
+    return failure();
+  builder.restoreInsertionPoint(sip);
+  auto targetOp =
+      WasmLabelBranchingInterface::getTargetOpFromBlock(curBlock, *level);
+  if (failed(targetOp))
+    return failure();
+  auto inputTypes = targetOp->getLabelTarget()->getArgumentTypes();
+  auto branchArgs = popOperands(inputTypes);
+  if (failed(branchArgs))
+    return failure();
+  builder.create<BranchIfOp>(*currentOpLoc, condition->front(),
+                             builder.getUI32IntegerAttr(*level), *branchArgs,
+                             elseBlock);
+  builder.setInsertionPointToStart(elseBlock);
+  return {*branchArgs};
 }
 
 template <>
