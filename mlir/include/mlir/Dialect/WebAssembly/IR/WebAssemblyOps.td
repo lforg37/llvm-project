@@ -41,6 +41,16 @@ def Wasm_BlockReturnOp : Wasm_Op<"block_return", [Terminator,
   let assemblyFormat = "($inputs^ `:` type($inputs))? attr-dict";
 }
 
+def Wasm_BranchIfOp : Wasm_Op<"branch_if", [
+    Terminator,
+    DeclareOpInterfaceMethods<WasmLabelBranchingInterface>]> {
+  let summary = "Jump to target level if condition has non-zero value";
+  let arguments = (ins I32: $condition,
+                       UI32Attr: $exitLevel,
+                       Variadic<Wasm_ValType>: $inputs);
+  let successors = (successor AnySuccessor: $elseSuccessor);
+  let assemblyFormat = "$condition `to` `level` $exitLevel (`with` `args`  `(`$inputs^ `:` type($inputs)`)`)?  `else` $elseSuccessor  attr-dict";
+}
 
 def Wasm_ConstOp : Wasm_Op<"const", [
     AllTypesMatch<["value", "result"]>, WasmConstantExprInterface]> {
@@ -179,6 +189,34 @@ def Wasm_GlobalGetOp : Wasm_Op<"global_get", [DeclareOpInterfaceMethods<WasmCont
   let arguments = (ins FlatSymbolRefAttr: $global);
   let results = (outs Wasm_ValType: $global_val);
   let assemblyFormat = "$global attr-dict `:` type($global_val)";
+}
+
+def Wasm_IfOp : Wasm_Op<"if", [Terminator,
+    DeclareOpInterfaceMethods<WasmLabelLevelInterface>]> {
+  let summary = "Execute the if region if condition value is nonzero, the else region otherwise.";
+  let arguments = (ins I32:$condition, Variadic<Wasm_ValType>: $inputs);
+  let regions = (region AnyRegion: $if, AnyRegion: $else);
+  let successors = (successor AnySuccessor: $target);
+  let extraClassDeclaration = [{
+    private:
+    inline ::mlir::Block* createBlock(::mlir::Region& region) {
+      assert(region.empty() && "Creating entry block on non empty region");
+      assert(region.getParentOp() == this->getOperation() &&
+        "Creating block for region that isn't part of the current op");
+      auto &block = region.emplaceBlock();
+      for (auto input : getInputs())
+        block.addArgument(input.getType(), input.getLoc());
+      return &block;
+    }
+
+    public:
+    ::mlir::Block* createIfBlock() {
+      return createBlock(getIf());
+    }
+    ::mlir::Block* createElseBlock() {
+      return createBlock(getElse());
+    }
+  }];
 }
 
 def Wasm_LocalOp : Wasm_Op<"local", [

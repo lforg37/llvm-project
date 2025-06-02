@@ -27,12 +27,6 @@ def WasmLabelLevelInterface : OpInterface<"WasmLabelLevelInterface"> {
       /*returnType=*/  "Block*",
       /*methodName=*/  "getLabelTarget",
       /*args=*/        (ins)
-    >,
-    InterfaceMethod<
-      /*desc=*/        "Returns the first block to be executed by this op",
-      /*returnType=*/  "Block*",
-      /*methodName=*/  "getEntryBlock",
-      /*args=*/        (ins)
     >
   ];
 }
@@ -50,7 +44,10 @@ def WasmLabelBranchingInterface : OpInterface<"WasmLabelBranchingInterface"> {
     >
   ];
   let extraClassDeclaration = [{
-    WasmLabelLevelInterface getLabelBranchingInterface();
+    static ::llvm::FailureOr<WasmLabelLevelInterface> getTargetOpFromBlock(::mlir::Block *block, uint32_t level);
+    WasmLabelLevelInterface getTargetOp() {
+      return *getTargetOpFromBlock(getOperation()->getBlock(), getExitLevel());
+    }
   }];
   let verify = [{return verifyWasmLabelBranchingInterface($_op);}];
 }
