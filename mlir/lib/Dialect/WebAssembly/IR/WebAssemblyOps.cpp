@@ -42,13 +42,6 @@ Block* BlockOp::getLabelTarget() {
   return getTarget();
 }
 
-Block* BlockOp::createBlock() {
-  auto &block = getBody().emplaceBlock();
-  for (auto input : getInputs())
-    block.addArgument(input.getType(), input.getLoc());
-  return &block;
-}
-
 std::size_t BlockReturnOp::getExitLevel() {
   return 0;
 }
@@ -157,6 +150,10 @@ LogicalResult LocalTeeOp::inferReturnTypes(
     ValueRange operands, DictionaryAttr attributes, OpaqueProperties properties,
     RegionRange regions, ::llvm::SmallVectorImpl<Type> &inferredReturnTypes) {
   return inferTeeGetResType(operands, inferredReturnTypes);
+}
+
+Block* LoopOp::getLabelTarget() {
+  return &getBody().front();
 }
 
 ParseResult parseImportOp(OpAsmParser &parser, OperationState &result) {
