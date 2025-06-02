@@ -39,7 +39,8 @@ namespace wasm {
 namespace detail{
 LogicalResult verifyWasmLabelBranchingInterface(Operation *op) {
   auto branchInterface = dyn_cast<WasmLabelBranchingInterface>(op);
-  auto res = tryGetOperand(op, branchInterface.getExitLevel());
+  auto res = WasmLabelBranchingInterface::getTargetOpFromBlock(
+      op->getBlock(), branchInterface.getExitLevel());
   return success(succeeded(res));
 }
 
@@ -61,9 +62,17 @@ verifyConstantExpressionInterface(Operation *op) {
 }
 } // namespace detail
 
-WasmLabelLevelInterface
-WasmLabelBranchingInterface::getLabelBranchingInterface() {
-  return *tryGetOperand(getOperation(), getExitLevel());
+llvm::FailureOr<WasmLabelLevelInterface>
+WasmLabelBranchingInterface::getTargetOpFromBlock(::mlir::Block *block,
+                                                  uint32_t breakLevel) {
+  WasmLabelLevelInterface res{};
+  for (size_t curLevel{0}; curLevel <= breakLevel; curLevel++) {
+    res = dyn_cast_or_null<WasmLabelLevelInterface>(block->getParentOp());
+    if (!res)
+      return failure();
+    block = res->getBlock();
+  }
+  return res;
 }
 } // namespace wasm
 } // namespace mlir

@@ -6,6 +6,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Dialect.h"
+#include "mlir/IR/Region.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/FunctionImplementation.h"
 #include "llvm/Support/Casting.h"
@@ -36,10 +37,6 @@ inline LogicalResult inferTeeGetResType(ValueRange operands, ::llvm::SmallVector
   return success();
 }
 } // namespace
-
-Block* BlockOp::getEntryBlock() {
-  return &getBody().front();
-}
 
 Block* BlockOp::getLabelTarget() {
   return getTarget();
@@ -111,6 +108,10 @@ void GlobalOp::print(OpAsmPrinter &printer) {
     printer.printRegion(body, /*printEntryBlockArgs=*/false,
                         /*printBlockTerminators=*/true);
   }
+}
+
+Block* IfOp::getLabelTarget() {
+  return getTarget();
 }
 
 LogicalResult LocalOp::inferReturnTypes(
