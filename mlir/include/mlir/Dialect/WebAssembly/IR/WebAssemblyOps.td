@@ -496,6 +496,10 @@ class Wasm_UnaryNumericalOp<string mnemonic,
     let assemblyFormat = "$src`:` type($src) attr-dict";
 }
 
+def Wasm_AbsOp : Wasm_UnaryNumericalOp<"abs",
+                                       "Floating point absolute value",
+                                       [Wasm_FPType]>{}
+
 def Wasm_NegOp : Wasm_UnaryNumericalOp<"neg",
                                        "Floating point negation",
                                        [Wasm_FPType]>{}

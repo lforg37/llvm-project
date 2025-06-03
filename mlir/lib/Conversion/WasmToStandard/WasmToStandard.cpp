@@ -105,6 +105,7 @@ using WasmCtzOpConversion =
     OpMappingConversion<CtzOp, math::CountTrailingZerosOp>;
 using WasmPopCntOpConversion =
     OpMappingConversion<PopCntOp, math::CtPopOp>;
+using WasmAbsOpConversion = OpMappingConversion<AbsOp, math::AbsFOp>;
 
 /// Lower a rotate to a series of bitwise operations. Intended for us
 /// in dialects that do not natively support rotate operations.
@@ -690,6 +691,7 @@ void mlir::populateWasmToStandardConversionPatterns(
   // clang-format off
   patternSet
       .add<
+           WasmAbsOpConversion,
            WasmAddOpConversion,
            WasmAndOpConversion,
            WasmCallOpConversion,
