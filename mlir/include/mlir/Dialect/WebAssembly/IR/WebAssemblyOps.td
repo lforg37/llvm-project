@@ -508,4 +508,8 @@ def Wasm_ClzOp : Wasm_UnaryNumericalOp<"clz",
                                        "Count leading zeroes of an integer",
                                        [Wasm_IntegerType]>{}
 
+def Wasm_PopCntOp : Wasm_UnaryNumericalOp<"popcnt",
+                                       "Population count of an integer.",
+                                       [Wasm_IntegerType]>{}
+
 #endif // WEBASSEMBLY_OPS

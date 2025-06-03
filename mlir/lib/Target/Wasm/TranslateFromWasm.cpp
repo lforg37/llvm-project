@@ -120,6 +120,7 @@ struct WasmEncodings {
     static constexpr std::byte leUI32{0x4D};
     static constexpr std::byte geSI32{0x4E};
     static constexpr std::byte geUI32{0x4F};
+    static constexpr std::byte popcntI32{0x69};
     static constexpr std::byte addI32{0x6A};
     static constexpr std::byte clzI32{0x67};
     static constexpr std::byte ctzI32{0x68};
@@ -154,6 +155,7 @@ struct WasmEncodings {
     static constexpr std::byte geUI64{0x5A};
     static constexpr std::byte clzI64{0x79};
     static constexpr std::byte ctzI64{0x7A};
+    static constexpr std::byte popcntI64{0x7B};
     static constexpr std::byte addI64{0x7C};
     static constexpr std::byte subI64{0x7D};
     static constexpr std::byte mulI64{0x7E};
@@ -1354,6 +1356,7 @@ ImplementNumericalBinOpInt(GeUIOp, geU)
 
 ImplementNumericalUnaryOpInt(CtzOp, ctz)
 ImplementNumericalUnaryOpInt(ClzOp, clz)
+ImplementNumericalUnaryOpInt(PopCntOp, popcnt)
 
 #undef ImplementNumericalUnaryOpInt
 
