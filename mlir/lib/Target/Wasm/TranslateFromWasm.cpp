@@ -121,6 +121,7 @@ struct WasmEncodings {
     static constexpr std::byte geSI32{0x4E};
     static constexpr std::byte geUI32{0x4F};
     static constexpr std::byte addI32{0x6A};
+    static constexpr std::byte clzI32{0x67};
     static constexpr std::byte ctzI32{0x68};
     static constexpr std::byte subI32{0x6B};
     static constexpr std::byte mulI32{0x6C};
@@ -151,6 +152,7 @@ struct WasmEncodings {
     static constexpr std::byte leUI64{0x58};
     static constexpr std::byte geSI64{0x59};
     static constexpr std::byte geUI64{0x5A};
+    static constexpr std::byte clzI64{0x79};
     static constexpr std::byte ctzI64{0x7A};
     static constexpr std::byte addI64{0x7C};
     static constexpr std::byte subI64{0x7D};
@@ -1351,6 +1353,7 @@ ImplementNumericalBinOpInt(GeUIOp, geU)
     ImplementNumericalOpPat(OP_NAME, 1, PREFIX, I64, int64_t)
 
 ImplementNumericalUnaryOpInt(CtzOp, ctz)
+ImplementNumericalUnaryOpInt(ClzOp, clz)
 
 #undef ImplementNumericalUnaryOpInt
 

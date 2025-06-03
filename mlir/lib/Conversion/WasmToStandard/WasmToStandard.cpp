@@ -99,9 +99,10 @@ using WasmXOrOpConversion = OpMappingConversion<XOrOp, arith::XOrIOp>;
 using WasmNegOpConversion = OpMappingConversion<NegOp, arith::NegFOp>;
 using WasmCopySignOpConversion =
     OpMappingConversion<CopySignOp, math::CopySignOp>;
+using WasmClzOpConversion =
+    OpMappingConversion<ClzOp, math::CountLeadingZerosOp>;
 using WasmCtzOpConversion =
     OpMappingConversion<CtzOp, math::CountTrailingZerosOp>;
-
 /// Lower a rotate to a series of bitwise operations. Intended for us
 /// in dialects that do not natively support rotate operations.
 ///
@@ -689,6 +690,7 @@ void mlir::populateWasmToStandardConversionPatterns(
            WasmAddOpConversion,
            WasmAndOpConversion,
            WasmCallOpConversion,
+           WasmClzOpConversion,
            WasmConstOpConversion,
            WasmCopySignOpConversion,
            WasmCtzOpConversion,
