@@ -504,4 +504,8 @@ def Wasm_CtzOp : Wasm_UnaryNumericalOp<"ctz",
                                        "Count trailing zeroes of an integer",
                                        [Wasm_IntegerType]>{}
 
+def Wasm_ClzOp : Wasm_UnaryNumericalOp<"clz",
+                                       "Count leading zeroes of an integer",
+                                       [Wasm_IntegerType]>{}
+
 #endif // WEBASSEMBLY_OPS
