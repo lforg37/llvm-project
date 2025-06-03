@@ -12,10 +12,10 @@
 
 #include "mlir/Conversion/WasmToStandard/WasmToStandard.h"
 
-
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/WebAssembly/IR/WebAssembly.h"
@@ -97,6 +97,8 @@ using WasmShRSOpConversion = OpMappingConversion<ShRSOp, arith::ShRSIOp>;
 using WasmShRUOpConversion = OpMappingConversion<ShRUOp, arith::ShRUIOp>;
 using WasmXOrOpConversion = OpMappingConversion<XOrOp, arith::XOrIOp>;
 using WasmNegOpConversion = OpMappingConversion<NegOp, arith::NegFOp>;
+using WasmCopySignOpConversion =
+    OpMappingConversion<CopySignOp, math::CopySignOp>;
 
 /// Lower a rotate to a series of bitwise operations. Intended for us
 /// in dialects that do not natively support rotate operations.
@@ -645,8 +647,9 @@ struct ConvertWasmToStandardPass
   void runOnOperation() override {
     ConversionTarget target{getContext()};
     target.addIllegalDialect<WasmDialect>();
-    target.addLegalDialect<arith::ArithDialect, BuiltinDialect, cf::ControlFlowDialect,
-                           func::FuncDialect, memref::MemRefDialect>();
+    target.addLegalDialect<arith::ArithDialect, BuiltinDialect,
+                           cf::ControlFlowDialect, func::FuncDialect,
+                           memref::MemRefDialect, math::MathDialect>();
     RewritePatternSet patterns(&getContext());
     TypeConverter tc{};
     tc.addConversion([](Type type) -> std::optional<Type> { return type; });
@@ -685,6 +688,7 @@ void mlir::populateWasmToStandardConversionPatterns(
            WasmAndOpConversion,
            WasmCallOpConversion,
            WasmConstOpConversion,
+           WasmCopySignOpConversion,
            WasmDivFPOpConversion,
            WasmDivSIOpConversion,
            WasmDivUIOpConversion,
