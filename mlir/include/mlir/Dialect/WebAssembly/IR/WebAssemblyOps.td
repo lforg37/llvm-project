@@ -366,6 +366,10 @@ def Wasm_MaxOp : Wasm_BinaryNumericalOp<"max",
     [{Compute the minimum of two floating point values.}],
     [Wasm_FPType]>{}
 
+def Wasm_CopySignOp : Wasm_BinaryNumericalOp<"copysign",
+    [{Copy sign from one floating point vaue to the other.}],
+    [Wasm_FPType]>{}
+
 class Wasm_BinaryComparisonOp<string mnemonic, string summaryStr,
                        list<Type> validOpTypes> :
   Wasm_Op<mnemonic, [AllTypesMatch<["lhs", "rhs"]>]> {

@@ -11,6 +11,7 @@ add_mlir_conversion_library(MLIRWasmToStandard
   MLIRArithDialect
   MLIRControlFlowDialect
   MLIRFuncDialect
+  MLIRMathDialect
   MLIRMemRefDialect
   MLIRTransforms
   MLIRVectorDialect
