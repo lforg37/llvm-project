@@ -38,6 +38,9 @@ def Wasm_BlockReturnOp : Wasm_Op<"block_return", [Terminator,
     DeclareOpInterfaceMethods<WasmLabelBranchingInterface>]> {
   let summary = "Return from the current block";
   let arguments = (ins Variadic<Wasm_ValType>: $inputs);
+  let extraClassDeclaration = [{
+    ::mlir::Block* getTarget();
+  }];
   let assemblyFormat = "($inputs^ `:` type($inputs))? attr-dict";
 }
 

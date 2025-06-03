@@ -53,6 +53,12 @@ std::size_t BlockReturnOp::getExitLevel() {
   return 0;
 }
 
+Block *BlockReturnOp::getTarget() {
+  return cast<WasmLabelBranchingInterface>(getOperation())
+      .getTargetOp()
+      .getOperation()
+      ->getSuccessor(0);
+}
 // Custom interface overrides
 
 LogicalResult GlobalGetOp::verifyConstantExprValidity() {

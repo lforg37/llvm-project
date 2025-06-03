@@ -304,9 +304,8 @@ struct WasmFuncOpConversion : OpConversionPattern<FuncOp> {
   /// flow related ops contained in a function.
   class CFRewriterVisitor {
   private:
-    using branch_op_map_t =
-        llvm::DenseMap<WasmLabelBranchingInterface, WasmLabelLevelInterface>;
-    using nest_block_map_t = llvm::DenseMap<WasmLabelLevelInterface, Block *>;
+    using branch_to_dest_t =
+        llvm::DenseMap<WasmLabelBranchingInterface, Block *>;
     Value getCompResultAsI1(Value compResult,
                             ConversionPatternRewriter &rewriter) {
       auto testValue = rewriter.create<arith::ConstantOp>(
@@ -385,14 +384,11 @@ struct WasmFuncOpConversion : OpConversionPattern<FuncOp> {
     }
 
     llvm::FailureOr<Block *> getBlockFor(WasmLabelBranchingInterface branchOp) {
-      auto nestIter = branchToOp.find(branchOp);
-      if (nestIter == branchToOp.end())
+      auto destIter = branchToDest.find(branchOp);
+      if (destIter == branchToDest.end())
         return branchOp->emitError("No indexed label op for this operation: ")
                << branchOp;
-      auto dest = cFGOpToDest.find(nestIter->second);
-      if (dest == cFGOpToDest.end())
-        return branchOp->emitError("Unknown destination for op ") << branchOp;
-      return dest->second;
+      return destIter->second;
     }
 
     inline void convertBranch(BranchIfOp brOp, Block *dest,
@@ -443,17 +439,12 @@ struct WasmFuncOpConversion : OpConversionPattern<FuncOp> {
       return convertBranchDispatch<BlockReturnOp, BranchIfOp>(branchOp, rewriter);
     }
 
-    branch_op_map_t branchToOp;
-    nest_block_map_t cFGOpToDest;
     func::FuncOp func;
-
+    branch_to_dest_t branchToDest;
   public:
     CFRewriterVisitor(func::FuncOp func) : func{func} {
       func.walk([this](WasmLabelBranchingInterface branchOp) {
-        branchToOp.insert({branchOp, branchOp.getTargetOp()});
-      });
-      func.walk([this](WasmLabelLevelInterface nestingLvlOp) {
-        cFGOpToDest.insert({nestingLvlOp, nestingLvlOp.getLabelTarget()});
+        branchToDest.insert({branchOp, branchOp.getTarget()});
       });
     }
     LogicalResult rewrite(ConversionPatternRewriter &rewriter) {
