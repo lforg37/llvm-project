@@ -121,6 +121,7 @@ struct WasmEncodings {
     static constexpr std::byte geSI32{0x4E};
     static constexpr std::byte geUI32{0x4F};
     static constexpr std::byte addI32{0x6A};
+    static constexpr std::byte ctzI32{0x68};
     static constexpr std::byte subI32{0x6B};
     static constexpr std::byte mulI32{0x6C};
     static constexpr std::byte divSI32{0x6d};
@@ -150,6 +151,7 @@ struct WasmEncodings {
     static constexpr std::byte leUI64{0x58};
     static constexpr std::byte geSI64{0x59};
     static constexpr std::byte geUI64{0x5A};
+    static constexpr std::byte ctzI64{0x7A};
     static constexpr std::byte addI64{0x7C};
     static constexpr std::byte subI64{0x7D};
     static constexpr std::byte mulI64{0x7E};
@@ -1341,6 +1343,16 @@ ImplementNumericalBinOpInt(GtUIOp, gtU)
 ImplementNumericalBinOpInt(GeUIOp, geU)
 
 #undef ImplementNumericalBinOpInt
+
+
+// Unary integer operation
+#define ImplementNumericalUnaryOpInt(OP_NAME, PREFIX)                             \
+    ImplementNumericalOpPat(OP_NAME, 1, PREFIX, I32, int32_t)                    \
+    ImplementNumericalOpPat(OP_NAME, 1, PREFIX, I64, int64_t)
+
+ImplementNumericalUnaryOpInt(CtzOp, ctz)
+
+#undef ImplementNumericalUnaryOpInt
 
 #define ImplementNumericalBinOpFP(OP_NAME, PREFIX)                             \
     ImplementNumericalOpPat(OP_NAME, 2, PREFIX, F32, float)                    \

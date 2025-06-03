@@ -500,4 +500,8 @@ def Wasm_NegOp : Wasm_UnaryNumericalOp<"neg",
                                        "Floating point negation",
                                        [Wasm_FPType]>{}
 
+def Wasm_CtzOp : Wasm_UnaryNumericalOp<"ctz",
+                                       "Count trailing zeroes of an integer",
+                                       [Wasm_IntegerType]>{}
+
 #endif // WEBASSEMBLY_OPS
