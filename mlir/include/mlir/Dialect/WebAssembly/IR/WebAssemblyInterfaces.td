@@ -24,7 +24,7 @@ def WasmLabelLevelInterface : OpInterface<"WasmLabelLevelInterface"> {
   let methods = [
     InterfaceMethod<
       /*desc=*/        "Returns the target block address",
-      /*returnType=*/  "Block*",
+      /*returnType=*/  "::mlir::Block*",
       /*methodName=*/  "getLabelTarget",
       /*args=*/        (ins)
     >
@@ -41,13 +41,30 @@ def WasmLabelBranchingInterface : OpInterface<"WasmLabelBranchingInterface"> {
       /*returnType=*/  "size_t",
       /*methodName=*/  "getExitLevel",
       /*args=*/        (ins)
+    >,
+    InterfaceMethod<
+      /*desc=*/        "Returns the destination of this operation",
+      /*returnType=*/  "WasmLabelLevelInterface",
+      /*methodName=*/  "getTargetOp",
+      /*args=*/        (ins),
+      /*methodBody=*/ [{
+        return *WasmLabelBranchingInterface::getTargetOpFromBlock($_op.getOperation()->getBlock(), $_op.getExitLevel());
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/        "Return the target control flow ops that defined the label of this operation",
+      /*returnType=*/  "::mlir::Block*",
+      /*methodName=*/  "getTarget",
+      /*args=*/        (ins),
+      /*methodBody=*/  [{}],
+      /*defaultImpl=*/ [{
+        auto op = mlir::cast<WasmLabelBranchingInterface>(this->getOperation());
+        return op.getTargetOp().getLabelTarget();
+      }]
     >
   ];
   let extraClassDeclaration = [{
     static ::llvm::FailureOr<WasmLabelLevelInterface> getTargetOpFromBlock(::mlir::Block *block, uint32_t level);
-    WasmLabelLevelInterface getTargetOp() {
-      return *getTargetOpFromBlock(getOperation()->getBlock(), getExitLevel());
-    }
   }];
   let verify = [{return verifyWasmLabelBranchingInterface($_op);}];
 }
