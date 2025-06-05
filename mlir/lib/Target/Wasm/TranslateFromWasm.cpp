@@ -1443,96 +1443,85 @@ inline parsed_inst_t ExpressionParser::buildNumericOp(
   return {{op}};
 }
 
-#define ImplementNumericalOpPat(OP_NAME, N_ARGS, PREFIX, SUFFIX, TYPE)         \
-    template <>                                                                \
-    inline parsed_inst_t ExpressionParser::parseSpecificInstruction<           \
-        WasmEncodings::OpCode::PREFIX##SUFFIX>(OpBuilder & builder) {          \
-      return buildNumericOp<OP_NAME, TYPE, N_ARGS>(builder);                   \
-    }
+// Convenience macro for generating numerical operations.
+#define BUILD_NUMERIC_OP(OP_NAME, N_ARGS, PREFIX, SUFFIX, TYPE)                \
+  template <>                                                                  \
+  inline parsed_inst_t ExpressionParser::parseSpecificInstruction<             \
+      WasmEncodings::OpCode::PREFIX##SUFFIX>(OpBuilder & builder) {            \
+    return buildNumericOp<OP_NAME, TYPE, N_ARGS>(builder);                     \
+  }
 
-// Ops that exists for all numerical types
+// Macro to define binops that only support integer types.
+#define BUILD_NUMERIC_BINOP_INT(OP_NAME, PREFIX)                               \
+  BUILD_NUMERIC_OP(OP_NAME, 2, PREFIX, I32, int32_t)                           \
+  BUILD_NUMERIC_OP(OP_NAME, 2, PREFIX, I64, int64_t)
 
-#define ImplementNumericalBinOpIntFP(OP_NAME, PREFIX)                          \
-    ImplementNumericalOpPat(OP_NAME, 2, PREFIX, I32, int32_t)                  \
-    ImplementNumericalOpPat(OP_NAME, 2, PREFIX, I64, int64_t)                  \
-    ImplementNumericalOpPat(OP_NAME, 2, PREFIX, F32, float)                    \
-    ImplementNumericalOpPat(OP_NAME, 2, PREFIX, F64, double)
+// Macro to define binops that only support floating point types.
+#define BUILD_NUMERIC_BINOP_FP(OP_NAME, PREFIX)                                \
+  BUILD_NUMERIC_OP(OP_NAME, 2, PREFIX, F32, float)                             \
+  BUILD_NUMERIC_OP(OP_NAME, 2, PREFIX, F64, double)
 
-ImplementNumericalBinOpIntFP(AddOp, add)
-ImplementNumericalBinOpIntFP(MulOp, mul)
-ImplementNumericalBinOpIntFP(SubOp, sub)
-ImplementNumericalBinOpIntFP(EqOp, eq)
-ImplementNumericalBinOpIntFP(NeOp, ne)
+// Macro to define binops that support both floating point and integer types.
+#define BUILD_NUMERIC_BINOP_INTFP(OP_NAME, PREFIX)                             \
+  BUILD_NUMERIC_BINOP_INT(OP_NAME, PREFIX)                                     \
+  BUILD_NUMERIC_BINOP_FP(OP_NAME, PREFIX)
 
-#undef ImplementNumericalBinOpIntFP
+// Macro to implement unary ops that only support integers.
+#define BUILD_NUMERIC_UNARY_OP_INT(OP_NAME, PREFIX)                            \
+  BUILD_NUMERIC_OP(OP_NAME, 1, PREFIX, I32, int32_t)                           \
+  BUILD_NUMERIC_OP(OP_NAME, 1, PREFIX, I64, int64_t)
 
-// Ops that exists for integer types
+// Macro to implement unary ops that support integer and floating point types.
+#define BUILD_NUMERIC_UNARY_OP_FP(OP_NAME, PREFIX)                             \
+  BUILD_NUMERIC_OP(OP_NAME, 1, PREFIX, F32, float)                             \
+  BUILD_NUMERIC_OP(OP_NAME, 1, PREFIX, F64, double)
 
-#define ImplementNumericalBinOpInt(OP_NAME, PREFIX)                                \
-    ImplementNumericalOpPat(OP_NAME, 2, PREFIX, I32, int32_t)                      \
-    ImplementNumericalOpPat(OP_NAME, 2, PREFIX, I64, int64_t)
+BUILD_NUMERIC_BINOP_FP(CopySignOp, copysign)
+BUILD_NUMERIC_BINOP_FP(DivOp, div)
+BUILD_NUMERIC_BINOP_FP(GeOp, ge)
+BUILD_NUMERIC_BINOP_FP(GtOp, gt)
+BUILD_NUMERIC_BINOP_FP(LeOp, le)
+BUILD_NUMERIC_BINOP_FP(LtOp, lt)
+BUILD_NUMERIC_BINOP_FP(MaxOp, max)
+BUILD_NUMERIC_BINOP_FP(MinOp, min)
+BUILD_NUMERIC_BINOP_INT(AndOp, and)
+BUILD_NUMERIC_BINOP_INT(DivSIOp, divS)
+BUILD_NUMERIC_BINOP_INT(DivUIOp, divU)
+BUILD_NUMERIC_BINOP_INT(GeSIOp, geS)
+BUILD_NUMERIC_BINOP_INT(GeUIOp, geU)
+BUILD_NUMERIC_BINOP_INT(GtSIOp, gtS)
+BUILD_NUMERIC_BINOP_INT(GtUIOp, gtU)
+BUILD_NUMERIC_BINOP_INT(LeSIOp, leS)
+BUILD_NUMERIC_BINOP_INT(LeUIOp, leU)
+BUILD_NUMERIC_BINOP_INT(LtSIOp, ltS)
+BUILD_NUMERIC_BINOP_INT(LtUIOp, ltU)
+BUILD_NUMERIC_BINOP_INT(OrOp, or)
+BUILD_NUMERIC_BINOP_INT(RemSIOp, remS)
+BUILD_NUMERIC_BINOP_INT(RemUIOp, remU)
+BUILD_NUMERIC_BINOP_INT(RotlOp, rotl)
+BUILD_NUMERIC_BINOP_INT(RotrOp, rotr)
+BUILD_NUMERIC_BINOP_INT(ShLOp, shl)
+BUILD_NUMERIC_BINOP_INT(ShRSOp, shr_s)
+BUILD_NUMERIC_BINOP_INT(ShRUOp, shr_u)
+BUILD_NUMERIC_BINOP_INT(XOrOp, xor)
+BUILD_NUMERIC_BINOP_INTFP(AddOp, add)
+BUILD_NUMERIC_BINOP_INTFP(EqOp, eq)
+BUILD_NUMERIC_BINOP_INTFP(MulOp, mul)
+BUILD_NUMERIC_BINOP_INTFP(NeOp, ne)
+BUILD_NUMERIC_BINOP_INTFP(SubOp, sub)
+BUILD_NUMERIC_UNARY_OP_FP(AbsOp, abs)
+BUILD_NUMERIC_UNARY_OP_FP(NegOp, neg)
+BUILD_NUMERIC_UNARY_OP_INT(ClzOp, clz)
+BUILD_NUMERIC_UNARY_OP_INT(CtzOp, ctz)
+BUILD_NUMERIC_UNARY_OP_INT(PopCntOp, popcnt)
 
-ImplementNumericalBinOpInt(AndOp, and)
-ImplementNumericalBinOpInt(DivSIOp, divS)
-ImplementNumericalBinOpInt(DivUIOp, divU)
-ImplementNumericalBinOpInt(OrOp, or)
-ImplementNumericalBinOpInt(RemSIOp, remS)
-ImplementNumericalBinOpInt(RemUIOp, remU)
-ImplementNumericalBinOpInt(RotlOp, rotl)
-ImplementNumericalBinOpInt(RotrOp, rotr)
-ImplementNumericalBinOpInt(ShLOp, shl)
-ImplementNumericalBinOpInt(ShRSOp, shr_s)
-ImplementNumericalBinOpInt(ShRUOp, shr_u)
-ImplementNumericalBinOpInt(XOrOp, xor)
-ImplementNumericalBinOpInt(LtSIOp, ltS)
-ImplementNumericalBinOpInt(LeSIOp, leS)
-ImplementNumericalBinOpInt(LtUIOp, ltU)
-ImplementNumericalBinOpInt(LeUIOp, leU)
-ImplementNumericalBinOpInt(GtSIOp, gtS)
-ImplementNumericalBinOpInt(GeSIOp, geS)
-ImplementNumericalBinOpInt(GtUIOp, gtU)
-ImplementNumericalBinOpInt(GeUIOp, geU)
-
-#undef ImplementNumericalBinOpInt
-
-
-// Unary integer operation
-#define ImplementNumericalUnaryOpInt(OP_NAME, PREFIX)                             \
-    ImplementNumericalOpPat(OP_NAME, 1, PREFIX, I32, int32_t)                    \
-    ImplementNumericalOpPat(OP_NAME, 1, PREFIX, I64, int64_t)
-
-ImplementNumericalUnaryOpInt(CtzOp, ctz)
-ImplementNumericalUnaryOpInt(ClzOp, clz)
-ImplementNumericalUnaryOpInt(PopCntOp, popcnt)
-
-#undef ImplementNumericalUnaryOpInt
-
-#define ImplementNumericalBinOpFP(OP_NAME, PREFIX)                             \
-    ImplementNumericalOpPat(OP_NAME, 2, PREFIX, F32, float)                    \
-    ImplementNumericalOpPat(OP_NAME, 2, PREFIX, F64, double)
-
-ImplementNumericalBinOpFP(DivOp, div)
-ImplementNumericalBinOpFP(LtOp, lt)
-ImplementNumericalBinOpFP(LeOp, le)
-ImplementNumericalBinOpFP(GtOp, gt)
-ImplementNumericalBinOpFP(GeOp, ge)
-ImplementNumericalBinOpFP(MaxOp, max)
-ImplementNumericalBinOpFP(MinOp, min)
-ImplementNumericalBinOpFP(CopySignOp, copysign)
-
-#undef ImplementNumericalBinOpFP
-
-// Unary floating-point operations.
-#define ImplementNumericalUnaryOpFP(OP_NAME, PREFIX)                             \
-    ImplementNumericalOpPat(OP_NAME, 1, PREFIX, F32, float)                    \
-    ImplementNumericalOpPat(OP_NAME, 1, PREFIX, F64, double)
-
-ImplementNumericalUnaryOpFP(AbsOp, abs)
-ImplementNumericalUnaryOpFP(NegOp, neg)
-
-#undef ImplementNumericalUnaryOpFP
-
-#undef ImplementNumericalOpPat
+// Don't need these anymore so let's undef them.
+#undef BUILD_NUMERIC_BINOP_FP
+#undef BUILD_NUMERIC_BINOP_INT
+#undef BUILD_NUMERIC_BINOP_INTFP
+#undef BUILD_NUMERIC_UNARY_OP_FP
+#undef BUILD_NUMERIC_UNARY_OP_INT
+#undef BUILD_NUMERIC_OP
 
 class WasmBinaryParser {
 private:
