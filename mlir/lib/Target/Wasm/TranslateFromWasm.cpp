@@ -14,10 +14,11 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/OwningOpRef.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/Target/Wasm/WasmBinaryEncoding.h"
 #include "mlir/Target/Wasm/WasmImporter.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -91,162 +92,6 @@ constexpr bool sectionShouldBeUnique(WasmSectionType secType) {
   return secType != WasmSectionType::CUSTOM;
 }
 
-struct WasmEncodings {
-  struct OpCode {
-    // Control instructions
-    static constexpr std::byte block{0x02};
-    static constexpr std::byte loop{0x03};
-    static constexpr std::byte ifOpCode{0x04};
-    static constexpr std::byte elseOpCode{0x05};
-    static constexpr std::byte branchIf{0x0D};
-    static constexpr std::byte call{0x10};
-
-    // Variable instructions
-    static constexpr std::byte localGet{0x20};
-    static constexpr std::byte localSet{0x21};
-    static constexpr std::byte localTee{0x22};
-    static constexpr std::byte globalGet{0x23};
-
-    // Numerical constants
-    static constexpr std::byte constI32{0x41};
-    static constexpr std::byte constI64{0x42};
-    static constexpr std::byte constFP32{0x43};
-    static constexpr std::byte constFP64{0x44};
-
-    // Numerical ops
-    static constexpr std::byte eqI32{0x46};
-    static constexpr std::byte neI32{0x47};
-    static constexpr std::byte ltSI32{0x48};
-    static constexpr std::byte ltUI32{0x49};
-    static constexpr std::byte gtSI32{0x4A};
-    static constexpr std::byte gtUI32{0x4B};
-    static constexpr std::byte leSI32{0x4C};
-    static constexpr std::byte leUI32{0x4D};
-    static constexpr std::byte geSI32{0x4E};
-    static constexpr std::byte geUI32{0x4F};
-    static constexpr std::byte popcntI32{0x69};
-    static constexpr std::byte addI32{0x6A};
-    static constexpr std::byte clzI32{0x67};
-    static constexpr std::byte ctzI32{0x68};
-    static constexpr std::byte subI32{0x6B};
-    static constexpr std::byte mulI32{0x6C};
-    static constexpr std::byte divSI32{0x6d};
-    static constexpr std::byte divUI32{0x6e};
-    static constexpr std::byte remSI32{0x6f};
-    static constexpr std::byte remUI32{0x70};
-    static constexpr std::byte andI32{0x71};
-    static constexpr std::byte orI32{0x72};
-    static constexpr std::byte xorI32{0x73};
-    static constexpr std::byte shlI32{0x74};
-    static constexpr std::byte shr_sI32{0x75};
-    static constexpr std::byte shr_uI32{0x76};
-    static constexpr std::byte rotlI32{0x77};
-    static constexpr std::byte rotrI32{0x78};
-    static constexpr std::byte absF32{0x8B};
-    static constexpr std::byte negF32{0x8C};
-    static constexpr std::byte minF32{0x96};
-    static constexpr std::byte maxF32{0x97};
-    static constexpr std::byte copysignF32{0x98};
-
-    static constexpr std::byte eqI64{0x51};
-    static constexpr std::byte neI64{0x52};
-    static constexpr std::byte ltSI64{0x53};
-    static constexpr std::byte ltUI64{0x54};
-    static constexpr std::byte gtSI64{0x55};
-    static constexpr std::byte gtUI64{0x56};
-    static constexpr std::byte leSI64{0x57};
-    static constexpr std::byte leUI64{0x58};
-    static constexpr std::byte geSI64{0x59};
-    static constexpr std::byte geUI64{0x5A};
-    static constexpr std::byte clzI64{0x79};
-    static constexpr std::byte ctzI64{0x7A};
-    static constexpr std::byte popcntI64{0x7B};
-    static constexpr std::byte addI64{0x7C};
-    static constexpr std::byte subI64{0x7D};
-    static constexpr std::byte mulI64{0x7E};
-    static constexpr std::byte divSI64{0x7F};
-    static constexpr std::byte divUI64{0x80};
-    static constexpr std::byte remSI64{0x81};
-    static constexpr std::byte remUI64{0x82};
-    static constexpr std::byte andI64{0x83};
-    static constexpr std::byte orI64{0x84};
-    static constexpr std::byte xorI64{0x85};
-    static constexpr std::byte shlI64{0x86};
-    static constexpr std::byte shr_sI64{0x87};
-    static constexpr std::byte shr_uI64{0x88};
-    static constexpr std::byte rotlI64{0x89};
-    static constexpr std::byte rotrI64{0x8A};
-    static constexpr std::byte absF64{0x99};
-    static constexpr std::byte negF64{0x9A};
-
-    static constexpr std::byte eqF32{0x5B};
-    static constexpr std::byte neF32{0x5C};
-    static constexpr std::byte ltF32{0x5D};
-    static constexpr std::byte gtF32{0x5E};
-    static constexpr std::byte leF32{0x5F};
-    static constexpr std::byte geF32{0x60};
-    static constexpr std::byte addF32{0x92};
-    static constexpr std::byte subF32{0x93};
-    static constexpr std::byte mulF32{0x94};
-    static constexpr std::byte divF32{0x95};
-
-    static constexpr std::byte eqF64{0x61};
-    static constexpr std::byte neF64{0x62};
-    static constexpr std::byte ltF64{0x63};
-    static constexpr std::byte gtF64{0x64};
-    static constexpr std::byte leF64{0x65};
-    static constexpr std::byte geF64{0x66};
-    static constexpr std::byte addF64{0xA0};
-    static constexpr std::byte subF64{0xA1};
-    static constexpr std::byte mulF64{0xA2};
-    static constexpr std::byte divF64{0xA3};
-    static constexpr std::byte minF64{0xA4};
-    static constexpr std::byte maxF64{0xA5};
-    static constexpr std::byte copysignF64{0xA6};
-  };
-
-  /// Byte encodings of types in wasm binaries
-  /// These are defined in the wasm binary spec
-  /// https://webassembly.github.io/spec/core/binary/types.html
-  struct TypeEncoding {
-    static constexpr std::byte i32{0x7F};
-    static constexpr std::byte i64{0x7E};
-    static constexpr std::byte f32{0x7D};
-    static constexpr std::byte f64{0x7C};
-    static constexpr std::byte v128{0x7B};
-    static constexpr std::byte funcRef{0x70};
-    static constexpr std::byte externRef{0x6F};
-    static constexpr std::byte funcType{0x60};
-    static constexpr std::byte emptyBlockType{0x40};
-  };
-
-  struct ImportType {
-    static constexpr std::byte typeID{0x00};
-    static constexpr std::byte tableType{0x01};
-    static constexpr std::byte memType{0x02};
-    static constexpr std::byte globalType{0x03};
-  };
-
-  struct LimitHeader {
-    static constexpr std::byte lowLimitOnly{0x00};
-    static constexpr std::byte bothLimits{0x01};
-  };
-
-  struct GlobalMutability {
-    static constexpr std::byte isConst{0x00};
-    static constexpr std::byte isMutable{0x01};
-  };
-
-  struct ExportType {
-    static constexpr std::byte function{0x00};
-    static constexpr std::byte table{0x01};
-    static constexpr std::byte memory{0x02};
-    static constexpr std::byte global{0x03};
-  };
-
-  static constexpr std::byte endByte{0x0B};
-};
-
 template <std::byte... Bytes>
 struct ByteSequence{};
 
@@ -270,9 +115,9 @@ constexpr auto allOpCodes =
     byteSeqFromIntSeq(std::make_integer_sequence<int, 256>());
 
 constexpr ByteSequence<
-    WasmEncodings::TypeEncoding::i32, WasmEncodings::TypeEncoding::i64,
-    WasmEncodings::TypeEncoding::f32, WasmEncodings::TypeEncoding::f64,
-    WasmEncodings::TypeEncoding::v128>
+    WasmBinaryEncoding::Type::i32, WasmBinaryEncoding::Type::i64,
+    WasmBinaryEncoding::Type::f32, WasmBinaryEncoding::Type::f64,
+    WasmBinaryEncoding::Type::v128>
     valueTypesEncodings{};
 
 template<std::byte... allowedFlags>
@@ -529,12 +374,13 @@ private:
     std::byte endingByte;
   };
 
-  template<typename FilterT = ByteSequence<WasmEncodings::endByte>>
+  template <typename FilterT = ByteSequence<WasmBinaryEncoding::endByte>>
   /// @param blockToFill: the block which content will be populated
   /// @param resType: the type that this block is supposed to return
-  llvm::FailureOr<std::byte> parseBlockContent(OpBuilder &builder, Block *blockToFill,
-                                  TypeRange resTypes, Location opLoc,
-                                  WasmLabelLevelInterface levelOp, FilterT parseEndBytes = {}) {
+  llvm::FailureOr<std::byte>
+  parseBlockContent(OpBuilder &builder, Block *blockToFill, TypeRange resTypes,
+                    Location opLoc, WasmLabelLevelInterface levelOp,
+                    FilterT parseEndBytes = {}) {
     auto sip = builder.saveInsertionPoint();
     builder.setInsertionPointToStart(blockToFill);
     LLVM_DEBUG(llvm::dbgs() << "Parsing a block of type "
@@ -557,7 +403,7 @@ private:
   }
 
 public:
-  template<std::byte ParseEndByte = WasmEncodings::endByte>
+  template<std::byte ParseEndByte = WasmBinaryEncoding::endByte>
   parsed_inst_t parse(OpBuilder &builder,
                       UniqueByte<ParseEndByte> = {});
 
@@ -664,8 +510,8 @@ public:
     return static_cast<WasmSectionType>(*id);
   }
 
-  llvm::FailureOr<LimitType> parseLimit(MLIRContext* ctx) {
-    using WasmLimits = WasmEncodings::LimitHeader;
+  llvm::FailureOr<LimitType> parseLimit(MLIRContext *ctx) {
+    using WasmLimits = WasmBinaryEncoding::LimitHeader;
     auto limitLocation = getLocation();
     auto limitHeader = consumeByte();
     if (failed(limitHeader))
@@ -693,19 +539,19 @@ public:
     if (failed(typeEncoding))
       return failure();
     switch (*typeEncoding) {
-    case WasmEncodings::TypeEncoding::i32:
+    case WasmBinaryEncoding::Type::i32:
       return IntegerType::get(ctx, 32);
-    case WasmEncodings::TypeEncoding::i64:
+    case WasmBinaryEncoding::Type::i64:
       return IntegerType::get(ctx, 64);
-    case WasmEncodings::TypeEncoding::f32:
+    case WasmBinaryEncoding::Type::f32:
       return Float32Type::get(ctx);
-    case WasmEncodings::TypeEncoding::f64:
+    case WasmBinaryEncoding::Type::f64:
       return Float64Type::get(ctx);
-    case WasmEncodings::TypeEncoding::v128:
+    case WasmBinaryEncoding::Type::v128:
       return IntegerType::get(ctx, 128);
-    case WasmEncodings::TypeEncoding::funcRef:
+    case WasmBinaryEncoding::Type::funcRef:
       return wasm::FuncRefType::get(ctx);
-    case WasmEncodings::TypeEncoding::externRef:
+    case WasmBinaryEncoding::Type::externRef:
       return wasm::ExternRefType::get(ctx);
     default:
       return emitError(typeLoc, "Invalid value type encoding: ")
@@ -714,7 +560,7 @@ public:
   }
 
   llvm::FailureOr<GlobalTypeRecord> parseGlobalType(MLIRContext *ctx) {
-    using WasmGlobalMut = WasmEncodings::GlobalMutability;
+    using WasmGlobalMut = WasmBinaryEncoding::GlobalMutability;
     auto typeParsed = parseValueType(ctx);
     if (failed(typeParsed))
       return failure();
@@ -749,9 +595,10 @@ public:
     auto funcTypeHeader = consumeByte();
     if (failed(funcTypeHeader))
       return failure();
-    if (*funcTypeHeader != WasmEncodings::TypeEncoding::funcType)
+    if (*funcTypeHeader != WasmBinaryEncoding::Type::funcType)
       return emitError(typeLoc, "Invalid function type header byte. Expecting ")
-             << std::to_integer<unsigned>(WasmEncodings::TypeEncoding::funcType)
+             << std::to_integer<unsigned>(
+                    WasmBinaryEncoding::Type::funcType)
              << " got " << std::to_integer<unsigned>(*funcTypeHeader);
     auto inputTypes = parseResultType(ctx);
     if (failed(inputTypes))
@@ -794,13 +641,13 @@ public:
     if (failed(importType))
       return failure();
     switch (*importType) {
-    case WasmEncodings::ImportType::typeID:
+    case WasmBinaryEncoding::Import::typeID:
       return packager(parseTypeIndex());
-    case WasmEncodings::ImportType::tableType:
+    case WasmBinaryEncoding::Import::tableType:
       return packager(parseTableType(ctx));
-    case WasmEncodings::ImportType::memType:
+    case WasmBinaryEncoding::Import::memType:
       return packager(parseLimit(ctx));
-    case WasmEncodings::ImportType::globalType:
+    case WasmBinaryEncoding::Import::globalType:
       return packager(parseGlobalType(ctx));
     default:
       return emitError(importLoc, "Invalid import type descriptor: ")
@@ -875,7 +722,7 @@ public:
     auto blockIndicator = peek();
     if (failed(blockIndicator))
       return failure();
-    if (*blockIndicator == WasmEncodings::TypeEncoding::emptyBlockType) {
+    if (*blockIndicator == WasmBinaryEncoding::Type::emptyBlockType) {
       offset += 1;
       return {EmptyBlockMarker{}};
     }
@@ -1163,22 +1010,21 @@ parsed_inst_t ExpressionParser::parseBlockLikeOp(OpBuilder &builder) {
 
 template <>
 inline parsed_inst_t
-ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::block>(
+ExpressionParser::parseSpecificInstruction<WasmBinaryEncoding::OpCode::block>(
     OpBuilder &builder) {
   return parseBlockLikeOp<BlockOp>(builder);
 }
 
 template <>
 inline parsed_inst_t
-ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::loop>(
+ExpressionParser::parseSpecificInstruction<WasmBinaryEncoding::OpCode::loop>(
     OpBuilder &builder) {
   return parseBlockLikeOp<LoopOp>(builder);
 }
 
 template <>
-inline parsed_inst_t
-ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::ifOpCode>(
-    OpBuilder &builder) {
+inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
+    WasmBinaryEncoding::OpCode::ifOpCode>(OpBuilder &builder) {
   auto opLoc = currentOpLoc;
   auto funcType = parseBlockFuncType(builder);
   if (failed(funcType))
@@ -1205,12 +1051,13 @@ ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::ifOpCode>(
                                    *inputOps, successor);
   auto *ifEntryBlock = ifOp.createIfBlock();
   constexpr auto ifElseFilter =
-      ByteSequence<WasmEncodings::endByte, WasmEncodings::OpCode::elseOpCode>{};
+      ByteSequence<WasmBinaryEncoding::endByte,
+                   WasmBinaryEncoding::OpCode::elseOpCode>{};
   auto parseIfRes = parseBlockContent(builder, ifEntryBlock, resTypes, *opLoc,
                                       ifOp, ifElseFilter);
   if (failed(parseIfRes))
     return failure();
-  if (*parseIfRes == WasmEncodings::OpCode::elseOpCode) {
+  if (*parseIfRes == WasmBinaryEncoding::OpCode::elseOpCode) {
     LLVM_DEBUG(
         llvm::dbgs()
         << "  else block is present.\n");
@@ -1225,9 +1072,8 @@ ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::ifOpCode>(
 }
 
 template <>
-inline parsed_inst_t
-ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::branchIf>(
-    OpBuilder &builder) {
+inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
+    WasmBinaryEncoding::OpCode::branchIf>(OpBuilder &builder) {
   auto level = parser.parseLiteral<uint32_t>();
   if (failed(level))
     return failure();
@@ -1256,7 +1102,7 @@ ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::branchIf>(
 
 template <>
 inline parsed_inst_t
-ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::call>(
+ExpressionParser::parseSpecificInstruction<WasmBinaryEncoding::OpCode::call>(
     OpBuilder &builder) {
   auto loc = *currentOpLoc;
   auto funcIdx = parser.parseLiteral<uint32_t>();
@@ -1276,9 +1122,8 @@ ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::call>(
 }
 
 template <>
-inline parsed_inst_t
-ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::localGet>(
-    OpBuilder &builder) {
+inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
+    WasmBinaryEncoding::OpCode::localGet>(OpBuilder &builder) {
   auto id = parser.parseLiteral<uint32_t>();
   auto instLoc = *currentOpLoc;
   if (failed(id))
@@ -1290,9 +1135,8 @@ ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::localGet>(
 }
 
 template <>
-inline parsed_inst_t
-ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::globalGet>(
-    OpBuilder &builder) {
+inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
+    WasmBinaryEncoding::OpCode::globalGet>(OpBuilder &builder) {
   auto id = parser.parseLiteral<uint32_t>();
   auto instLoc = *currentOpLoc;
   if (failed(id))
@@ -1328,16 +1172,14 @@ parsed_inst_t ExpressionParser::parseSetOrTee(OpBuilder &builder) {
 }
 
 template <>
-inline parsed_inst_t
-ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::localSet>(
-    OpBuilder &builder) {
+inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
+    WasmBinaryEncoding::OpCode::localSet>(OpBuilder &builder) {
   return parseSetOrTee<LocalSetOp>(builder);
 }
 
 template <>
-inline parsed_inst_t
-ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::localTee>(
-    OpBuilder & builder) {
+inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
+    WasmBinaryEncoding::OpCode::localTee>(OpBuilder &builder) {
   return parseSetOrTee<LocalTeeOp>(builder);
 }
 
@@ -1398,30 +1240,26 @@ parsed_inst_t ExpressionParser::parseConstInst(
 }
 
 template <>
-inline parsed_inst_t
-ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::constI32>(
-    OpBuilder &builder) {
+inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
+    WasmBinaryEncoding::OpCode::constI32>(OpBuilder &builder) {
   return parseConstInst<int32_t>(builder);
 }
 
 template <>
-inline parsed_inst_t
-ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::constI64>(
-    OpBuilder &builder) {
+inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
+    WasmBinaryEncoding::OpCode::constI64>(OpBuilder &builder) {
   return parseConstInst<int64_t>(builder);
 }
 
 template <>
-inline parsed_inst_t
-ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::constFP32>(
-    OpBuilder &builder) {
+inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
+    WasmBinaryEncoding::OpCode::constFP32>(OpBuilder &builder) {
   return parseConstInst<float>(builder);
 }
 
 template <>
-inline parsed_inst_t
-ExpressionParser::parseSpecificInstruction<WasmEncodings::OpCode::constFP64>(
-    OpBuilder &builder) {
+inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
+    WasmBinaryEncoding::OpCode::constFP64>(OpBuilder &builder) {
   return parseConstInst<double>(builder);
 }
 
@@ -1447,7 +1285,7 @@ inline parsed_inst_t ExpressionParser::buildNumericOp(
 #define BUILD_NUMERIC_OP(OP_NAME, N_ARGS, PREFIX, SUFFIX, TYPE)                \
   template <>                                                                  \
   inline parsed_inst_t ExpressionParser::parseSpecificInstruction<             \
-      WasmEncodings::OpCode::PREFIX##SUFFIX>(OpBuilder & builder) {            \
+      WasmBinaryEncoding::OpCode::PREFIX##SUFFIX>(OpBuilder & builder) {       \
     return buildNumericOp<OP_NAME, TYPE, N_ARGS>(builder);                     \
   }
 
@@ -1501,8 +1339,8 @@ BUILD_NUMERIC_BINOP_INT(RemUIOp, remU)
 BUILD_NUMERIC_BINOP_INT(RotlOp, rotl)
 BUILD_NUMERIC_BINOP_INT(RotrOp, rotr)
 BUILD_NUMERIC_BINOP_INT(ShLOp, shl)
-BUILD_NUMERIC_BINOP_INT(ShRSOp, shr_s)
-BUILD_NUMERIC_BINOP_INT(ShRUOp, shr_u)
+BUILD_NUMERIC_BINOP_INT(ShRSOp, shrS)
+BUILD_NUMERIC_BINOP_INT(ShRUOp, shrU)
 BUILD_NUMERIC_BINOP_INT(XOrOp, xor)
 BUILD_NUMERIC_BINOP_INTFP(AddOp, add)
 BUILD_NUMERIC_BINOP_INTFP(EqOp, eq)
@@ -1823,19 +1661,19 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::EXPORT>(ParserHead &ph,
   SymbolRefDesc currentSymbolList;
   std::string symbolType = "";
   switch (*opcode) {
-  case WasmEncodings::ExportType::function:
+  case WasmBinaryEncoding::Export::function:
     symbolType = "function";
     currentSymbolList = symbols.funcSymbols;
     break;
-  case WasmEncodings::ExportType::table:
+  case WasmBinaryEncoding::Export::table:
     symbolType = "table";
     currentSymbolList = symbols.tableSymbols;
     break;
-  case WasmEncodings::ExportType::memory:
+  case WasmBinaryEncoding::Export::memory:
     symbolType = "memory";
     currentSymbolList = symbols.memSymbols;
     break;
-  case WasmEncodings::ExportType::global:
+  case WasmBinaryEncoding::Export::global:
     symbolType = "global";
     currentSymbolList = symbols.globalSymbols;
     break;
