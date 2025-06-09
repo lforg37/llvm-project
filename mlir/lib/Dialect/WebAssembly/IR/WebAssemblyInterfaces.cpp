@@ -16,22 +16,6 @@
 #include "mlir/IR/Visitors.h"
 #include "mlir/Support/LLVM.h"
 
-namespace {
-using namespace mlir;
-using namespace mlir::wasm;
-llvm::FailureOr<WasmLabelLevelInterface> tryGetOperand(Operation *op,
-                                                       size_t breakLevel) {
-  WasmLabelLevelInterface res{};
-  for (size_t curLevel{0}; curLevel <= breakLevel; curLevel++) {
-    auto *parentOp = op->getParentOp();
-    if (!parentOp || !isa<WasmLabelLevelInterface>(parentOp))
-      return failure();
-    op = parentOp;
-  }
-  return llvm::cast<WasmLabelLevelInterface>(op);
-}
-} // namespace
-
 namespace mlir {
 namespace wasm {
 #include "mlir/Dialect/WebAssembly/IR/WebAssemblyInterfaces.cpp.inc"
