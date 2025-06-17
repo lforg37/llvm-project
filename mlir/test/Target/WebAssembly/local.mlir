@@ -30,31 +30,30 @@
 */
 
 // CHECK-LABEL:   wasm.func nested @func_0() -> f32 {
-// CHECK:           %[[VAL_0:.*]] = wasm.local f32
-// CHECK:           %[[VAL_1:.*]] = wasm.local f32
+// CHECK:           %[[VAL_0:.*]] = wasm.local of type f32
+// CHECK:           %[[VAL_1:.*]] = wasm.local of type f32
 // CHECK:           %[[VAL_2:.*]] = wasm.const 8.000000e+00 : f32
-// CHECK:           wasm.local_set %[[VAL_0]] : memref<f32> to %[[VAL_2]] : f32
-// CHECK:           %[[VAL_3:.*]] = wasm.local_get %[[VAL_0]] : memref<f32>
+// CHECK:           wasm.local_set %[[VAL_0]] :  ref to f32 to %[[VAL_2]] : f32
+// CHECK:           %[[VAL_3:.*]] = wasm.local_get %[[VAL_0]] :  ref to f32
 // CHECK:           %[[VAL_4:.*]] = wasm.const 1.200000e+01 : f32
-// CHECK:           %[[VAL_5:.*]] = wasm.local_tee %[[VAL_1]] : memref<f32> to %[[VAL_4]] : f32
+// CHECK:           %[[VAL_5:.*]] = wasm.local_tee %[[VAL_1]] :  ref to f32 to %[[VAL_4]] : f32
 // CHECK:           %[[VAL_6:.*]] = wasm.add %[[VAL_3]] %[[VAL_5]] : f32
 // CHECK:           wasm.return %[[VAL_6]] : f32
 
 // CHECK-LABEL:   wasm.func nested @func_1() -> i32 {
-// CHECK:           %[[VAL_0:.*]] = wasm.local i32
-// CHECK:           %[[VAL_1:.*]] = wasm.local i32
+// CHECK:           %[[VAL_0:.*]] = wasm.local of type i32
+// CHECK:           %[[VAL_1:.*]] = wasm.local of type i32
 // CHECK:           %[[VAL_2:.*]] = wasm.const 8 : i32
-// CHECK:           wasm.local_set %[[VAL_0]] : memref<i32> to %[[VAL_2]] : i32
-// CHECK:           %[[VAL_3:.*]] = wasm.local_get %[[VAL_0]] : memref<i32>
+// CHECK:           wasm.local_set %[[VAL_0]] :  ref to i32 to %[[VAL_2]] : i32
+// CHECK:           %[[VAL_3:.*]] = wasm.local_get %[[VAL_0]] :  ref to i32
 // CHECK:           %[[VAL_4:.*]] = wasm.const 12 : i32
-// CHECK:           %[[VAL_5:.*]] = wasm.local_tee %[[VAL_1]] : memref<i32> to %[[VAL_4]] : i32
+// CHECK:           %[[VAL_5:.*]] = wasm.local_tee %[[VAL_1]] :  ref to i32 to %[[VAL_4]] : i32
 // CHECK:           %[[VAL_6:.*]] = wasm.add %[[VAL_3]] %[[VAL_5]] : i32
 // CHECK:           wasm.return %[[VAL_6]] : i32
 
 // CHECK-LABEL:   wasm.func nested @func_2(
-// CHECK-SAME:      %[[VAL_0:.*]]: i32) -> i32 {
-// CHECK:           %[[VAL_1:.*]] = wasm.local_from_arg %[[VAL_0]] : i32
-// CHECK:           %[[VAL_2:.*]] = wasm.const 3 : i32
-// CHECK:           wasm.local_set %[[VAL_1]] : memref<i32> to %[[VAL_2]] : i32
-// CHECK:           %[[VAL_3:.*]] = wasm.local_get %[[VAL_1]] : memref<i32>
-// CHECK:           wasm.return %[[VAL_3]] : i32
+// CHECK-SAME:      %[[ARG0:.*]]: !wasm<local ref to i32>) -> i32 {
+// CHECK:           %[[VAL_0:.*]] = wasm.const 3 : i32
+// CHECK:           wasm.local_set %[[ARG0]] :  ref to i32 to %[[VAL_0]] : i32
+// CHECK:           %[[VAL_1:.*]] = wasm.local_get %[[ARG0]] :  ref to i32
+// CHECK:           wasm.return %[[VAL_1]] : i32
