@@ -247,7 +247,7 @@ private:
   llvm::SmallVector<LabelLevel> labelLevel;
 };
 
-using local_val_t = TypedValue<MemRefType>;
+using local_val_t = TypedValue<wasm::LocalRefType>;
 
 class ExpressionParser {
 public:
@@ -689,8 +689,7 @@ public:
       return failure();
     OpBuilder builder{&func.getBody().front().back()};
     for (auto arg : block.getArguments())
-      locals.push_back(
-          builder.create<LocalFromArgOp>(func->getLoc(), arg).getResult());
+      locals.push_back(cast<TypedValue<LocalRefType>>(arg));
     // Declare the local ops
     auto nVarVec = *localVecSize;
     for (size_t i = 0; i < nVarVec; ++i) {

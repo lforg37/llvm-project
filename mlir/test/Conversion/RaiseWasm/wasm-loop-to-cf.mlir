@@ -28,9 +28,9 @@ module {
 
 module {
   wasm.func nested @func_0() -> i32 {
-    %0 = wasm.local i32
+    %0 = wasm.local of type i32
     wasm.loop : {
-      %1 = wasm.local_get %0 : memref<i32>
+      %1 = wasm.local_get %0 : ref to i32
       %2 = wasm.const 10 : i32
       %3 = wasm.lt_si %1 %2 : i32 -> i32
       wasm.block_return %3 : i32
@@ -68,9 +68,9 @@ module {
 
 module {
   wasm.func nested @func_0() {
-    %0 = wasm.local i32
+    %0 = wasm.local of type i32
     wasm.loop : {
-      %1 = wasm.local_get %0 : memref<i32>
+      %1 = wasm.local_get %0 : ref to i32
       %2 = wasm.const 10 : i32
       %3 = wasm.lt_si %1 %2 : i32 -> i32
       wasm.branch_if %3 to level 0 else ^bb1
@@ -118,16 +118,16 @@ module {
 
 module {
   wasm.func nested @func_0() {
-    %0 = wasm.local i32
-    %1 = wasm.local i32
+    %0 = wasm.local of type i32
+    %1 = wasm.local of type i32
     wasm.loop : {
-      %2 = wasm.local_get %0 : memref<i32>
+      %2 = wasm.local_get %0 : ref to i32
       %3 = wasm.const 1 : i32
       %4 = wasm.add %2 %3 : i32
-      wasm.local_set %0 : memref<i32> to %4 : i32
+      wasm.local_set %0 : ref to i32 to %4 : i32
       wasm.loop : {
         %8 = wasm.const 12 : i32
-        %9 = wasm.local_get %0 : memref<i32>
+        %9 = wasm.local_get %0 : ref to i32
         %10 = wasm.gt_si %8 %9 : i32 -> i32
         wasm.branch_if %10 to level 0 else ^bb1
       ^bb1:  // pred: ^bb0

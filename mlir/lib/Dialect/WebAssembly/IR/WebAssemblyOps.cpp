@@ -30,7 +30,7 @@ namespace {
 inline LogicalResult inferTeeGetResType(ValueRange operands, ::llvm::SmallVectorImpl<Type> &inferredReturnTypes) {
   if (operands.empty())
     return failure();
-  auto opType = llvm::dyn_cast<MemRefType>(operands.front().getType());
+  auto opType = llvm::dyn_cast<LocalRefType>(operands.front().getType());
   if (!opType)
     return failure();
   inferredReturnTypes.push_back(opType.getElementType());
@@ -93,6 +93,18 @@ Block *BlockReturnOp::getTarget() {
 // FuncOp
 //===----------------------------------------------------------------------===//
 
+Block* FuncOp::addEntryBlock() {
+  if (!getBody().empty()) {
+    emitError("Adding entry block to a FuncOp which already has one.");
+    return &getBody().front();
+  }
+  Block &block = getBody().emplaceBlock();
+  for (auto argType : getFunctionType().getInputs()) {
+    block.addArgument(LocalRefType::get(argType), getLoc());
+  }
+  return &block;
+}
+
 void FuncOp::build(::mlir::OpBuilder &odsBuilder,
                                ::mlir::OperationState &odsState,
                                llvm::StringRef symbol, FunctionType funcType) {
@@ -104,14 +116,52 @@ void FuncOp::build(::mlir::OpBuilder &odsBuilder,
 
 ParseResult FuncOp::parse(::mlir::OpAsmParser &parser, ::mlir::OperationState &result) {
   auto buildFuncType =
-      [](Builder &builder, ArrayRef<Type> argTypes, ArrayRef<Type> results,
+      [&parser](Builder &builder, ArrayRef<Type> argTypes, ArrayRef<Type> results,
          function_interface_impl::VariadicFlag,
-         std::string &) { return builder.getFunctionType(argTypes, results); };
+         std::string &) {
+
+          llvm::SmallVector<Type> argTypesWithoutLocal{};
+          argTypesWithoutLocal.reserve(argTypes.size());
+          llvm::for_each(argTypes, [&parser, &argTypesWithoutLocal](Type argType){
+            auto refType = dyn_cast<LocalRefType>(argType);
+            auto loc = parser.getEncodedSourceLoc(parser.getCurrentLocation());
+            if (!refType) {
+              mlir::emitError(loc, "Invalid type for wasm.func argument. Expecting !wasm<local T>, got ") << argType << ".";
+              return;
+            }
+            argTypesWithoutLocal.push_back(refType.getElementType());
+          });
+
+          return builder.getFunctionType(argTypesWithoutLocal, results); };
 
   return function_interface_impl::parseFunctionOp(
       parser, result, /*allowVariadic=*/false,
       getFunctionTypeAttrName(result.name), buildFuncType,
       getArgAttrsAttrName(result.name), getResAttrsAttrName(result.name));
+}
+
+LogicalResult FuncOp::verifyBody() {
+  if (getBody().empty())
+    return success();
+  Block &entry = getBody().front();
+  if (entry.getNumArguments() != getFunctionType().getNumInputs())
+    return emitError("Entry block should have same number of arguments than "
+                     "function type. Function type has ")
+           << getFunctionType().getNumInputs() << ", entry block has "
+           << entry.getNumArguments() << ".";
+
+  for (auto [argNo, funcSignatureType, blockType] : llvm::enumerate(getFunctionType().getInputs(), entry.getArgumentTypes())) {
+    auto blockLocalRefType = dyn_cast<LocalRefType>(blockType);
+    if (!blockLocalRefType)
+      return emitError("Entry block argument type should be LocalRefType, got ")
+             << blockType << " for block argument " << argNo << ".";
+    if (blockLocalRefType.getElementType() != funcSignatureType)
+      return emitError("Func argument type #")
+             << argNo << "(" << funcSignatureType
+             << ") doesn't match entry block referenced type ("
+             << blockLocalRefType.getElementType() << ").";
+  }
+  return success();
 }
 
 void FuncOp::print(OpAsmPrinter &p) {
@@ -283,22 +333,7 @@ LogicalResult LocalOp::inferReturnTypes(
   auto type = adaptor.getTypeAttr();
   if (!type)
       return failure();
-  inferredReturnTypes.push_back(MemRefType::get({}, type.getValue()));
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// LocalFromArgOp
-//===----------------------------------------------------------------------===//
-
-LogicalResult LocalFromArgOp::inferReturnTypes(
-    MLIRContext *context, ::std::optional<Location> location,
-    ValueRange operands, DictionaryAttr attributes, OpaqueProperties properties,
-    RegionRange regions, ::llvm::SmallVectorImpl<Type> &inferredReturnTypes) {
-  if (operands.empty())
-    return failure();
-  Type opType = operands.front().getType();
-  auto resType = MemRefType::get({}, opType);
+  auto resType = LocalRefType::get(type.getContext(), type.getValue());
   inferredReturnTypes.push_back(resType);
   return success();
 }
@@ -314,6 +349,20 @@ LogicalResult LocalGetOp::inferReturnTypes(
   return inferTeeGetResType(operands, inferredReturnTypes);
 }
 
+LogicalResult LocalGetOp::verify() {
+  return success(getLocalVar().getType().getElementType() ==
+                 getResult().getType());
+}
+
+//===----------------------------------------------------------------------===//
+// LocalSetOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult LocalSetOp::verify() {
+  return success(getLocalVar().getType().getElementType() ==
+                 getValue().getType());
+}
+
 //===----------------------------------------------------------------------===//
 // LocalTeeOp
 //===----------------------------------------------------------------------===//
@@ -323,6 +372,12 @@ LogicalResult LocalTeeOp::inferReturnTypes(
     ValueRange operands, DictionaryAttr attributes, OpaqueProperties properties,
     RegionRange regions, ::llvm::SmallVectorImpl<Type> &inferredReturnTypes) {
   return inferTeeGetResType(operands, inferredReturnTypes);
+}
+
+LogicalResult LocalTeeOp::verify() {
+  return success(getLocalVar().getType().getElementType() ==
+                     getValue().getType() &&
+                 getValue().getType() == getResult().getType());
 }
 
 //===----------------------------------------------------------------------===//
