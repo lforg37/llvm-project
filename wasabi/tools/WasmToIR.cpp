@@ -15,7 +15,7 @@
 #include "mlir/Conversion/ConvertToLLVM/ToLLVMPass.h"
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
-#include "mlir/Conversion/WasmToStandard/WasmToStandard.h"
+#include "mlir/Conversion/RaiseWasm/RaiseWasmMLIR.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
@@ -64,7 +64,7 @@ static llvm::cl::opt<std::string>
                    llvm::cl::value_desc("filename"), llvm::cl::init("wasabi.module.out"));
 
 static llvm::cl::opt<std::string>
-    outputType("output-type", llvm::cl::desc("Step for when to stop"),
+    outputType("output-type", llvm::cl::desc("Step at which to stop for debug purpose: wasm-mlir or llvm-mlir"),
                llvm::cl::value_desc("step name"));
 
 static llvm::cl::opt<std::string>
@@ -74,15 +74,15 @@ static llvm::cl::opt<std::string>
 
 static llvm::cl::opt<bool> dumpResult("dump", llvm::cl::desc("Print the resulting module to stdout"), llvm::cl::init(false));
 
-LogicalResult runPipelineToStandardMLIR(OwningOpRef<ModuleOp> &module) {
+LogicalResult runPipelineToLLVMMLIR(OwningOpRef<ModuleOp> &module) {
 
   auto pm = mlir::PassManager(&currentCtx);
-  pm.addPass(mlir::createConvertWasmToStandardPass());
+  pm.addPass(mlir::createRaiseWasmMLIRPass());
   pm.addPass(mlir::memref::createExpandOpsPass());
   pm.addPass(mlir::arith::createArithExpandOpsPass());
   pm.addPass(mlir::createFinalizeMemRefToLLVMConversionPass());
   pm.addPass(mlir::createCanonicalizerPass());
-  pm.addPass(mlir::LLVM::createLegalizeForExportPass());
+  pm.addPass(mlir::LLVM::createLLVMLegalizeForExportPass());
   pm.addPass(mlir::createConvertToLLVMPass());
   pm.addPass(mlir::createReconcileUnrealizedCastsPass());
 
@@ -155,11 +155,11 @@ int main(int argc, char **argv) {
   if (outputType == "wasm-mlir")
     ExitOnErr(dumpModuleToOutputFile<ModuleOp>(*module));
 
-  LogicalResult res = runPipelineToStandardMLIR(module);
+  LogicalResult res = runPipelineToLLVMMLIR(module);
   if (failed(res))
     return 1;
 
-  if (outputType == "std-mlir")
+  if (outputType == "llvm-mlir")
     ExitOnErr(dumpModuleToOutputFile<ModuleOp>(*module));
 
   llvm::LLVMContext llvmCtx;

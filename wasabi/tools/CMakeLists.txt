@@ -27,6 +27,6 @@ mlir_target_link_libraries(wasabi PRIVATE
   MLIRTransforms
   MLIRTranslateLib
   MLIRWasmDialect
-  MLIRWasmToStandard
+  MLIRWasmRaise
   MLIRToLLVMIRTranslationRegistration
 )
