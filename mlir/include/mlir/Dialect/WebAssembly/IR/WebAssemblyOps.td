@@ -655,6 +655,26 @@ def Wasm_TruncOp : Wasm_UnaryNumericalOp<"trunc",
                                        "Trunc of floating point value",
                                        [Wasm_FPType]>{}
 
+def Wasm_NearestOp : Wasm_UnaryNumericalOp<"nearest",
+    [{
+    Round floating point value to nearest integer.
+
+    Result is stored in same floating point type as input type.
+
+    Example:
+
+    ```
+    // %x is an f32 containing the nearest integer value to %f.
+    %x = wasm.nearest %f : f32
+
+    // %y is an f64 containing the nearest integer value to %d.
+    %y = wasm.nearest %d : f64
+    ```
+
+    See the Numerics section in the Wasm specification for details.
+    }],
+    [Wasm_FPType]>{}
+
 def Wasm_CtzOp : Wasm_UnaryNumericalOp<"ctz",
                                        "Count trailing zeroes of an integer",
                                        [Wasm_IntegerType]>{}
