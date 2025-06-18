@@ -22,18 +22,16 @@
 // CHECK-LABEL:   wasm.import_func "twoTimes" from "env" as @func_0 {sym_visibility = "nested", type = (i32) -> i32}
 
 // CHECK-LABEL:   wasm.func @add(
-// CHECK-SAME:                   %[[VAL_0:.*]]: i32,
-// CHECK-SAME:                   %[[VAL_1:.*]]: i32) -> i32 {
-// CHECK:           %[[VAL_2:.*]] = wasm.local_from_arg %[[VAL_0]] : i32
-// CHECK:           %[[VAL_3:.*]] = wasm.local_from_arg %[[VAL_1]] : i32
-// CHECK:           %[[VAL_4:.*]] = wasm.local_get %[[VAL_2]] : memref<i32>
-// CHECK:           %[[VAL_5:.*]] = wasm.call @func_0(%[[VAL_4]]) : (i32) -> i32
-// CHECK:           %[[VAL_6:.*]] = wasm.local_get %[[VAL_3]] : memref<i32>
-// CHECK:           %[[VAL_7:.*]] = wasm.call @func_0(%[[VAL_6]]) : (i32) -> i32
-// CHECK:           %[[VAL_8:.*]] = wasm.add %[[VAL_5]] %[[VAL_7]] : i32
-// CHECK:           %[[VAL_9:.*]] = wasm.const 2 : i32
-// CHECK:           %[[VAL_10:.*]] = wasm.div_si %[[VAL_8]] %[[VAL_9]] : i32
-// CHECK:           wasm.return %[[VAL_10]] : i32
+// CHECK-SAME:                   %[[ARG0:.*]]: !wasm<local ref to i32>,
+// CHECK-SAME:                   %[[ARG1:.*]]: !wasm<local ref to i32>) -> i32 {
+// CHECK:           %[[VAL_0:.*]] = wasm.local_get %[[ARG0]] :  ref to i32
+// CHECK:           %[[VAL_1:.*]] = wasm.call @func_0(%[[VAL_0]]) : (i32) -> i32
+// CHECK:           %[[VAL_2:.*]] = wasm.local_get %[[ARG1]] :  ref to i32
+// CHECK:           %[[VAL_3:.*]] = wasm.call @func_0(%[[VAL_2]]) : (i32) -> i32
+// CHECK:           %[[VAL_4:.*]] = wasm.add %[[VAL_1]] %[[VAL_3]] : i32
+// CHECK:           %[[VAL_5:.*]] = wasm.const 2 : i32
+// CHECK:           %[[VAL_6:.*]] = wasm.div_si %[[VAL_4]] %[[VAL_5]] : i32
+// CHECK:           wasm.return %[[VAL_6]] : i32
 // CHECK:         }
 // CHECK:         "wasm.memory"() <{limits = !wasm<limit[2:]>, sym_name = "memory"}> : () -> ()
 

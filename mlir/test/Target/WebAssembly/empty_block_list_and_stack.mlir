@@ -21,8 +21,7 @@
 */
 
 // CHECK-LABEL:   wasm.func nested @func_0(
-// CHECK-SAME:      %[[VAL_0:.*]]: i32) {
-// CHECK:           %[[VAL_1:.*]] = wasm.local_from_arg %[[VAL_0]] : i32
+// CHECK-SAME:      %[[ARG0:.*]]: !wasm<local ref to i32>) {
 // CHECK:           wasm.block : {
 // CHECK:             wasm.block : {
 // CHECK:               wasm.block : {
@@ -38,8 +37,7 @@
 // CHECK:           wasm.return
 
 // CHECK-LABEL:   wasm.func nested @func_1(
-// CHECK-SAME:      %[[VAL_0:.*]]: i32) {
-// CHECK:           %[[VAL_1:.*]] = wasm.local_from_arg %[[VAL_0]] : i32
+// CHECK-SAME:      %[[ARG0:.*]]: !wasm<local ref to i32>) {
 // CHECK:           wasm.block : {
 // CHECK:             wasm.block_return
 // CHECK:           }> ^bb1

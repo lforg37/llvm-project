@@ -18,4 +18,7 @@ add_mlir_dialect_library(MLIRWasmDialect
   MLIRInferTypeOpInterface
   MLIRIR
   MLIRSupport
+
+  PRIVATE
+  MLIRFunctionInterfaces
   )
