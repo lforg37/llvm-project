@@ -77,6 +77,20 @@ def Wasm_FuncOp : Wasm_Op<"func", [
     DeclareOpInterfaceMethods<FunctionOpInterface>,
     IsolatedFromAbove,
     Symbol]> {
+  let description = [{
+    Represents a Wasm function definition.
+
+    In Wasm function, locals and function arguments are interchangeable.
+    They are for instance both accessed using `local.get` instruction.
+
+    On the other hand, a function type is defined as a pair of tuples of Wasm value types.
+    To model this, the wasm.func operation has:
+
+    - A function type that represents the corresponding wasm type (tuples of value types)
+
+    - Arguments of the entry block of type `!wasm<local T>`, with T the corresponding type
+     in the function type.
+  }];
   let arguments = (ins SymbolNameAttr: $sym_name,
                      Wasm_FuncTypeAttr: $functionType,
                      OptionalAttr<DictArrayAttr>:$arg_attrs,
@@ -84,6 +98,10 @@ def Wasm_FuncOp : Wasm_Op<"func", [
                      DefaultValuedAttr<StrAttr, "\"nested\"">:$sym_visibility);
   let regions = (region AnyRegion: $body);
   let extraClassDeclaration = [{
+
+    /// Create the entry block for the function with parameters wrapped in local ref.
+    ::mlir::Block* addEntryBlock();
+
     //===------------------------------------------------------------------===//
     // FunctionOpInterface Methods
     //===------------------------------------------------------------------===//
@@ -92,6 +110,8 @@ def Wasm_FuncOp : Wasm_Op<"func", [
     /// return null in the case of an external callable object, e.g. an external
     /// function.
     ::mlir::Region *getCallableRegion() { return isExternal() ? nullptr : &getBody(); }
+
+    ::mlir::LogicalResult verifyBody();
 
     /// Returns the argument types of this function.
     ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
@@ -236,48 +256,33 @@ def Wasm_LocalOp : Wasm_Op<"local", [
   let summary = "Declaration of local variable";
   let arguments = (ins Wasm_ValTypeAttr: $type);
   let results = (outs Wasm_LocalRef: $result);
-  let assemblyFormat = "$type attr-dict";
-}
-
-def Wasm_LocalFromArgOp : Wasm_Op<"local_from_arg", [
-    ParentOneOf<["FuncOp"]>,
-    SameOperandsAndResultElementType,
-    DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
-  let summary = "Declaration of local variable storage from block argument";
-  let description = [{
-    Wasm locals includes the function arguments.
-    As they can be overriden in different path, they should be converted to memref.
-    This op is not a counterpart to any Wasm existing op.
-  }];
-  let arguments = (ins Wasm_ValType: $blockInput);
-  let results = (outs Wasm_LocalRef: $result);
-  let assemblyFormat = "$blockInput `:` type($blockInput) attr-dict";
+  let assemblyFormat = "`of` `type` $type attr-dict";
 }
 
 def Wasm_LocalGetOp : Wasm_Op<"local_get", [
-    SameOperandsAndResultElementType,
     DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
   let summary = "Set local to value and return the operand.";
   let arguments = (ins Wasm_LocalRef: $localVar);
   let results = (outs Wasm_ValType: $result);
   let assemblyFormat = "$localVar `:` type($localVar) attr-dict";
+  let hasVerifier = 1;
 }
 
-def Wasm_LocalSetOp : Wasm_Op<"local_set",[
-    SameOperandsElementType]> {
+def Wasm_LocalSetOp : Wasm_Op<"local_set"> {
   let summary = "Set local to given value";
   let arguments = (ins Wasm_LocalRef: $localVar,
                        Wasm_ValType: $value);
+  let hasVerifier = 1;
   let assemblyFormat = "$localVar `:` type($localVar) `to` $value `:` type($value) attr-dict";
 }
 
 def Wasm_LocalTeeOp : Wasm_Op<"local_tee", [
-    SameOperandsAndResultElementType,
     DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
   let summary = "Set local to value and return the operand.";
   let arguments = (ins Wasm_LocalRef: $localVar,
                        Wasm_ValType: $value);
   let results = (outs Wasm_ValType: $result);
+  let hasVerifier = 1;
   let assemblyFormat = "$localVar `:` type($localVar) `to` $value `:` type($value) attr-dict";
 }
 

@@ -343,8 +343,11 @@ struct WasmFuncOpConversion : OpConversionPattern<FuncOp> {
           ifOp.getInputs());
     }
 
-    template<typename LevelType>
-    LogicalResult replaceNestLevelWithBranchWrapper(WasmLabelLevelInterface nestingOp, llvm::ArrayRef<Block*> regionsToEntry, ConversionPatternRewriter& rewriter) {
+    template <typename LevelType>
+    LogicalResult
+    replaceNestLevelWithBranchWrapper(WasmLabelLevelInterface nestingOp,
+                                      llvm::ArrayRef<Block *> regionsToEntry,
+                                      ConversionPatternRewriter &rewriter) {
       auto cast = dyn_cast<LevelType>(nestingOp.getOperation());
       if (!cast)
         return failure();
@@ -480,6 +483,18 @@ struct WasmFuncOpConversion : OpConversionPattern<FuncOp> {
         funcOp->getLoc(), funcOp.getSymName(), funcOp.getFunctionType());
     rewriter.cloneRegionBefore(funcOp.getBody(), newFunc.getBody(),
                                newFunc.getBody().end());
+    Block *oldEntryBlock = &newFunc.getBody().front();
+    auto blockArgTypes = oldEntryBlock->getArgumentTypes();
+    TypeConverter::SignatureConversion sC{oldEntryBlock->getNumArguments()};
+    auto numArgs = blockArgTypes.size();
+    for (size_t i = 0; i < numArgs; ++i) {
+      auto argType = dyn_cast<LocalRefType>(blockArgTypes[i]);
+      if (!argType)
+        return failure();
+      sC.addInputs(i, argType.getElementType());
+    }
+
+    rewriter.applySignatureConversion(oldEntryBlock, sC, getTypeConverter());
     rewriter.replaceOp(funcOp, newFunc);
     CFRewriterVisitor cfRewriter{newFunc};
     return cfRewriter.rewrite(rewriter);
@@ -644,22 +659,6 @@ struct WasmLocalConversion : OpConversionPattern<LocalOp> {
   }
 };
 
-struct WasmLocalFromArgConversion : OpConversionPattern<LocalFromArgOp> {
-  using OpConversionPattern::OpConversionPattern;
-  LogicalResult
-  matchAndRewrite(LocalFromArgOp localFromArgOp,
-                  LocalFromArgOp::Adaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    auto alloca = rewriter.replaceOpWithNewOp<memref::AllocaOp>(
-        localFromArgOp,
-        MemRefType::get({}, localFromArgOp.getBlockInput().getType()));
-    rewriter.create<memref::StoreOp>(localFromArgOp->getLoc(),
-                                     adaptor.getBlockInput(),
-                                     alloca.getResult());
-    return success();
-  }
-};
-
 struct WasmLocalGetConversion : OpConversionPattern<LocalGetOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult
@@ -719,7 +718,16 @@ struct RaiseWasmMLIRPass
     RewritePatternSet patterns(&getContext());
     TypeConverter tc{};
     tc.addConversion([](Type type) -> std::optional<Type> { return type; });
-
+    tc.addConversion([](LocalRefType type)->std::optional<Type> {
+      return MemRefType::get({}, type.getElementType());
+    });
+    tc.addTargetMaterialization([](OpBuilder& builder, MemRefType destType, ValueRange values, Location loc)->Value{
+      if (values.size() != 1 || values.front().getType() != destType.getElementType())
+        return {};
+      auto localVar = builder.create<memref::AllocaOp>(loc, destType);
+      builder.create<memref::StoreOp>(loc, values.front(), localVar.getResult());
+      return localVar.getResult();
+    });
     populateRaiseWasmMLIRConversionPatterns(tc, patterns);
 
     llvm::DenseMap<StringAttr, StringAttr> idxSymToImportSym{};
@@ -777,7 +785,6 @@ void mlir::populateRaiseWasmMLIRConversionPatterns(
            WasmLeSIOpConversion,
            WasmLeUIOpConversion,
            WasmLocalConversion,
-           WasmLocalFromArgConversion,
            WasmLocalGetConversion,
            WasmLocalSetConversion,
            WasmLocalTeeConversion,

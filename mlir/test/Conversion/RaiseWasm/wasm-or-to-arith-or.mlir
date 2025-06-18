@@ -2,21 +2,37 @@
 
 
 // CHECK-LABEL:   func.func @or_i32(
-// CHECK-SAME:      %[[VAL_0:.*]]: i32,
-// CHECK-SAME:      %[[VAL_1:.*]]: i32) -> i32 {
-// CHECK:           %[[VAL_2:.*]] = arith.ori %[[VAL_0]], %[[VAL_1]] : i32
-// CHECK:           return %[[VAL_2]] : i32
-wasm.func nested @or_i32(%arg0: i32, %arg1: i32) -> i32 {
-    %op = wasm.or %arg0 %arg1 : i32
-    wasm.return %op : i32
+// CHECK-SAME:                      %[[ARG0:.*]]: i32,
+// CHECK-SAME:                      %[[ARG1:.*]]: i32) -> i32 {
+// CHECK:           %[[VAL_0:.*]] = memref.alloca() : memref<i32>
+// CHECK:           memref.store %[[ARG1]], %[[VAL_0]][] : memref<i32>
+// CHECK:           %[[VAL_1:.*]] = memref.alloca() : memref<i32>
+// CHECK:           memref.store %[[ARG0]], %[[VAL_1]][] : memref<i32>
+// CHECK:           %[[VAL_2:.*]] = memref.load %[[VAL_1]][] : memref<i32>
+// CHECK:           %[[VAL_3:.*]] = memref.load %[[VAL_0]][] : memref<i32>
+// CHECK:           %[[VAL_4:.*]] = arith.ori %[[VAL_2]], %[[VAL_3]] : i32
+// CHECK:           return %[[VAL_4]] : i32
+wasm.func nested @or_i32(%arg0: !wasm<local ref to i32>, %arg1: !wasm<local ref to i32>) -> i32 {
+    %v0 = wasm.local_get %arg0 : ref to i32
+    %v1 = wasm.local_get %arg1 : ref to i32
+    %or = wasm.or %v0 %v1 : i32
+    wasm.return %or : i32
 }
 
 // CHECK-LABEL:   func.func @or_i64(
-// CHECK-SAME:      %[[VAL_0:.*]]: i64,
-// CHECK-SAME:      %[[VAL_1:.*]]: i64) -> i64 {
-// CHECK:           %[[VAL_2:.*]] = arith.ori %[[VAL_0]], %[[VAL_1]] : i64
-// CHECK:           return %[[VAL_2]] : i64
-wasm.func nested @or_i64(%arg0: i64, %arg1: i64) -> i64 {
-    %op = wasm.or %arg0 %arg1 : i64
-    wasm.return %op : i64
+// CHECK-SAME:                      %[[ARG0:.*]]: i64,
+// CHECK-SAME:                      %[[ARG1:.*]]: i64) -> i64 {
+// CHECK:           %[[VAL_0:.*]] = memref.alloca() : memref<i64>
+// CHECK:           memref.store %[[ARG1]], %[[VAL_0]][] : memref<i64>
+// CHECK:           %[[VAL_1:.*]] = memref.alloca() : memref<i64>
+// CHECK:           memref.store %[[ARG0]], %[[VAL_1]][] : memref<i64>
+// CHECK:           %[[VAL_2:.*]] = memref.load %[[VAL_1]][] : memref<i64>
+// CHECK:           %[[VAL_3:.*]] = memref.load %[[VAL_0]][] : memref<i64>
+// CHECK:           %[[VAL_4:.*]] = arith.ori %[[VAL_2]], %[[VAL_3]] : i64
+// CHECK:           return %[[VAL_4]] : i64
+wasm.func nested @or_i64(%arg0: !wasm<local ref to i64>, %arg1: !wasm<local ref to i64>) -> i64 {
+    %v0 = wasm.local_get %arg0 : ref to i64
+    %v1 = wasm.local_get %arg1 : ref to i64
+    %or = wasm.or %v0 %v1 : i64
+    wasm.return %or : i64
 }
