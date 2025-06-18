@@ -99,9 +99,8 @@ Block* FuncOp::addEntryBlock() {
     return &getBody().front();
   }
   Block &block = getBody().emplaceBlock();
-  for (auto argType : getFunctionType().getInputs()) {
+  for (auto argType : getFunctionType().getInputs())
     block.addArgument(LocalRefType::get(argType), getLoc());
-  }
   return &block;
 }
 
@@ -145,7 +144,7 @@ LogicalResult FuncOp::verifyBody() {
     return success();
   Block &entry = getBody().front();
   if (entry.getNumArguments() != getFunctionType().getNumInputs())
-    return emitError("Entry block should have same number of arguments than "
+    return emitError("Entry block should have same number of arguments as "
                      "function type. Function type has ")
            << getFunctionType().getNumInputs() << ", entry block has "
            << entry.getNumArguments() << ".";

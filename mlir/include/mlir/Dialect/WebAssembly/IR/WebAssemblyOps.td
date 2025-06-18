@@ -78,18 +78,18 @@ def Wasm_FuncOp : Wasm_Op<"func", [
     IsolatedFromAbove,
     Symbol]> {
   let description = [{
-    Represents a wasm function definition.
+    Represents a Wasm function definition.
 
     In Wasm function, locals and function arguments are interchangeable.
     They are for instance both accessed using `local.get` instruction.
 
-    In the other hand, function type is defined as a a pair of tuples of Wasm value types.
+    On the other hand, a function type is defined as a pair of tuples of Wasm value types.
     To model this, the wasm.func operation has:
 
     - A function type that represents the corresponding wasm type (tuples of value types)
 
     - Arguments of the entry block of type `!wasm<local T>`, with T the corresponding type
-     in thr function type.
+     in the function type.
   }];
   let arguments = (ins SymbolNameAttr: $sym_name,
                      Wasm_FuncTypeAttr: $functionType,

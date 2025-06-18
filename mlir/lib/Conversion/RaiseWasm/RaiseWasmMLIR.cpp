@@ -486,7 +486,8 @@ struct WasmFuncOpConversion : OpConversionPattern<FuncOp> {
     Block *oldEntryBlock = &newFunc.getBody().front();
     auto blockArgTypes = oldEntryBlock->getArgumentTypes();
     TypeConverter::SignatureConversion sC{oldEntryBlock->getNumArguments()};
-    for (size_t i = 0; i < blockArgTypes.size(); ++i) {
+    auto numArgs = blockArgTypes.size();
+    for (size_t i = 0; i < numArgs; ++i) {
       auto argType = dyn_cast<LocalRefType>(blockArgTypes[i]);
       if (!argType)
         return failure();
