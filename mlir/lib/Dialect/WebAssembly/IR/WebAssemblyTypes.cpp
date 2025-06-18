@@ -4,7 +4,6 @@
 #include "llvm/Support/LogicalResult.h"
 
 #include <optional>
-#include <sstream>
 
 namespace mlir {
 namespace wasm {

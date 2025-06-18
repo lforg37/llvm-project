@@ -56,14 +56,21 @@ def Wasm_LimitType : Wasm_Type<"Limit", "limit"> {
   let hasCustomAssemblyFormat = 1;
 }
 
+def Wasm_LocalRef : Wasm_Type<"LocalRef", "local"> {
+  let summary = "Type of a local variable";
+  let parameters = (ins Wasm_ValType: $elementType);
+  let assemblyFormat = "`ref` `to` $elementType";
+   let builders = [TypeBuilderWithInferredContext<(ins "Type":$typeParam), [{
+      return get(typeParam.getContext(), typeParam);
+    }]>,];
+}
+
 def Wasm_TableType : Wasm_Type<"Table", "tabletype"> {
   let summary = "Wasm table type";
   let parameters = (ins Wasm_RefType:$reference,
                        Wasm_LimitType:$limit);
   let assemblyFormat = "$reference $limit";
 }
-
-def Wasm_LocalRef : MemRefRankOf<[Wasm_ValType], [0]>;
 
 def Wasm_FuncTypeAttr : TypeAttrOf<Wasm_FuncType>;
 def Wasm_LimitTypeAttr : TypeAttrOf<Wasm_LimitType>;
