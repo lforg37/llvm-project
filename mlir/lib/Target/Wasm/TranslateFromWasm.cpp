@@ -25,6 +25,7 @@
 #include "llvm/Support/LEB128.h"
 #include "llvm/Support/LogicalResult.h"
 
+#include <cstdint>
 #include <optional>
 #include <type_traits>
 #include <utility>
@@ -1403,6 +1404,12 @@ ExpressionParser::buildConvertOp(OpBuilder &builder,
   auto op = builder.create<opType>(*currentOpLoc, outType, *operand);
   LLVM_DEBUG(llvm::dbgs() << "Built: " << op);
   return {{op.getResult()}};
+}
+
+template <>
+inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
+    WasmBinaryEncoding::OpCode::demoteF64ToF32>(OpBuilder &builder) {
+   return buildConvertOp<DemoteOp, double, float>(builder);
 }
 
 template<>

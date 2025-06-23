@@ -89,6 +89,8 @@ using WasmCeilOpConversion = OpMappingConversion<CeilOp, math::CeilOp>;
 /// rounding mode
 using WasmConvertSOpConversion = OpMappingConversion<ConvertSOp, arith::SIToFPOp>;
 using WasmConvertUOpConversion = OpMappingConversion<ConvertUOp, arith::UIToFPOp>;
+using WasmDemoteOpConversion =
+    OpMappingConversion<DemoteOp, arith::TruncFOp>;
 using WasmDivFPOpConversion = OpMappingConversion<DivOp, arith::DivFOp>;
 using WasmDivSIOpConversion = OpMappingConversion<DivSIOp, arith::DivSIOp>;
 using WasmDivUIOpConversion = OpMappingConversion<DivUIOp, arith::DivUIOp>;
@@ -801,6 +803,7 @@ void mlir::populateRaiseWasmMLIRConversionPatterns(
            WasmConvertUOpConversion,
            WasmCopySignOpConversion,
            WasmCtzOpConversion,
+           WasmDemoteOpConversion,
            WasmDivFPOpConversion,
            WasmDivSIOpConversion,
            WasmDivUIOpConversion,
