@@ -567,6 +567,14 @@ def Wasm_ClzOp : Wasm_UnaryNumericalOp<"clz",
                                        "Count leading zeroes of an integer",
                                        [Wasm_IntegerType]>{}
 
+def Wasm_EqzOp : Wasm_Op<"eqz", []> {
+  let summary = "Check if the given value is equal to zero";
+  let arguments = (ins Wasm_IntegerType: $input);
+  let results = (outs I32: $result);
+  let assemblyFormat = "$input`:` type($input) `->` type($result) attr-dict";
+}
+
+
 def Wasm_PopCntOp : Wasm_UnaryNumericalOp<"popcnt",
                                        "Population count of an integer.",
                                        [Wasm_IntegerType]>{}
