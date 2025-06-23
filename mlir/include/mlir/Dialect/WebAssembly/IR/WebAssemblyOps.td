@@ -565,6 +565,11 @@ def Wasm_ConvertSOp : Wasm_ConversionOp<"convert_s",
     [Wasm_IntegerType],
     [Wasm_FPType]>{}
 
+def Wasm_DemoteOp : Wasm_ConversionOp<"demote",
+    "Convert a f64 value to f32",
+    [F64],
+    [F32]>{}
+
 def Wasm_WrapOp : Wasm_ConversionOp<"wrap",
     "Cast an i64 to i32 by using a wrapping mechanism: y = x mod 2^32",
     [I64],
