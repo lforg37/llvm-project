@@ -115,6 +115,8 @@ using WasmAbsOpConversion = OpMappingConversion<AbsOp, math::AbsFOp>;
 using WasmTruncOpConversion = OpMappingConversion<TruncOp, math::TruncOp>;
 using WasmSqrtOpConversion =
     OpMappingConversion<SqrtOp, math::SqrtOp>;
+using WasmWrapOpConversion =
+    OpMappingConversion<WrapOp, arith::TruncIOp>;
 
 /// Lower a rotate to a series of bitwise operations. Intended for us
 /// in dialects that do not natively support rotate operations.
@@ -845,6 +847,7 @@ void mlir::populateRaiseWasmMLIRConversionPatterns(
            WasmSqrtOpConversion,
            WasmSubOpConversion,
            WasmTruncOpConversion,
+           WasmWrapOpConversion,
            WasmXOrOpConversion
            >(tc, ctx);
   // clang-format on
