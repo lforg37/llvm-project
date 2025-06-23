@@ -565,6 +565,11 @@ def Wasm_ConvertSOp : Wasm_ConversionOp<"convert_s",
     [Wasm_IntegerType],
     [Wasm_FPType]>{}
 
+def Wasm_WrapOp : Wasm_ConversionOp<"wrap",
+    "Cast an i64 to i32 by using a wrapping mechanism: y = x mod 2^32",
+    [I64],
+    [I32]>{}
+
 class Wasm_UnaryNumericalOp<string mnemonic,
                             string summaryStr,
                             list<Type> validOpTypes> :
@@ -618,5 +623,6 @@ def Wasm_EqzOp : Wasm_Op<"eqz", []> {
 def Wasm_PopCntOp : Wasm_UnaryNumericalOp<"popcnt",
                                        "Population count of an integer.",
                                        [Wasm_IntegerType]>{}
+
 
 #endif // WEBASSEMBLY_OPS

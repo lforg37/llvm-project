@@ -1389,6 +1389,7 @@ BUILD_NUMERIC_UNARY_OP_INT(PopCntOp, popcnt)
 #undef BUILD_NUMERIC_UNARY_OP_FP
 #undef BUILD_NUMERIC_UNARY_OP_INT
 #undef BUILD_NUMERIC_OP
+#undef BUILD_NUMERIC_CAST_OP
 
 template <typename opType, typename inputType, typename outputType>
 inline parsed_inst_t
@@ -1402,6 +1403,12 @@ ExpressionParser::buildConvertOp(OpBuilder &builder,
   auto op = builder.create<opType>(*currentOpLoc, outType, *operand);
   LLVM_DEBUG(llvm::dbgs() << "Built: " << op);
   return {{op.getResult()}};
+}
+
+template<>
+inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
+    WasmBinaryEncoding::OpCode::wrap>(OpBuilder & builder) {
+  return buildConvertOp<WrapOp, int64_t, int32_t>(builder);
 }
 
 #define BUILD_CONVERT_OP(IN_T, OUT_T, SUFFIX) \
