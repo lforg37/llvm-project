@@ -153,14 +153,14 @@ int main(int argc, char **argv) {
     return 1;
 
   if (outputType == "wasm-mlir")
-    ExitOnErr(dumpModuleToOutputFile<ModuleOp>(*module));
+    return ExitOnErr(dumpModuleToOutputFile<ModuleOp>(*module));
 
   LogicalResult res = runPipelineToLLVMMLIR(module);
   if (failed(res))
     return 1;
 
   if (outputType == "llvm-mlir")
-    ExitOnErr(dumpModuleToOutputFile<ModuleOp>(*module));
+    return ExitOnErr(dumpModuleToOutputFile<ModuleOp>(*module));
 
   llvm::LLVMContext llvmCtx;
   std::unique_ptr<llvm::Module> llvmModule =
