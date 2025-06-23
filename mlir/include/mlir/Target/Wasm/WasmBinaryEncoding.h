@@ -37,6 +37,7 @@ struct WasmBinaryEncoding {
     static constexpr std::byte constFP64{0x44};
 
     // Comparisons.
+    static constexpr std::byte eqzI32{0x45};
     static constexpr std::byte eqI32{0x46};
     static constexpr std::byte neI32{0x47};
     static constexpr std::byte ltSI32{0x48};
@@ -47,6 +48,7 @@ struct WasmBinaryEncoding {
     static constexpr std::byte leUI32{0x4D};
     static constexpr std::byte geSI32{0x4E};
     static constexpr std::byte geUI32{0x4F};
+    static constexpr std::byte eqzI64{0x50};
     static constexpr std::byte eqI64{0x51};
     static constexpr std::byte neI64{0x52};
     static constexpr std::byte ltSI64{0x53};
