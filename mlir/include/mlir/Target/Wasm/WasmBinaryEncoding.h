@@ -135,6 +135,17 @@ struct WasmBinaryEncoding {
     static constexpr std::byte minF64{0xA4};
     static constexpr std::byte maxF64{0xA5};
     static constexpr std::byte copysignF64{0xA6};
+
+    // Conversion operations
+    static constexpr std::byte convertSI32F32{0xB2};
+    static constexpr std::byte convertUI32F32{0xB3};
+    static constexpr std::byte convertSI64F32{0xB4};
+    static constexpr std::byte convertUI64F32{0xB5};
+
+    static constexpr std::byte convertSI32F64{0xB7};
+    static constexpr std::byte convertUI32F64{0xB8};
+    static constexpr std::byte convertSI64F64{0xB9};
+    static constexpr std::byte convertUI64F64{0xBA};
   };
 
   /// Byte encodings of types in WASM binaries

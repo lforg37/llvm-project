@@ -85,6 +85,10 @@ struct OpMappingConversion : OpConversionPattern<SourceOp> {
 
 using WasmAndOpConversion = OpMappingConversion<AndOp, arith::AndIOp>;
 using WasmCeilOpConversion = OpMappingConversion<CeilOp, math::CeilOp>;
+/// TODO: SIToFP and UIToFP don't allow specification of the floating point
+/// rounding mode
+using WasmConvertSOpConversion = OpMappingConversion<ConvertSOp, arith::SIToFPOp>;
+using WasmConvertUOpConversion = OpMappingConversion<ConvertUOp, arith::UIToFPOp>;
 using WasmDivFPOpConversion = OpMappingConversion<DivOp, arith::DivFOp>;
 using WasmDivSIOpConversion = OpMappingConversion<DivSIOp, arith::DivSIOp>;
 using WasmDivUIOpConversion = OpMappingConversion<DivUIOp, arith::DivUIOp>;
@@ -791,6 +795,8 @@ void mlir::populateRaiseWasmMLIRConversionPatterns(
            WasmCeilOpConversion,
            WasmClzOpConversion,
            WasmConstOpConversion,
+           WasmConvertSOpConversion,
+           WasmConvertUOpConversion,
            WasmCopySignOpConversion,
            WasmCtzOpConversion,
            WasmDivFPOpConversion,
