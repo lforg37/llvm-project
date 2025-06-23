@@ -143,6 +143,8 @@ struct WasmBinaryEncoding {
     static constexpr std::byte convertSI64F32{0xB4};
     static constexpr std::byte convertUI64F32{0xB5};
 
+    static constexpr std::byte demoteF64ToF32{0xB6};
+
     static constexpr std::byte convertSI32F64{0xB7};
     static constexpr std::byte convertUI32F64{0xB8};
     static constexpr std::byte convertSI64F64{0xB9};
