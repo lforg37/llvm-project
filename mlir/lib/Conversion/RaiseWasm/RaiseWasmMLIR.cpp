@@ -280,6 +280,27 @@ struct WasmConstOpConversion : OpConversionPattern<ConstOp> {
   }
 };
 
+struct WasmEqzOpConversion : OpConversionPattern<EqzOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(EqzOp eqzOp, EqzOp::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto loc = eqzOp->getLoc();
+    auto zero = rewriter.create<arith::ConstantOp>(loc, rewriter.getIntegerAttr(adaptor.getInput().getType(), 0)).getResult();
+    auto cmpRes =
+        rewriter
+            .create<arith::CmpIOp>(loc, rewriter.getI1Type(),
+                              arith::CmpIPredicateAttr::get(rewriter.getContext(), arith::CmpIPredicate::eq),
+                              adaptor.getInput(), zero)
+            .getResult();
+    rewriter.replaceOpWithNewOp<arith::ExtUIOp>(eqzOp, rewriter.getI32Type(),
+                                                cmpRes);
+
+    return success();
+  }
+};
+
 struct WasmFuncImportOpConversion : OpConversionPattern<FuncImportOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -770,6 +791,7 @@ void mlir::populateRaiseWasmMLIRConversionPatterns(
            WasmDivSIOpConversion,
            WasmDivUIOpConversion,
            WasmEqOpConversion,
+           WasmEqzOpConversion,
            WasmFuncImportOpConversion,
            WasmFuncOpConversion,
            WasmGeOpConversion,

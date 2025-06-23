@@ -1350,6 +1350,7 @@ BUILD_NUMERIC_UNARY_OP_FP(AbsOp, abs)
 BUILD_NUMERIC_UNARY_OP_FP(NegOp, neg)
 BUILD_NUMERIC_UNARY_OP_INT(ClzOp, clz)
 BUILD_NUMERIC_UNARY_OP_INT(CtzOp, ctz)
+BUILD_NUMERIC_UNARY_OP_INT(EqzOp, eqz)
 BUILD_NUMERIC_UNARY_OP_INT(PopCntOp, popcnt)
 
 // Don't need these anymore so let's undef them.
