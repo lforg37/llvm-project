@@ -273,11 +273,26 @@ private:
   /// \p valueType - The operand and result type for the built instruction.
   /// \p numOperands - The number of operands for the built operation.
   ///
-  /// \returns The parsed instruction, or failure.
+  /// \returns The parsed instruction result, or failure.
   template <typename opcode, typename valueType, unsigned int numOperands>
   inline parsed_inst_t
   buildNumericOp(OpBuilder &builder,
                  std::enable_if_t<std::is_arithmetic_v<valueType>> * = nullptr);
+
+  /// Construct a conversion operation of type \p opType that takes a value from
+  /// type \p inputType on the stack and will produce a value of type
+  /// \p outputType.
+  ///
+  /// \p opType - The WASM dialect operation to build.
+  /// \p inputType - The operand type for the built instruction.
+  /// \p outputType - The result type for the built instruction.
+  ///
+  /// \returns The parsed instruction result, or failure.
+  template <typename opType, typename inputType, typename outputType>
+  inline parsed_inst_t
+  buildConvertOp(OpBuilder &builder,
+                 std::enable_if_t<std::is_arithmetic_v<inputType> && std::is_arithmetic_v<outputType>> * = nullptr);
+
 
   /// This function generates a dispatch tree to associate an opcode with a
   /// parser. Parsers are registered by specialising the
@@ -1196,6 +1211,16 @@ inline Type buildLiteralType<int64_t>(OpBuilder &builder) {
 }
 
 template <>
+inline Type buildLiteralType<uint32_t>(OpBuilder &builder) {
+  return builder.getI32Type();
+}
+
+template <>
+inline Type buildLiteralType<uint64_t>(OpBuilder &builder) {
+  return builder.getI64Type();
+}
+
+template <>
 inline Type buildLiteralType<float>(OpBuilder &builder) {
   return builder.getF32Type();
 }
@@ -1359,6 +1384,39 @@ BUILD_NUMERIC_UNARY_OP_INT(PopCntOp, popcnt)
 #undef BUILD_NUMERIC_UNARY_OP_FP
 #undef BUILD_NUMERIC_UNARY_OP_INT
 #undef BUILD_NUMERIC_OP
+
+template <typename opType, typename inputType, typename outputType>
+inline parsed_inst_t
+ExpressionParser::buildConvertOp(OpBuilder &builder,
+                std::enable_if_t<std::is_arithmetic_v<inputType> && std::is_arithmetic_v<outputType>> *) {
+  auto intype = buildLiteralType<inputType>(builder);
+  auto outType = buildLiteralType<outputType>(builder);
+  auto operand = popOperands(intype);
+  if (failed(operand))
+    return failure();
+  auto op = builder.create<opType>(*currentOpLoc, outType, *operand);
+  LLVM_DEBUG(llvm::dbgs() << "Built: " << op);
+  return {{op.getResult()}};
+}
+
+#define BUILD_CONVERT_OP(IN_T, OUT_T, SUFFIX) \
+template <> \
+inline parsed_inst_t ExpressionParser::parseSpecificInstruction< \
+    WasmBinaryEncoding::OpCode::convert##SUFFIX>(OpBuilder &builder) { \
+  using OpT = std::conditional_t<std::is_signed_v<IN_T>, ConvertSOp, ConvertUOp>; \
+  return buildConvertOp<OpT, IN_T, OUT_T>(builder); \
+}
+
+#define BUILD_CONVERT_OP_FOR(DEST_T, WIDTH) \
+BUILD_CONVERT_OP(uint32_t, DEST_T, UI32F##WIDTH) \
+BUILD_CONVERT_OP(int32_t, DEST_T, SI32F##WIDTH) \
+BUILD_CONVERT_OP(uint64_t, DEST_T, UI64F##WIDTH) \
+BUILD_CONVERT_OP(int64_t, DEST_T, SI64F##WIDTH)
+
+BUILD_CONVERT_OP_FOR(float, 32)
+BUILD_CONVERT_OP_FOR(double, 64)
+
+#undef BUILD_CONVERT_OP
 
 class WasmBinaryParser {
 private:
