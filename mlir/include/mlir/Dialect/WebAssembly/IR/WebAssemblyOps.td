@@ -570,6 +570,38 @@ def Wasm_DemoteOp : Wasm_ConversionOp<"demote",
     [F64],
     [F32]>{}
 
+def Wasm_ExtendSI32Op : Wasm_Op<"extend_i32_s">{
+  let summary = [{Sign extend i32 to i64.}];
+  let arguments = (ins I32:$input);
+  let results = (outs I64:$result);
+  let assemblyFormat = "$input `to` type($result)  attr-dict";
+}
+
+def Wasm_ExtendUI32Op : Wasm_Op<"extend_i32_u">{
+  let summary = [{Zero extend i32 to i64.}];
+  let arguments = (ins I32:$input);
+  let results = (outs I64:$result);
+  let assemblyFormat = "$input `to` type($result)  attr-dict";
+}
+
+def Wasm_ExtendLowBitsSOp : Wasm_Op<"extend", [AllTypesMatch<["input", "result"]>]> {
+  let summary = "";
+  let description = [{
+  Extend low bytes of a value to fit a given width.
+  For instance, signed extension from 8 low bits of the 32-bits integer value
+  254 (0x000000FE) would produce the value -2 (0xFFFFFFFE).
+
+  This corresponds to the `extendnn` instruction of Wasm, which shouldn't be
+  confused with the `extend_inn` Wasm instruction, for which all input bits
+  are used and widened to wider output type.
+  In this operation, input and output types are the same.
+  }];
+  let arguments = (ins Wasm_IntegerType:$input, Builtin_IntegerAttr: $bitsToTake);
+  let results = (outs Wasm_IntegerType: $result);
+  let hasVerifier = 1;
+  let hasCustomAssemblyFormat = 1;
+}
+
 def Wasm_PromoteOp : Wasm_ConversionOp<"promote",
     "Get f64 representation of a f32 value.",
     [Builtin_Float32],
