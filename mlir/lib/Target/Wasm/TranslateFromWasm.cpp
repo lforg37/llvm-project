@@ -25,6 +25,7 @@
 #include "llvm/Support/LEB128.h"
 #include "llvm/Support/LogicalResult.h"
 
+#include <cstdint>
 #include <optional>
 #include <type_traits>
 #include <utility>
@@ -1399,24 +1400,32 @@ ExpressionParser::buildConvertOp(OpBuilder &builder,
   return {{op.getResult()}};
 }
 
-#define BUILD_CONVERT_OP(IN_T, OUT_T, SUFFIX) \
+#define BUILD_CONVERSION_OP(IN_T, OUT_T, SOURCE_OP, TARGET_OP) \
 template <> \
 inline parsed_inst_t ExpressionParser::parseSpecificInstruction< \
-    WasmBinaryEncoding::OpCode::convert##SUFFIX>(OpBuilder &builder) { \
-  using OpT = std::conditional_t<std::is_signed_v<IN_T>, ConvertSOp, ConvertUOp>; \
-  return buildConvertOp<OpT, IN_T, OUT_T>(builder); \
+    WasmBinaryEncoding::OpCode::SOURCE_OP>(OpBuilder &builder) { \
+  return buildConvertOp<TARGET_OP, IN_T, OUT_T>(builder); \
 }
 
 #define BUILD_CONVERT_OP_FOR(DEST_T, WIDTH) \
-BUILD_CONVERT_OP(uint32_t, DEST_T, UI32F##WIDTH) \
-BUILD_CONVERT_OP(int32_t, DEST_T, SI32F##WIDTH) \
-BUILD_CONVERT_OP(uint64_t, DEST_T, UI64F##WIDTH) \
-BUILD_CONVERT_OP(int64_t, DEST_T, SI64F##WIDTH)
+BUILD_CONVERSION_OP(uint32_t, DEST_T, convertUI32F##WIDTH, ConvertUOp) \
+BUILD_CONVERSION_OP(int32_t, DEST_T, convertSI32F##WIDTH, ConvertSOp) \
+BUILD_CONVERSION_OP(uint64_t, DEST_T, convertUI64F##WIDTH, ConvertUOp) \
+BUILD_CONVERSION_OP(int64_t, DEST_T, convertSI64F##WIDTH, ConvertSOp)
 
 BUILD_CONVERT_OP_FOR(float, 32)
 BUILD_CONVERT_OP_FOR(double, 64)
 
-#undef BUILD_CONVERT_OP
+BUILD_CONVERSION_OP(int32_t, int64_t, extendS, ExtendSOp)
+BUILD_CONVERSION_OP(int32_t, int64_t, extendU, ExtendUOp)
+BUILD_CONVERSION_OP(int32_t, int32_t, extendI328S, Extend8SOp)
+BUILD_CONVERSION_OP(int32_t, int32_t, extendI3216S, Extend16SOp)
+BUILD_CONVERSION_OP(int64_t, int64_t, extendI648S, Extend8SOp)
+BUILD_CONVERSION_OP(int64_t, int64_t, extendI6416S, Extend16SOp)
+BUILD_CONVERSION_OP(int64_t, int64_t, extendI6432S, Extend32SOp)
+
+#undef BUILD_CONVERSION_OP
+#undef BUILD_CONVERT_OP_FOR
 
 class WasmBinaryParser {
 private:

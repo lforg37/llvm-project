@@ -89,6 +89,8 @@ using WasmConvertUOpConversion = OpMappingConversion<ConvertUOp, arith::UIToFPOp
 using WasmDivFPOpConversion = OpMappingConversion<DivOp, arith::DivFOp>;
 using WasmDivSIOpConversion = OpMappingConversion<DivSIOp, arith::DivSIOp>;
 using WasmDivUIOpConversion = OpMappingConversion<DivUIOp, arith::DivUIOp>;
+using WasmExtendSOpConversion = OpMappingConversion<ExtendSOp, arith::ExtSIOp>;
+using WasmExtendUOpConversion = OpMappingConversion<ExtendUOp, arith::ExtUIOp>;
 using WasmMaxOpConversion = OpMappingConversion<MaxOp, arith::MaximumFOp>;
 using WasmMinOpConversion = OpMappingConversion<MinOp, arith::MinimumFOp>;
 using WasmOrOpConversion = OpMappingConversion<OrOp, arith::OrIOp>;
@@ -774,6 +776,8 @@ void mlir::populateRaiseWasmMLIRConversionPatterns(
            WasmDivSIOpConversion,
            WasmDivUIOpConversion,
            WasmEqOpConversion,
+           WasmExtendSOpConversion,
+           WasmExtendUOpConversion,
            WasmFuncImportOpConversion,
            WasmFuncOpConversion,
            WasmGeOpConversion,

@@ -565,6 +565,31 @@ def Wasm_ConvertSOp : Wasm_ConversionOp<"convert_s",
     [Wasm_IntegerType],
     [Wasm_FPType]>{}
 
+def Wasm_Extend8SOp : Wasm_ConversionOp<"extend8_s",
+  [{"Extend the first 8 bits of an integer"}],
+  [Wasm_IntegerType],
+  [Wasm_IntegerType]>{}
+
+def Wasm_Extend16SOp : Wasm_ConversionOp<"extend16_s",
+  [{"Extend the first 16 bits of an integer"}],
+  [Wasm_IntegerType],
+  [Wasm_IntegerType]>{}
+
+def Wasm_Extend32SOp : Wasm_ConversionOp<"extend32_s",
+  [{"Extend the first 32 bits of an i64"}],
+  [I64],
+  [I64]>{}
+
+def Wasm_ExtendSOp : Wasm_ConversionOp<"extend_s",
+  [{"Extend a signed i32 to i64 preserving the signedness"}],
+  [I32],
+  [I64]>{}
+
+def Wasm_ExtendUOp : Wasm_ConversionOp<"extend_u",
+  [{"Extend an unsigned i32 to i64"}],
+  [I32],
+  [I64]>{}
+
 class Wasm_UnaryNumericalOp<string mnemonic,
                             string summaryStr,
                             list<Type> validOpTypes> :
