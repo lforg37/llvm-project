@@ -541,6 +541,30 @@ def Wasm_RotrOp : Wasm_ShiftRotateOp<"rotr",
     second integer. The result shall be pushed to the stack.}]
     >{}
 
+class Wasm_ConversionOp<string mnemonic, string summaryStr,
+                       list<Type> ValidInputTypes,
+                       list<Type> ValidOutputTypes> :
+    Wasm_Op<mnemonic> {
+  let summary = summaryStr;
+  let arguments = (ins AnyTypeOf<ValidInputTypes>:$input);
+  let results = (outs AnyTypeOf<ValidOutputTypes>:$result);
+  let assemblyFormat = "$input `:` type($input) `to` type($result)  attr-dict";
+}
+
+def Wasm_ConvertUOp : Wasm_ConversionOp<"convert_u",
+    [{Convert integer, interpreted as binary encoded positive value, to floating-point value.
+
+    Consume an integer and produces a floating point value containing the rounded value of the original operand. Rounding is round to nearest, tie to even.}],
+    [Wasm_IntegerType],
+    [Wasm_FPType]>{}
+
+def Wasm_ConvertSOp : Wasm_ConversionOp<"convert_s",
+    [{Convert integer interpreted as 2's complement signed value to floating-point value.
+
+    Consume an integer and produces a floating point value containing the rounded value of the original operand. Rounding is round to nearest, tie to even.}],
+    [Wasm_IntegerType],
+    [Wasm_FPType]>{}
+
 class Wasm_UnaryNumericalOp<string mnemonic,
                             string summaryStr,
                             list<Type> validOpTypes> :
