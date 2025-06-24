@@ -289,10 +289,9 @@ private:
   /// \p outputType - The result type for the built instruction.
   ///
   /// \returns The parsed instruction result, or failure.
-  template <typename opType, typename inputType, typename outputType>
+  template <typename opType, typename inputType, typename outputType, typename... extraArgsT>
   inline parsed_inst_t
-  buildConvertOp(OpBuilder &builder,
-                 std::enable_if_t<std::is_arithmetic_v<inputType> && std::is_arithmetic_v<outputType>> * = nullptr);
+  buildConvertOp(OpBuilder &builder, extraArgsT...);
 
 
   /// This function generates a dispatch tree to associate an opcode with a
@@ -1391,16 +1390,21 @@ BUILD_NUMERIC_UNARY_OP_INT(PopCntOp, popcnt)
 #undef BUILD_NUMERIC_UNARY_OP_INT
 #undef BUILD_NUMERIC_OP
 
-template <typename opType, typename inputType, typename outputType>
-inline parsed_inst_t
-ExpressionParser::buildConvertOp(OpBuilder &builder,
-                std::enable_if_t<std::is_arithmetic_v<inputType> && std::is_arithmetic_v<outputType>> *) {
+template <typename opType, typename inputType, typename outputType,
+          typename... extraArgsT>
+inline parsed_inst_t ExpressionParser::buildConvertOp(OpBuilder &builder,
+                                                      extraArgsT... extraArgs) {
+  static_assert(std::is_arithmetic_v<inputType>,
+                "InputType should be an arithmetic type");
+  static_assert(std::is_arithmetic_v<outputType>,
+                "OutputType should be an arithmetic type");
   auto intype = buildLiteralType<inputType>(builder);
   auto outType = buildLiteralType<outputType>(builder);
   auto operand = popOperands(intype);
   if (failed(operand))
     return failure();
-  auto op = builder.create<opType>(*currentOpLoc, outType, *operand);
+  auto op = builder.create<opType>(*currentOpLoc, outType, operand->front(),
+                                   extraArgs...);
   LLVM_DEBUG(llvm::dbgs() << "Built: " << op);
   return {{op.getResult()}};
 }
@@ -1421,16 +1425,34 @@ BUILD_CONVERSION_OP(int64_t, DEST_T, convertSI64F##WIDTH, ConvertSOp)
 BUILD_CONVERT_OP_FOR(float, 32)
 BUILD_CONVERT_OP_FOR(double, 64)
 
-BUILD_CONVERSION_OP(int32_t, int64_t, extendS, ExtendSOp)
-BUILD_CONVERSION_OP(int32_t, int64_t, extendU, ExtendUOp)
-BUILD_CONVERSION_OP(int32_t, int32_t, extendI328S, Extend8SOp)
-BUILD_CONVERSION_OP(int32_t, int32_t, extendI3216S, Extend16SOp)
-BUILD_CONVERSION_OP(int64_t, int64_t, extendI648S, Extend8SOp)
-BUILD_CONVERSION_OP(int64_t, int64_t, extendI6416S, Extend16SOp)
-BUILD_CONVERSION_OP(int64_t, int64_t, extendI6432S, Extend32SOp)
+#undef BUILD_CONVERT_OP_FOR
+
+BUILD_CONVERSION_OP(int32_t, int64_t, extendS, ExtendSI32Op)
+BUILD_CONVERSION_OP(int32_t, int64_t, extendU, ExtendUI32Op)
 
 #undef BUILD_CONVERSION_OP
-#undef BUILD_CONVERT_OP_FOR
+
+#define BUILD_SLICE_EXTEND_PARSER(IT_WIDTH, EXTRACT_WIDTH)                     \
+  template <>                                                                  \
+  parsed_inst_t ExpressionParser::parseSpecificInstruction<                    \
+      WasmBinaryEncoding::OpCode::extendI##IT_WIDTH##EXTRACT_WIDTH##S>(        \
+      OpBuilder & builder) {                                                   \
+    using inout_t = int##IT_WIDTH##_t;                                         \
+    auto attr = builder.getI64IntegerAttr(EXTRACT_WIDTH);                      \
+    return buildConvertOp<ExtendFromLowBytesSOp, inout_t, inout_t>(builder,    \
+                                                                   attr);      \
+  }
+
+BUILD_SLICE_EXTEND_PARSER(32, 8)
+BUILD_SLICE_EXTEND_PARSER(32, 16)
+BUILD_SLICE_EXTEND_PARSER(64, 8)
+BUILD_SLICE_EXTEND_PARSER(64, 16)
+BUILD_SLICE_EXTEND_PARSER(64, 32)
+
+#undef BUILD_SLICE_EXTEND_PARSER
+
+
+
 
 class WasmBinaryParser {
 private:

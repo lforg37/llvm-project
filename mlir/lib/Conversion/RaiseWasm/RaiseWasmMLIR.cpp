@@ -92,8 +92,8 @@ using WasmConvertUOpConversion = OpMappingConversion<ConvertUOp, arith::UIToFPOp
 using WasmDivFPOpConversion = OpMappingConversion<DivOp, arith::DivFOp>;
 using WasmDivSIOpConversion = OpMappingConversion<DivSIOp, arith::DivSIOp>;
 using WasmDivUIOpConversion = OpMappingConversion<DivUIOp, arith::DivUIOp>;
-using WasmExtendSOpConversion = OpMappingConversion<ExtendSOp, arith::ExtSIOp>;
-using WasmExtendUOpConversion = OpMappingConversion<ExtendUOp, arith::ExtUIOp>;
+using WasmExtendSOpConversion = OpMappingConversion<ExtendSI32Op, arith::ExtSIOp>;
+using WasmExtendUOpConversion = OpMappingConversion<ExtendUI32Op, arith::ExtUIOp>;
 using WasmFloorOpConversion = OpMappingConversion<FloorOp, math::FloorOp>;
 using WasmMaxOpConversion = OpMappingConversion<MaxOp, arith::MaximumFOp>;
 using WasmMinOpConversion = OpMappingConversion<MinOp, arith::MinimumFOp>;
@@ -308,6 +308,24 @@ struct WasmEqzOpConversion : OpConversionPattern<EqzOp> {
     rewriter.replaceOpWithNewOp<arith::ExtUIOp>(eqzOp, rewriter.getI32Type(),
                                                 cmpRes);
 
+    return success();
+  }
+};
+
+struct WasmExtendLowBytesOpConversion : OpConversionPattern<ExtendFromLowBytesSOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(ExtendFromLowBytesSOp extendLowBytesSOp,
+                  ExtendFromLowBytesSOp::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto truncWidth = extendLowBytesSOp.getBitsToTake().getUInt();
+    auto truncation = rewriter.create<arith::TruncIOp>(
+        extendLowBytesSOp->getLoc(), rewriter.getIntegerType(truncWidth),
+        adaptor.getInput());
+    rewriter.replaceOpWithNewOp<arith::ExtSIOp>(
+        extendLowBytesSOp, extendLowBytesSOp.getResult().getType(),
+        truncation.getResult());
     return success();
   }
 };
@@ -806,6 +824,7 @@ void mlir::populateRaiseWasmMLIRConversionPatterns(
            WasmDivUIOpConversion,
            WasmEqOpConversion,
            WasmEqzOpConversion,
+           WasmExtendLowBytesOpConversion,
            WasmExtendSOpConversion,
            WasmExtendUOpConversion,
            WasmFloorOpConversion,

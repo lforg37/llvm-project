@@ -565,30 +565,37 @@ def Wasm_ConvertSOp : Wasm_ConversionOp<"convert_s",
     [Wasm_IntegerType],
     [Wasm_FPType]>{}
 
-def Wasm_Extend8SOp : Wasm_ConversionOp<"extend8_s",
-  [{"Extend the first 8 bits of an integer"}],
-  [Wasm_IntegerType],
-  [Wasm_IntegerType]>{}
+def Wasm_ExtendSI32Op : Wasm_Op<"extend_i32_s">{
+  let summary = [{"Extend i32 to i64 performing sign extension."}];
+  let arguments = (ins I32:$input);
+  let results = (outs I64:$result);
+  let assemblyFormat = "$input `to` type($result)  attr-dict";
+}
 
-def Wasm_Extend16SOp : Wasm_ConversionOp<"extend16_s",
-  [{"Extend the first 16 bits of an integer"}],
-  [Wasm_IntegerType],
-  [Wasm_IntegerType]>{}
+def Wasm_ExtendUI32Op : Wasm_Op<"extend_i32_u">{
+  let summary = [{"Extend i32 to i64 performing zero extension."}];
+  let arguments = (ins I32:$input);
+  let results = (outs I64:$result);
+  let assemblyFormat = "$input `to` type($result)  attr-dict";
+}
 
-def Wasm_Extend32SOp : Wasm_ConversionOp<"extend32_s",
-  [{"Extend the first 32 bits of an i64"}],
-  [I64],
-  [I64]>{}
+def Wasm_ExtendFromLowBytesSOp : Wasm_Op<"extend", [AllTypesMatch<["input", "result"]>]> {
+  let summary = "";
+  let description = [{
+  Extend low bytes of a value to fit a given width.
+  For instance, signed extension from 8 low bits of the 32-bits integer value
+  254 (0x000000FE) would produce the value -2 (0xFFFFFFFE).
 
-def Wasm_ExtendSOp : Wasm_ConversionOp<"extend_s",
-  [{"Extend a signed i32 to i64 preserving the signedness"}],
-  [I32],
-  [I64]>{}
-
-def Wasm_ExtendUOp : Wasm_ConversionOp<"extend_u",
-  [{"Extend an unsigned i32 to i64"}],
-  [I32],
-  [I64]>{}
+  This corresponds to the `extendnn` instruction of Wasm, which shouldn't be
+  confused with the `extend_inn` Wasm instruction, for which all input bits
+  are used and widened to wider output type.
+  In this operation, input and output types are the same.
+  }];
+  let arguments = (ins Wasm_IntegerType:$input, Builtin_IntegerAttr: $bitsToTake);
+  let results = (outs Wasm_IntegerType: $result);
+  let hasVerifier = 1;
+  let hasCustomAssemblyFormat = 1;
+}
 
 class Wasm_UnaryNumericalOp<string mnemonic,
                             string summaryStr,

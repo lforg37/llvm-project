@@ -35,42 +35,35 @@
 
 // CHECK-LABEL:   wasm.func nested @func_0() -> i64 {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 10 : i32
-// CHECK:           %[[VAL_1:.*]] = wasm.extend_s %[[VAL_0]] : i32 to i64
+// CHECK:           %[[VAL_1:.*]] = wasm.extend_i32_s %[[VAL_0]] to i64
 // CHECK:           wasm.return %[[VAL_1]] : i64
-// CHECK:         }
 
 // CHECK-LABEL:   wasm.func nested @func_1() -> i64 {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 10 : i32
-// CHECK:           %[[VAL_1:.*]] = wasm.extend_u %[[VAL_0]] : i32 to i64
+// CHECK:           %[[VAL_1:.*]] = wasm.extend_i32_u %[[VAL_0]] to i64
 // CHECK:           wasm.return %[[VAL_1]] : i64
-// CHECK:         }
 
 // CHECK-LABEL:   wasm.func nested @func_2() -> i32 {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 10 : i32
-// CHECK:           %[[VAL_1:.*]] = wasm.extend8_s %[[VAL_0]] : i32 to i32
+// CHECK:           %[[VAL_1:.*]] = wasm.extend 8 low bits from %[[VAL_0]]: i32
 // CHECK:           wasm.return %[[VAL_1]] : i32
-// CHECK:         }
 
 // CHECK-LABEL:   wasm.func nested @func_3() -> i32 {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 10 : i32
-// CHECK:           %[[VAL_1:.*]] = wasm.extend16_s %[[VAL_0]] : i32 to i32
+// CHECK:           %[[VAL_1:.*]] = wasm.extend 16 low bits from %[[VAL_0]]: i32
 // CHECK:           wasm.return %[[VAL_1]] : i32
-// CHECK:         }
 
 // CHECK-LABEL:   wasm.func nested @func_4() -> i64 {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 10 : i64
-// CHECK:           %[[VAL_1:.*]] = wasm.extend8_s %[[VAL_0]] : i64 to i64
+// CHECK:           %[[VAL_1:.*]] = wasm.extend 8 low bits from %[[VAL_0]]: i64
 // CHECK:           wasm.return %[[VAL_1]] : i64
-// CHECK:         }
 
 // CHECK-LABEL:   wasm.func nested @func_5() -> i64 {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 10 : i64
-// CHECK:           %[[VAL_1:.*]] = wasm.extend16_s %[[VAL_0]] : i64 to i64
+// CHECK:           %[[VAL_1:.*]] = wasm.extend 16 low bits from %[[VAL_0]]: i64
 // CHECK:           wasm.return %[[VAL_1]] : i64
-// CHECK:         }
 
 // CHECK-LABEL:   wasm.func nested @func_6() -> i64 {
 // CHECK:           %[[VAL_0:.*]] = wasm.const 10 : i64
-// CHECK:           %[[VAL_1:.*]] = wasm.extend32_s %[[VAL_0]] : i64 to i64
+// CHECK:           %[[VAL_1:.*]] = wasm.extend 32 low bits from %[[VAL_0]]: i64
 // CHECK:           wasm.return %[[VAL_1]] : i64
-// CHECK:         }
