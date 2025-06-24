@@ -555,6 +555,14 @@ def Wasm_AbsOp : Wasm_UnaryNumericalOp<"abs",
                                        "Floating point absolute value",
                                        [Wasm_FPType]>{}
 
+def Wasm_CeilOp : Wasm_UnaryNumericalOp<"ceil",
+                                       "Ceil rounding of floating point value",
+                                       [Wasm_FPType]>{}
+
+def Wasm_FloorOp : Wasm_UnaryNumericalOp<"floor",
+                                       "Floor rounding of floating point value",
+                                       [Wasm_FPType]>{}
+
 def Wasm_NegOp : Wasm_UnaryNumericalOp<"neg",
                                        "Floating point negation",
                                        [Wasm_FPType]>{}
