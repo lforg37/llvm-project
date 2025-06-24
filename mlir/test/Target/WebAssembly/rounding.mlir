@@ -38,3 +38,13 @@
 // CHECK:           %[[VAL_0:.*]] = wasm.const 1.618000e+00 : f32
 // CHECK:           %[[VAL_1:.*]] = wasm.floor %[[VAL_0]] : f32
 // CHECK:           wasm.return %[[VAL_1]] : f32
+
+// CHECK-LABEL:   wasm.func nested @func_4() -> f64 {
+// CHECK:           %[[VAL_0:.*]] = wasm.const -1.210000e+01 : f64
+// CHECK:           %[[VAL_1:.*]] = wasm.trunc %[[VAL_0]] : f64
+// CHECK:           wasm.return %[[VAL_1]] : f64
+
+// CHECK-LABEL:   wasm.func nested @func_5() -> f32 {
+// CHECK:           %[[VAL_0:.*]] = wasm.const 1.618000e+00 : f32
+// CHECK:           %[[VAL_1:.*]] = wasm.trunc %[[VAL_0]] : f32
+// CHECK:           wasm.return %[[VAL_1]] : f32

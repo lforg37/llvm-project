@@ -108,6 +108,7 @@ using WasmCtzOpConversion =
 using WasmPopCntOpConversion =
     OpMappingConversion<PopCntOp, math::CtPopOp>;
 using WasmAbsOpConversion = OpMappingConversion<AbsOp, math::AbsFOp>;
+using WasmTruncOpConversion = OpMappingConversion<TruncOp, math::TruncOp>;
 using WasmSqrtOpConversion =
     OpMappingConversion<SqrtOp, math::SqrtOp>;
 
@@ -837,6 +838,7 @@ void mlir::populateRaiseWasmMLIRConversionPatterns(
            WasmShRUOpConversion,
            WasmSqrtOpConversion,
            WasmSubOpConversion,
+           WasmTruncOpConversion,
            WasmXOrOpConversion
            >(tc, ctx);
   // clang-format on
