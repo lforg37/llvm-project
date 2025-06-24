@@ -84,9 +84,11 @@ struct OpMappingConversion : OpConversionPattern<SourceOp> {
 };
 
 using WasmAndOpConversion = OpMappingConversion<AndOp, arith::AndIOp>;
+using WasmCeilOpConversion = OpMappingConversion<CeilOp, math::CeilOp>;
 using WasmDivFPOpConversion = OpMappingConversion<DivOp, arith::DivFOp>;
 using WasmDivSIOpConversion = OpMappingConversion<DivSIOp, arith::DivSIOp>;
 using WasmDivUIOpConversion = OpMappingConversion<DivUIOp, arith::DivUIOp>;
+using WasmFloorOpConversion = OpMappingConversion<FloorOp, math::FloorOp>;
 using WasmMaxOpConversion = OpMappingConversion<MaxOp, arith::MaximumFOp>;
 using WasmMinOpConversion = OpMappingConversion<MinOp, arith::MinimumFOp>;
 using WasmOrOpConversion = OpMappingConversion<OrOp, arith::OrIOp>;
@@ -785,6 +787,7 @@ void mlir::populateRaiseWasmMLIRConversionPatterns(
            WasmAddOpConversion,
            WasmAndOpConversion,
            WasmCallOpConversion,
+           WasmCeilOpConversion,
            WasmClzOpConversion,
            WasmConstOpConversion,
            WasmCopySignOpConversion,
@@ -794,6 +797,7 @@ void mlir::populateRaiseWasmMLIRConversionPatterns(
            WasmDivUIOpConversion,
            WasmEqOpConversion,
            WasmEqzOpConversion,
+           WasmFloorOpConversion,
            WasmFuncImportOpConversion,
            WasmFuncOpConversion,
            WasmGeOpConversion,
