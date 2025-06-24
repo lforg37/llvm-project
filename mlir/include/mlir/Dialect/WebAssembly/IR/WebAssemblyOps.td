@@ -571,6 +571,10 @@ def Wasm_SqrtOp : Wasm_UnaryNumericalOp<"sqrt",
                                        "Floating point square root",
                                        [Wasm_FPType]>{}
 
+def Wasm_TruncOp : Wasm_UnaryNumericalOp<"trunc",
+                                       "Trunc of floating point value",
+                                       [Wasm_FPType]>{}
+
 def Wasm_CtzOp : Wasm_UnaryNumericalOp<"ctz",
                                        "Count trailing zeroes of an integer",
                                        [Wasm_IntegerType]>{}

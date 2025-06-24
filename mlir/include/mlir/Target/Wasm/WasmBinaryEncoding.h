@@ -113,6 +113,7 @@ struct WasmBinaryEncoding {
     static constexpr std::byte negF32{0x8C};
     static constexpr std::byte ceilF32{0x8D};
     static constexpr std::byte floorF32{0x8E};
+    static constexpr std::byte truncF32{0x8F};
     static constexpr std::byte sqrtF32{0x91};
     static constexpr std::byte addF32{0x92};
     static constexpr std::byte subF32{0x93};
@@ -125,6 +126,7 @@ struct WasmBinaryEncoding {
     static constexpr std::byte negF64{0x9A};
     static constexpr std::byte ceilF64{0x9B};
     static constexpr std::byte floorF64{0x9C};
+    static constexpr std::byte truncF64{0x9D};
     static constexpr std::byte sqrtF64{0x9F};
     static constexpr std::byte addF64{0xA0};
     static constexpr std::byte subF64{0xA1};
