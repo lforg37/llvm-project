@@ -90,6 +90,56 @@ Block *BlockReturnOp::getTarget() {
 }
 
 //===----------------------------------------------------------------------===//
+// ExtendLowBitsSOp
+//===----------------------------------------------------------------------===//
+
+ParseResult ExtendLowBitsSOp::parse(::mlir::OpAsmParser &parser,
+                                         ::mlir::OperationState &result) {
+  OpAsmParser::UnresolvedOperand operand;
+  uint64_t nBits;
+  auto parseRes = parser.parseInteger(nBits);
+  parseRes = parser.parseKeyword("low");
+  parseRes = parser.parseKeyword("bits");
+  parseRes = parser.parseKeyword("from");
+  parseRes = parser.parseOperand(operand);
+  parseRes = parser.parseColon();
+  Type inType;
+  parseRes = parser.parseType(inType);
+  if (!inType.isInteger())
+    return failure();
+  llvm::SmallVector<Value, 1> opVal;
+  parseRes = parser.resolveOperand(operand, inType, opVal);
+  if (parseRes.failed())
+    return failure();
+  result.addOperands(opVal);
+  result.addAttribute(
+      ExtendLowBitsSOp::getBitsToTakeAttrName(OperationName{
+          ExtendLowBitsSOp::getOperationName(), parser.getContext()}),
+      parser.getBuilder().getI64IntegerAttr(nBits));
+  result.addTypes(inType);
+  return success();
+}
+
+void ExtendLowBitsSOp::print(OpAsmPrinter &p) {
+  p << " " << getBitsToTake().getUInt() << " low bits from ";
+  p.printOperand(getInput());
+  p << ": " << getInput().getType();
+}
+
+LogicalResult ExtendLowBitsSOp::verify() {
+  auto bitsToTake = getBitsToTake().getValue().getLimitedValue();
+  if (bitsToTake != 32 && bitsToTake != 16 && bitsToTake != 8)
+    return emitError("Extend op can only take 8, 16 or 32 bits. Got ")
+           << bitsToTake;
+
+  if (bitsToTake >= getInput().getType().getIntOrFloatBitWidth())
+    return emitError("Trying to extend the ")
+           << bitsToTake << " low bits from a " << getInput().getType()
+           << " value";
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // FuncOp
 //===----------------------------------------------------------------------===//
 
