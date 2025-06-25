@@ -6,7 +6,7 @@ module {
 // CHECK:           return %[[VAL_1]] : i32
   wasm.func @i32.reinterpret_f32() -> i32 {
     %0 = wasm.const -1.000000e+00 : f32
-    %1 = wasm.reinterpret_f32 %0 : f32 to i32
+    %1 = wasm.reinterpret %0 : f32 as i32
     wasm.return %1 : i32
   }
 
@@ -16,7 +16,7 @@ module {
 // CHECK:           return %[[VAL_1]] : i64
   wasm.func @i64.reinterpret_f64() -> i64 {
     %0 = wasm.const -1.000000e+00 : f64
-    %1 = wasm.reinterpret_f64 %0 : f64 to i64
+    %1 = wasm.reinterpret %0 : f64 as i64
     wasm.return %1 : i64
   }
 
@@ -26,7 +26,7 @@ module {
 // CHECK:           return %[[VAL_1]] : f32
   wasm.func @f32.reinterpret_i32() -> f32 {
     %0 = wasm.const -1 : i32
-    %1 = wasm.reinterpret_i32 %0 : i32 to f32
+    %1 = wasm.reinterpret %0 : i32 as f32
     wasm.return %1 : f32
   }
 
@@ -36,7 +36,7 @@ module {
 // CHECK:           return %[[VAL_1]] : f64
   wasm.func @f64.reinterpret_i64() -> f64 {
     %0 = wasm.const -1 : i64
-    %1 = wasm.reinterpret_i64 %0 : i64 to f64
+    %1 = wasm.reinterpret %0 : i64 as f64
     wasm.return %1 : f64
   }
 }

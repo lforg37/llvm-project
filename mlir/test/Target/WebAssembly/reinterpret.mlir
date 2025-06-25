@@ -27,20 +27,20 @@ Test generated from:
 
 // CHECK-LABEL:   wasm.func @i32.reinterpret_f32() -> i32 {
 // CHECK:           %[[VAL_0:.*]] = wasm.const -1.000000e+00 : f32
-// CHECK:           %[[VAL_1:.*]] = wasm.reinterpret_f32 %[[VAL_0]] : f32 to i32
+// CHECK:           %[[VAL_1:.*]] = wasm.reinterpret %[[VAL_0]] : f32 as i32
 // CHECK:           wasm.return %[[VAL_1]] : i32
 
 // CHECK-LABEL:   wasm.func @i64.reinterpret_f64() -> i64 {
 // CHECK:           %[[VAL_0:.*]] = wasm.const -1.000000e+00 : f64
-// CHECK:           %[[VAL_1:.*]] = wasm.reinterpret_f64 %[[VAL_0]] : f64 to i64
+// CHECK:           %[[VAL_1:.*]] = wasm.reinterpret %[[VAL_0]] : f64 as i64
 // CHECK:           wasm.return %[[VAL_1]] : i64
 
 // CHECK-LABEL:   wasm.func @f32.reinterpret_i32() -> f32 {
 // CHECK:           %[[VAL_0:.*]] = wasm.const -1 : i32
-// CHECK:           %[[VAL_1:.*]] = wasm.reinterpret_i32 %[[VAL_0]] : i32 to f32
+// CHECK:           %[[VAL_1:.*]] = wasm.reinterpret %[[VAL_0]] : i32 as f32
 // CHECK:           wasm.return %[[VAL_1]] : f32
 
 // CHECK-LABEL:   wasm.func @f64.reinterpret_i64() -> f64 {
 // CHECK:           %[[VAL_0:.*]] = wasm.const -1 : i64
-// CHECK:           %[[VAL_1:.*]] = wasm.reinterpret_i64 %[[VAL_0]] : i64 to f64
+// CHECK:           %[[VAL_1:.*]] = wasm.reinterpret %[[VAL_0]] : i64 as f64
 // CHECK:           wasm.return %[[VAL_1]] : f64

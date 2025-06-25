@@ -1470,29 +1470,25 @@ inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
   return buildConvertOp<PromoteOp, float, double>(builder);
 }
 
-template <>
-inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
-    WasmBinaryEncoding::OpCode::reinterpretF32AsI32>(OpBuilder &builder) {
-  return buildConvertOp<ReinterpretF32AsI32Op, float, int32_t>(builder);
-}
+#define BUILD_REINTERPRET_PARSER(WIDTH, FP_TYPE)                               \
+  template <>                                                                  \
+  inline parsed_inst_t ExpressionParser::parseSpecificInstruction<             \
+      WasmBinaryEncoding::OpCode::reinterpretF##WIDTH##AsI##WIDTH>(OpBuilder & \
+                                                                   builder) {  \
+    return buildConvertOp<ReinterpretOp, FP_TYPE, int##WIDTH##_t>(builder);    \
+  }                                                                            \
+                                                                               \
+  template <>                                                                  \
+  inline parsed_inst_t ExpressionParser::parseSpecificInstruction<             \
+      WasmBinaryEncoding::OpCode::reinterpretI##WIDTH##AsF##WIDTH>(OpBuilder & \
+                                                                   builder) {  \
+    return buildConvertOp<ReinterpretOp, int##WIDTH##_t, FP_TYPE>(builder);    \
+  }
 
-template <>
-inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
-    WasmBinaryEncoding::OpCode::reinterpretF64AsI64>(OpBuilder &builder) {
-  return buildConvertOp<ReinterpretF64AsI64Op, double, int64_t>(builder);
-}
+BUILD_REINTERPRET_PARSER(32, float)
+BUILD_REINTERPRET_PARSER(64, double)
 
-template <>
-inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
-    WasmBinaryEncoding::OpCode::reinterpretI32AsF32>(OpBuilder &builder) {
-  return buildConvertOp<ReinterpretI32AsF32Op, int32_t, float>(builder);
-}
-
-template <>
-inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
-    WasmBinaryEncoding::OpCode::reinterpretI64AsF64>(OpBuilder &builder) {
-  return buildConvertOp<ReinterpretI64AsF64Op, int64_t, double>(builder);
-}
+#undef BUILD_REINTERPRET_PARSER
 
 class WasmBinaryParser {
 private:

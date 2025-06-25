@@ -103,10 +103,7 @@ using WasmOrOpConversion = OpMappingConversion<OrOp, arith::OrIOp>;
 using WasmPromoteOpConversion = OpMappingConversion<PromoteOp, arith::ExtFOp>;
 using WasmRemSIOpConversion = OpMappingConversion<RemSIOp, arith::RemSIOp>;
 using WasmRemUIOpConversion = OpMappingConversion<RemUIOp, arith::RemUIOp>;
-using WasmReinterpretF32AsI32OpConversion = OpMappingConversion<ReinterpretF32AsI32Op, arith::BitcastOp>;
-using WasmReinterpretF64AsI64OpConversion = OpMappingConversion<ReinterpretF64AsI64Op, arith::BitcastOp>;
-using WasmReinterpretI32AsF32OpConversion = OpMappingConversion<ReinterpretI32AsF32Op, arith::BitcastOp>;
-using WasmReinterpretI64AsF64OpConversion = OpMappingConversion<ReinterpretI64AsF64Op, arith::BitcastOp>;
+using WasmReinterpretOpConversion = OpMappingConversion<ReinterpretOp, arith::BitcastOp>;
 using WasmShLOpConversion = OpMappingConversion<ShLOp, arith::ShLIOp>;
 using WasmShRSOpConversion = OpMappingConversion<ShRSOp, arith::ShRSIOp>;
 using WasmShRUOpConversion = OpMappingConversion<ShRUOp, arith::ShRUIOp>;
@@ -868,10 +865,7 @@ void mlir::populateRaiseWasmMLIRConversionPatterns(
            WasmOrOpConversion,
            WasmPopCntOpConversion,
            WasmPromoteOpConversion,
-           WasmReinterpretF32AsI32OpConversion,
-           WasmReinterpretF64AsI64OpConversion,
-           WasmReinterpretI32AsF32OpConversion,
-           WasmReinterpretI64AsF64OpConversion,
+           WasmReinterpretOpConversion,
            WasmRemSIOpConversion,
            WasmRemUIOpConversion,
            WasmReturnOpConversion,
