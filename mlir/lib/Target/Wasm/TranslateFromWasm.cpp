@@ -1427,6 +1427,15 @@ BUILD_CONVERT_OP_FOR(double, 64)
 
 #undef BUILD_CONVERT_OP_FOR
 
+#define BUILD_TRUNC_CONVERSION_OP(WIDTH) \
+BUILD_CONVERSION_OP(float, int##WIDTH##_t, truncF32SI##WIDTH, TruncFloatToSIntOp) \
+BUILD_CONVERSION_OP(float, uint##WIDTH##_t, truncF32UI##WIDTH, TruncFloatToUIntOp) \
+BUILD_CONVERSION_OP(double, int##WIDTH##_t, truncF64SI##WIDTH, TruncFloatToSIntOp) \
+BUILD_CONVERSION_OP(double, uint##WIDTH##_t, truncF64UI##WIDTH, TruncFloatToUIntOp)
+
+BUILD_TRUNC_CONVERSION_OP(32)
+BUILD_TRUNC_CONVERSION_OP(64)
+
 BUILD_CONVERSION_OP(int32_t, int64_t, extendS, ExtendSI32Op)
 BUILD_CONVERSION_OP(int32_t, int64_t, extendU, ExtendUI32Op)
 

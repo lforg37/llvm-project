@@ -597,6 +597,16 @@ def Wasm_ExtendFromLowBytesSOp : Wasm_Op<"extend", [AllTypesMatch<["input", "res
   let hasCustomAssemblyFormat = 1;
 }
 
+def Wasm_TruncFloatToSIntOp : Wasm_ConversionOp<"trunc_float_to_int",
+    "Convert a float value to a signed integer",
+    [Wasm_FPType],
+    [Wasm_IntegerType]>{}
+
+def Wasm_TruncFloatToUIntOp : Wasm_ConversionOp<"trunc_float_to_uint",
+    "Convert a float value to an unsigned integer",
+    [Wasm_FPType],
+    [Wasm_IntegerType]>{}
+
 class Wasm_UnaryNumericalOp<string mnemonic,
                             string summaryStr,
                             list<Type> validOpTypes> :

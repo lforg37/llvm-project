@@ -20,6 +20,7 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/WebAssembly/IR/WebAssembly.h"
 #include "mlir/IR/BuiltinDialect.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/ValueRange.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/Passes.h"
@@ -265,6 +266,23 @@ struct IntFpComparisonOpConversion : OpConversionPattern<SourceOp> {
 
 using WasmEqOpConversion = IntFpComparisonOpConversion<EqOp, arith::CmpIPredicate::eq, arith::CmpFPredicate::OEQ>;
 using WasmNeOpConversion = IntFpComparisonOpConversion<NeOp, arith::CmpIPredicate::ne, arith::CmpFPredicate::ONE>;
+
+struct WasmTruncFtoSIOpConversion : OpConversionPattern<TruncFloatToSIntOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(TruncFloatToSIntOp tfsiOp, TruncFloatToSIntOp::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto loc = tfsiOp.getLoc();
+    auto outType = tfsiOp.getResult().getType();
+    auto castInput = adaptor.getInput();
+    if (outType.isInteger(32) && castInput.getType().isF64())
+      castInput = rewriter.create<arith::TruncFOp>(loc, rewriter.getF32Type(), adaptor.getInput()).getResult();
+    rewriter.replaceOpWithNewOp<arith::FPToSIOp>(
+        tfsiOp, outType, castInput);
+    return success();
+  }
+};
 
 struct WasmCallOpConversion : OpConversionPattern<FuncCallOp> {
   using OpConversionPattern::OpConversionPattern;
