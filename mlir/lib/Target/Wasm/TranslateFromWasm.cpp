@@ -1470,6 +1470,30 @@ inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
   return buildConvertOp<PromoteOp, float, double>(builder);
 }
 
+template <>
+inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
+    WasmBinaryEncoding::OpCode::reinterpretF32AsI32>(OpBuilder &builder) {
+  return buildConvertOp<ReinterpretF32AsI32Op, float, int32_t>(builder);
+}
+
+template <>
+inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
+    WasmBinaryEncoding::OpCode::reinterpretF64AsI64>(OpBuilder &builder) {
+  return buildConvertOp<ReinterpretF64AsI64Op, double, int64_t>(builder);
+}
+
+template <>
+inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
+    WasmBinaryEncoding::OpCode::reinterpretI32AsF32>(OpBuilder &builder) {
+  return buildConvertOp<ReinterpretI32AsF32Op, int32_t, float>(builder);
+}
+
+template <>
+inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
+    WasmBinaryEncoding::OpCode::reinterpretI64AsF64>(OpBuilder &builder) {
+  return buildConvertOp<ReinterpretI64AsF64Op, int64_t, double>(builder);
+}
+
 class WasmBinaryParser {
 private:
   struct SectionRegistry {

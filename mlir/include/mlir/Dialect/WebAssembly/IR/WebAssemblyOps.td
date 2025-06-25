@@ -611,6 +611,16 @@ def Wasm_WrapOp : Wasm_ConversionOp<"wrap",
     "Cast an i64 to i32 by using a wrapping mechanism: y = x mod 2^32",
     [I64],
     [I32]>{}
+// Reinterpret ops are basically all one-offs. They all have an unique,
+// type-postfixed opcode, and support exactly one input and output type.
+def Wasm_ReinterpretF32AsI32Op : Wasm_ConversionOp<"reinterpret_f32",
+    "Reinterpret bits of an f32 as an i32.", [F32], [I32]>{}
+def Wasm_ReinterpretF64AsI64Op : Wasm_ConversionOp<"reinterpret_f64",
+    "Reinterpret bits of an f64 as an i64.", [F64], [I64]>{}
+def Wasm_ReinterpretI32AsF32Op : Wasm_ConversionOp<"reinterpret_i32",
+    "Reinterpret bits of an i32 as an f32.", [I32], [F32]>{}
+def Wasm_ReinterpretI64AsF64Op : Wasm_ConversionOp<"reinterpret_i64",
+    "Reinterpret bits of an i64 as an f64.", [I64], [F64]>{}
 
 class Wasm_UnaryNumericalOp<string mnemonic,
                             string summaryStr,
