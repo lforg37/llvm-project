@@ -98,6 +98,7 @@ using WasmFloorOpConversion = OpMappingConversion<FloorOp, math::FloorOp>;
 using WasmMaxOpConversion = OpMappingConversion<MaxOp, arith::MaximumFOp>;
 using WasmMinOpConversion = OpMappingConversion<MinOp, arith::MinimumFOp>;
 using WasmOrOpConversion = OpMappingConversion<OrOp, arith::OrIOp>;
+using WasmPromoteOpConversion = OpMappingConversion<PromoteOp, arith::ExtFOp>;
 using WasmRemSIOpConversion = OpMappingConversion<RemSIOp, arith::RemSIOp>;
 using WasmRemUIOpConversion = OpMappingConversion<RemUIOp, arith::RemUIOp>;
 using WasmShLOpConversion = OpMappingConversion<ShLOp, arith::ShLIOp>;
@@ -839,6 +840,7 @@ void mlir::populateRaiseWasmMLIRConversionPatterns(
            WasmNegOpConversion,
            WasmOrOpConversion,
            WasmPopCntOpConversion,
+           WasmPromoteOpConversion,
            WasmRemSIOpConversion,
            WasmRemUIOpConversion,
            WasmReturnOpConversion,

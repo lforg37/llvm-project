@@ -1437,6 +1437,12 @@ BUILD_CONVERT_OP_FOR(double, 64)
 
 #undef BUILD_CONVERT_OP
 
+template <>
+inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
+    WasmBinaryEncoding::OpCode::promoteF32ToF64>(OpBuilder &builder) {
+  return buildConvertOp<PromoteOp, float, double>(builder);
+}
+
 class WasmBinaryParser {
 private:
   struct SectionRegistry {

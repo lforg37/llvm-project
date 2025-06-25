@@ -570,6 +570,11 @@ def Wasm_DemoteOp : Wasm_ConversionOp<"demote",
     [F64],
     [F32]>{}
 
+def Wasm_PromoteOp : Wasm_ConversionOp<"promote",
+    "Get f64 representation of a f32 value.",
+    [Builtin_Float32],
+    [Builtin_Float64]>{}
+
 def Wasm_WrapOp : Wasm_ConversionOp<"wrap",
     "Cast an i64 to i32 by using a wrapping mechanism: y = x mod 2^32",
     [I64],
