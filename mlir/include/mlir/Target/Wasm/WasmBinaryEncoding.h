@@ -146,6 +146,10 @@ struct WasmBinaryEncoding {
     static constexpr std::byte convertUI32F64{0xB8};
     static constexpr std::byte convertSI64F64{0xB9};
     static constexpr std::byte convertUI64F64{0xBA};
+    static constexpr std::byte reinterpretF32AsI32{0xBC};
+    static constexpr std::byte reinterpretF64AsI64{0xBD};
+    static constexpr std::byte reinterpretI32AsF32{0xBE};
+    static constexpr std::byte reinterpretI64AsF64{0xBF};
   };
 
   /// Byte encodings of types in WASM binaries
