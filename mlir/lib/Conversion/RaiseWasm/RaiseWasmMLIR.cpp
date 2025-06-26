@@ -103,6 +103,7 @@ using WasmOrOpConversion = OpMappingConversion<OrOp, arith::OrIOp>;
 using WasmPromoteOpConversion = OpMappingConversion<PromoteOp, arith::ExtFOp>;
 using WasmRemSIOpConversion = OpMappingConversion<RemSIOp, arith::RemSIOp>;
 using WasmRemUIOpConversion = OpMappingConversion<RemUIOp, arith::RemUIOp>;
+using WasmReinterpretOpConversion = OpMappingConversion<ReinterpretOp, arith::BitcastOp>;
 using WasmShLOpConversion = OpMappingConversion<ShLOp, arith::ShLIOp>;
 using WasmShRSOpConversion = OpMappingConversion<ShRSOp, arith::ShRSIOp>;
 using WasmShRUOpConversion = OpMappingConversion<ShRUOp, arith::ShRUIOp>;
@@ -864,6 +865,7 @@ void mlir::populateRaiseWasmMLIRConversionPatterns(
            WasmOrOpConversion,
            WasmPopCntOpConversion,
            WasmPromoteOpConversion,
+           WasmReinterpretOpConversion,
            WasmRemSIOpConversion,
            WasmRemUIOpConversion,
            WasmReturnOpConversion,

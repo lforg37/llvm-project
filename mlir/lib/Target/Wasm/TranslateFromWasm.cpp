@@ -1470,6 +1470,26 @@ inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
   return buildConvertOp<PromoteOp, float, double>(builder);
 }
 
+#define BUILD_REINTERPRET_PARSER(WIDTH, FP_TYPE)                               \
+  template <>                                                                  \
+  inline parsed_inst_t ExpressionParser::parseSpecificInstruction<             \
+      WasmBinaryEncoding::OpCode::reinterpretF##WIDTH##AsI##WIDTH>(OpBuilder & \
+                                                                   builder) {  \
+    return buildConvertOp<ReinterpretOp, FP_TYPE, int##WIDTH##_t>(builder);    \
+  }                                                                            \
+                                                                               \
+  template <>                                                                  \
+  inline parsed_inst_t ExpressionParser::parseSpecificInstruction<             \
+      WasmBinaryEncoding::OpCode::reinterpretI##WIDTH##AsF##WIDTH>(OpBuilder & \
+                                                                   builder) {  \
+    return buildConvertOp<ReinterpretOp, int##WIDTH##_t, FP_TYPE>(builder);    \
+  }
+
+BUILD_REINTERPRET_PARSER(32, float)
+BUILD_REINTERPRET_PARSER(64, double)
+
+#undef BUILD_REINTERPRET_PARSER
+
 class WasmBinaryParser {
 private:
   struct SectionRegistry {
