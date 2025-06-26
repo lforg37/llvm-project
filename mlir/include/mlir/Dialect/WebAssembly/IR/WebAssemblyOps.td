@@ -611,6 +611,15 @@ def Wasm_WrapOp : Wasm_ConversionOp<"wrap",
     "Cast an i64 to i32 by using a wrapping mechanism: y = x mod 2^32",
     [I64],
     [I32]>{}
+// Reinterpret ops are basically all one-offs. They all have an unique,
+// type-postfixed opcode, and support exactly one input and output type.
+def Wasm_ReinterpretOp : Wasm_ConversionOp<"reinterpret",
+    [{Reinterpret the value represented by a bit vector by
+      bit-casting it to another type of same representation width.}],
+    [Wasm_NumericType], [Wasm_NumericType]>{
+    let assemblyFormat = "$input `:` type($input) `as` type($result) attr-dict";
+    let hasVerifier = 1;
+}
 
 class Wasm_UnaryNumericalOp<string mnemonic,
                             string summaryStr,
