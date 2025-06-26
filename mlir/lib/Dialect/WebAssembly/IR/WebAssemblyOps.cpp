@@ -465,6 +465,21 @@ void MemImportOp::build(mlir::OpBuilder &odsBuilder,
 }
 
 //===----------------------------------------------------------------------===//
+// ReinterpretOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult ReinterpretOp::verify() {
+  auto inT = getInput().getType();
+  auto resT = getResult().getType();
+  if (inT == resT)
+    return emitError("reinterpret input and output type should be distinct.");
+  if (inT.getIntOrFloatBitWidth() != resT.getIntOrFloatBitWidth())
+    return emitError() << "input type (" << inT << ") and output type (" << resT
+                       << ") have incompatible bit widths.";
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // ReturnOp
 //===----------------------------------------------------------------------===//
 
