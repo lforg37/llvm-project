@@ -1,4 +1,4 @@
-// RUN: mlir-translate --import-wasm %S/inputs/loop.wasm | FileCheck %s
+// RUN: yaml2obj %S/inputs/loop.yaml.wasm -o - | mlir-translate --import-wasm | FileCheck %s
 
 /* IR generated from:
 (module

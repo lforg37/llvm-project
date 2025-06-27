@@ -1,4 +1,4 @@
-// RUN: mlir-translate --import-wasm %S/inputs/eq.wasm | FileCheck %s
+// RUN: yaml2obj %S/inputs/eq.yaml.wasm -o - | mlir-translate --import-wasm | FileCheck %s
 /* Source code used to create this test:
 (module
     (func $eq_i32 (result i32)

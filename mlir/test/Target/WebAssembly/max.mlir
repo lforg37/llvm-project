@@ -1,4 +1,4 @@
-// RUN: mlir-translate --import-wasm %S/inputs/max.wasm | FileCheck %s
+// RUN: yaml2obj %S/inputs/max.yaml.wasm -o - | mlir-translate --import-wasm | FileCheck %s
 
 /* Source code used to generate this test:
 (module

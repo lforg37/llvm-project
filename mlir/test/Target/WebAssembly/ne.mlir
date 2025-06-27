@@ -1,4 +1,4 @@
-// RUN: mlir-translate --import-wasm %S/inputs/ne.wasm | FileCheck %s
+// RUN: yaml2obj %S/inputs/ne.yaml.wasm -o - | mlir-translate --import-wasm | FileCheck %s
 /* Source code used to create this test:
 (module
     (func $ne_i32 (result i32)
