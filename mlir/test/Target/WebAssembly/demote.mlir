@@ -1,4 +1,5 @@
-// RUN: mlir-translate --import-wasm %S/inputs/demote.wasm | FileCheck %s
+// RUN: yaml2obj %S/inputs/demote.yaml.wasm -o - | mlir-translate --import-wasm | FileCheck %s
+
 /* Source code used to create this test:
 (module
   (func $main (result f32)

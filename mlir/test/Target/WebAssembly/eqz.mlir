@@ -1,4 +1,4 @@
-// RUN: mlir-translate --import-wasm %S/inputs/eqz.wasm | FileCheck %s
+// RUN: yaml2obj %S/inputs/eqz.yaml.wasm -o - | mlir-translate --import-wasm | FileCheck %s
 /* Source code used to create this test:
 (module
     (func (export "eqz_i32") (result i32)

@@ -1,4 +1,4 @@
-// RUN: mlir-translate --import-wasm %S/inputs/rounding.wasm | FileCheck %s
+// RUN: yaml2obj %S/inputs/rounding.yaml.wasm -o - | mlir-translate --import-wasm | FileCheck %s
 /* Source code used to create this test:
 (module
   (func $ceil_f64 (result f64)

@@ -1,4 +1,4 @@
-// RUN: mlir-translate --import-wasm %S/inputs/reinterpret.wasm | FileCheck %s
+// RUN: yaml2obj %S/inputs/reinterpret.yaml.wasm -o - | mlir-translate --import-wasm | FileCheck %s
 
 /*
 Test generated from:
