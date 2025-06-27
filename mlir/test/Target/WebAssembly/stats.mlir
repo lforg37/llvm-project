@@ -1,4 +1,4 @@
-// RUN: mlir-translate --import-wasm -stats %S/inputs/stats.wasm 2>&1 | FileCheck %s
+// RUN: yaml2obj %S/inputs/stats.yaml.wasm -o - | mlir-translate --import-wasm -stats 2>&1 | FileCheck %s
 // Check that we get the correct stats for a module that has a single
 // function, table, memory, and global.
 // REQUIRES: asserts

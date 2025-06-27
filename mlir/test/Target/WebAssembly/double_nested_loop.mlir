@@ -1,4 +1,4 @@
-// RUN: mlir-translate --import-wasm %S/inputs/double_nest_loop.wasm | FileCheck %s
+// RUN: yaml2obj %S/inputs/double_nested_loop.yaml.wasm -o - | mlir-translate --import-wasm | FileCheck %s
 
 /*
 (module

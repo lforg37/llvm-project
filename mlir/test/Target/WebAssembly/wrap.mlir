@@ -1,4 +1,4 @@
-// RUN: mlir-translate --import-wasm %S/inputs/wrap.wasm | FileCheck %s
+// RUN: yaml2obj %S/inputs/wrap.yaml.wasm -o - | mlir-translate --import-wasm | FileCheck %s
 /* Source code used to create this test:
 (module
     (func (export "i64_wrap") (param $in i64) (result i32)

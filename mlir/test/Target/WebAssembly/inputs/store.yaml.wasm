@@ -1,0 +1,29 @@
+--- !WASM
+FileHeader:
+  Version:         0x1
+Sections:
+  - Type:            TYPE
+    Signatures:
+      - Index:           0
+        ParamTypes:
+          - I32
+        ReturnTypes:     []
+  - Type:            FUNCTION
+    FunctionTypes:   [ 0 ]
+  - Type:            MEMORY
+    Memories:
+      - Minimum:         0x1
+  - Type:            EXPORT
+    Exports:
+      - Name:            memory
+        Kind:            MEMORY
+        Index:           0
+      - Name:            store_in_mem
+        Kind:            FUNCTION
+        Index:           0
+  - Type:            CODE
+    Functions:
+      - Index:           0
+        Locals:          []
+        Body:            410020003602000B
+...

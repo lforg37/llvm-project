@@ -1,4 +1,4 @@
-// RUN: mlir-translate --import-wasm %S/inputs/comparison_ops.wasm | FileCheck %s
+// RUN: yaml2obj %S/inputs/comparison_ops.yaml.wasm -o - | mlir-translate --import-wasm | FileCheck %s
 /* Source code used to create this test:
 (module
     (func $lt_si32 (result i32)
