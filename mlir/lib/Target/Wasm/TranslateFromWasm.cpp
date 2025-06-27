@@ -1451,7 +1451,7 @@ BUILD_CONVERSION_OP(int32_t, int64_t, extendU, ExtendUI32Op)
       WasmBinaryEncoding::OpCode::extendI##IT_WIDTH##EXTRACT_WIDTH##S>(        \
       OpBuilder & builder) {                                                   \
     using inout_t = int##IT_WIDTH##_t;                                         \
-    auto attr = builder.getI64IntegerAttr(EXTRACT_WIDTH);                      \
+    auto attr = builder.getUI32IntegerAttr(EXTRACT_WIDTH);                      \
     return buildConvertOp<ExtendLowBitsSOp, inout_t, inout_t>(builder,    \
                                                                    attr);      \
   }

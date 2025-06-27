@@ -325,7 +325,7 @@ struct WasmExtendLowBitsOpConversion : OpConversionPattern<ExtendLowBitsSOp> {
   matchAndRewrite(ExtendLowBitsSOp extendLowBytesSOp,
                   ExtendLowBitsSOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto truncWidth = extendLowBytesSOp.getBitsToTake().getUInt();
+    auto truncWidth = extendLowBytesSOp.getBitsToTake().getInt();
     auto truncation = rewriter.create<arith::TruncIOp>(
         extendLowBytesSOp->getLoc(), rewriter.getIntegerType(truncWidth),
         adaptor.getInput());
