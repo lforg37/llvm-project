@@ -123,6 +123,8 @@ using WasmSqrtOpConversion =
     OpMappingConversion<SqrtOp, math::SqrtOp>;
 using WasmWrapOpConversion =
     OpMappingConversion<WrapOp, arith::TruncIOp>;
+using WasmNearestOpConversion =
+    OpMappingConversion<NearestOp, math::RoundEvenOp>;
 
 /// Lower a rotate to a series of bitwise operations. Intended for us
 /// in dialects that do not natively support rotate operations.
@@ -861,6 +863,7 @@ void mlir::populateRaiseWasmMLIRConversionPatterns(
            WasmMinOpConversion,
            WasmMulOpConversion,
            WasmNeOpConversion,
+           WasmNearestOpConversion,
            WasmNegOpConversion,
            WasmOrOpConversion,
            WasmPopCntOpConversion,
