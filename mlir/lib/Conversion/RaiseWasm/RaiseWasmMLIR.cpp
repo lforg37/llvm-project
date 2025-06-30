@@ -1,4 +1,5 @@
-//===- RaiseWasmMLIR.cpp - Convert Wasm to less abstract dialects ---*- C++ -*-===//
+//===- RaiseWasmMLIR.cpp - Convert Wasm to less abstract dialects ---*- C++
+//-*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -12,6 +13,8 @@
 
 #include "mlir/Conversion/RaiseWasm/RaiseWasmMLIR.h"
 
+
+#include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -23,10 +26,7 @@
 #include "mlir/IR/ValueRange.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/Passes.h"
-#include "llvm/Support/LogicalResult.h"
-
 #include <optional>
-
 
 #define DEBUG_TYPE "wasm-convert"
 
@@ -87,15 +87,18 @@ using WasmAndOpConversion = OpMappingConversion<AndOp, arith::AndIOp>;
 using WasmCeilOpConversion = OpMappingConversion<CeilOp, math::CeilOp>;
 /// TODO: SIToFP and UIToFP don't allow specification of the floating point
 /// rounding mode
-using WasmConvertSOpConversion = OpMappingConversion<ConvertSOp, arith::SIToFPOp>;
-using WasmConvertUOpConversion = OpMappingConversion<ConvertUOp, arith::UIToFPOp>;
-using WasmDemoteOpConversion =
-    OpMappingConversion<DemoteOp, arith::TruncFOp>;
+using WasmConvertSOpConversion =
+    OpMappingConversion<ConvertSOp, arith::SIToFPOp>;
+using WasmConvertUOpConversion =
+    OpMappingConversion<ConvertUOp, arith::UIToFPOp>;
+using WasmDemoteOpConversion = OpMappingConversion<DemoteOp, arith::TruncFOp>;
 using WasmDivFPOpConversion = OpMappingConversion<DivOp, arith::DivFOp>;
 using WasmDivSIOpConversion = OpMappingConversion<DivSIOp, arith::DivSIOp>;
 using WasmDivUIOpConversion = OpMappingConversion<DivUIOp, arith::DivUIOp>;
-using WasmExtendSOpConversion = OpMappingConversion<ExtendSI32Op, arith::ExtSIOp>;
-using WasmExtendUOpConversion = OpMappingConversion<ExtendUI32Op, arith::ExtUIOp>;
+using WasmExtendSOpConversion =
+    OpMappingConversion<ExtendSI32Op, arith::ExtSIOp>;
+using WasmExtendUOpConversion =
+    OpMappingConversion<ExtendUI32Op, arith::ExtUIOp>;
 using WasmFloorOpConversion = OpMappingConversion<FloorOp, math::FloorOp>;
 using WasmMaxOpConversion = OpMappingConversion<MaxOp, arith::MaximumFOp>;
 using WasmMinOpConversion = OpMappingConversion<MinOp, arith::MinimumFOp>;
@@ -103,7 +106,8 @@ using WasmOrOpConversion = OpMappingConversion<OrOp, arith::OrIOp>;
 using WasmPromoteOpConversion = OpMappingConversion<PromoteOp, arith::ExtFOp>;
 using WasmRemSIOpConversion = OpMappingConversion<RemSIOp, arith::RemSIOp>;
 using WasmRemUIOpConversion = OpMappingConversion<RemUIOp, arith::RemUIOp>;
-using WasmReinterpretOpConversion = OpMappingConversion<ReinterpretOp, arith::BitcastOp>;
+using WasmReinterpretOpConversion =
+    OpMappingConversion<ReinterpretOp, arith::BitcastOp>;
 using WasmShLOpConversion = OpMappingConversion<ShLOp, arith::ShLIOp>;
 using WasmShRSOpConversion = OpMappingConversion<ShRSOp, arith::ShRSIOp>;
 using WasmShRUOpConversion = OpMappingConversion<ShRUOp, arith::ShRUIOp>;
@@ -115,14 +119,11 @@ using WasmClzOpConversion =
     OpMappingConversion<ClzOp, math::CountLeadingZerosOp>;
 using WasmCtzOpConversion =
     OpMappingConversion<CtzOp, math::CountTrailingZerosOp>;
-using WasmPopCntOpConversion =
-    OpMappingConversion<PopCntOp, math::CtPopOp>;
+using WasmPopCntOpConversion = OpMappingConversion<PopCntOp, math::CtPopOp>;
 using WasmAbsOpConversion = OpMappingConversion<AbsOp, math::AbsFOp>;
 using WasmTruncOpConversion = OpMappingConversion<TruncOp, math::TruncOp>;
-using WasmSqrtOpConversion =
-    OpMappingConversion<SqrtOp, math::SqrtOp>;
-using WasmWrapOpConversion =
-    OpMappingConversion<WrapOp, arith::TruncIOp>;
+using WasmSqrtOpConversion = OpMappingConversion<SqrtOp, math::SqrtOp>;
+using WasmWrapOpConversion = OpMappingConversion<WrapOp, arith::TruncIOp>;
 
 /// Lower a rotate to a series of bitwise operations. Intended for us
 /// in dialects that do not natively support rotate operations.
@@ -221,18 +222,30 @@ using IntComparisonConversion =
     ComparisonOpConversion<SourceOp, arith::CmpIOp, arith::CmpIPredicateAttr,
                            arith::CmpIPredicate, compFlag>;
 
-using WasmLtSIOpConversion = IntComparisonConversion<LtSIOp, arith::CmpIPredicate::slt>;
-using WasmLeSIOpConversion = IntComparisonConversion<LeSIOp, arith::CmpIPredicate::sle>;
-using WasmGtSIOpConversion = IntComparisonConversion<GtSIOp, arith::CmpIPredicate::sgt>;
-using WasmGeSIOpConversion = IntComparisonConversion<GeSIOp, arith::CmpIPredicate::sge>;
-using WasmLtUIOpConversion = IntComparisonConversion<LtUIOp, arith::CmpIPredicate::ult>;
-using WasmLeUIOpConversion = IntComparisonConversion<LeUIOp, arith::CmpIPredicate::ule>;
-using WasmGtUIOpConversion = IntComparisonConversion<GtUIOp, arith::CmpIPredicate::ugt>;
-using WasmGeUIOpConversion = IntComparisonConversion<GeUIOp, arith::CmpIPredicate::uge>;
-using WasmLtOpConversion = FPComparisonConversion<LtOp, arith::CmpFPredicate::OLT>;
-using WasmLeOpConversion = FPComparisonConversion<LeOp, arith::CmpFPredicate::OLE>;
-using WasmGtOpConversion = FPComparisonConversion<GtOp, arith::CmpFPredicate::OGT>;
-using WasmGeOpConversion = FPComparisonConversion<GeOp, arith::CmpFPredicate::OGE>;
+using WasmLtSIOpConversion =
+    IntComparisonConversion<LtSIOp, arith::CmpIPredicate::slt>;
+using WasmLeSIOpConversion =
+    IntComparisonConversion<LeSIOp, arith::CmpIPredicate::sle>;
+using WasmGtSIOpConversion =
+    IntComparisonConversion<GtSIOp, arith::CmpIPredicate::sgt>;
+using WasmGeSIOpConversion =
+    IntComparisonConversion<GeSIOp, arith::CmpIPredicate::sge>;
+using WasmLtUIOpConversion =
+    IntComparisonConversion<LtUIOp, arith::CmpIPredicate::ult>;
+using WasmLeUIOpConversion =
+    IntComparisonConversion<LeUIOp, arith::CmpIPredicate::ule>;
+using WasmGtUIOpConversion =
+    IntComparisonConversion<GtUIOp, arith::CmpIPredicate::ugt>;
+using WasmGeUIOpConversion =
+    IntComparisonConversion<GeUIOp, arith::CmpIPredicate::uge>;
+using WasmLtOpConversion =
+    FPComparisonConversion<LtOp, arith::CmpFPredicate::OLT>;
+using WasmLeOpConversion =
+    FPComparisonConversion<LeOp, arith::CmpFPredicate::OLE>;
+using WasmGtOpConversion =
+    FPComparisonConversion<GtOp, arith::CmpFPredicate::OGT>;
+using WasmGeOpConversion =
+    FPComparisonConversion<GeOp, arith::CmpFPredicate::OGE>;
 
 template <typename SourceOp, arith::CmpIPredicate IntFlag,
           arith::CmpFPredicate FloatFlag>
@@ -269,8 +282,12 @@ struct IntFpComparisonOpConversion : OpConversionPattern<SourceOp> {
   }
 };
 
-using WasmEqOpConversion = IntFpComparisonOpConversion<EqOp, arith::CmpIPredicate::eq, arith::CmpFPredicate::OEQ>;
-using WasmNeOpConversion = IntFpComparisonOpConversion<NeOp, arith::CmpIPredicate::ne, arith::CmpFPredicate::ONE>;
+using WasmEqOpConversion =
+    IntFpComparisonOpConversion<EqOp, arith::CmpIPredicate::eq,
+                                arith::CmpFPredicate::OEQ>;
+using WasmNeOpConversion =
+    IntFpComparisonOpConversion<NeOp, arith::CmpIPredicate::ne,
+                                arith::CmpFPredicate::ONE>;
 
 struct WasmCallOpConversion : OpConversionPattern<FuncCallOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -291,8 +308,7 @@ struct WasmConstOpConversion : OpConversionPattern<ConstOp> {
   LogicalResult
   matchAndRewrite(ConstOp constOp, ConstOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<arith::ConstantOp>(
-        constOp, constOp.getValue());
+    rewriter.replaceOpWithNewOp<arith::ConstantOp>(constOp, constOp.getValue());
     return success();
   }
 };
@@ -304,13 +320,18 @@ struct WasmEqzOpConversion : OpConversionPattern<EqzOp> {
   matchAndRewrite(EqzOp eqzOp, EqzOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto loc = eqzOp->getLoc();
-    auto zero = rewriter.create<arith::ConstantOp>(loc, rewriter.getIntegerAttr(adaptor.getInput().getType(), 0)).getResult();
-    auto cmpRes =
+    auto zero =
         rewriter
-            .create<arith::CmpIOp>(loc, rewriter.getI1Type(),
-                              arith::CmpIPredicateAttr::get(rewriter.getContext(), arith::CmpIPredicate::eq),
-                              adaptor.getInput(), zero)
+            .create<arith::ConstantOp>(
+                loc, rewriter.getIntegerAttr(adaptor.getInput().getType(), 0))
             .getResult();
+    auto cmpRes = rewriter
+                      .create<arith::CmpIOp>(
+                          loc, rewriter.getI1Type(),
+                          arith::CmpIPredicateAttr::get(
+                              rewriter.getContext(), arith::CmpIPredicate::eq),
+                          adaptor.getInput(), zero)
+                      .getResult();
     rewriter.replaceOpWithNewOp<arith::ExtUIOp>(eqzOp, rewriter.getI32Type(),
                                                 cmpRes);
 
@@ -343,8 +364,7 @@ struct WasmFuncImportOpConversion : OpConversionPattern<FuncImportOp> {
   matchAndRewrite(FuncImportOp funcImportOp, FuncImportOp::Adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto nFunc = rewriter.replaceOpWithNewOp<func::FuncOp>(
-        funcImportOp, funcImportOp.getSymName(),
-        funcImportOp.getType());
+        funcImportOp, funcImportOp.getSymName(), funcImportOp.getType());
     nFunc.setVisibility(SymbolTable::Visibility::Private);
     return success();
   }
@@ -411,9 +431,9 @@ struct WasmFuncOpConversion : OpConversionPattern<FuncOp> {
       return success();
     }
 
-    template<typename... LevelTypes>
+    template <typename... LevelTypes>
     LogicalResult inlineNestDispatcher(WasmLabelLevelInterface nestingOp,
-                             ConversionPatternRewriter &rewriter) {
+                                       ConversionPatternRewriter &rewriter) {
       auto sip = rewriter.saveInsertionPoint();
       Block *blockSuccessor = nestingOp->getSuccessor(0);
       llvm::SmallVector<Block *, 2> regionEntries;
@@ -436,18 +456,19 @@ struct WasmFuncOpConversion : OpConversionPattern<FuncOp> {
       LLVM_DEBUG(llvm::dbgs() << "End of region inlining\n");
       LLVM_DEBUG(llvm::dbgs() << "Replacing initial op with branching\n");
       rewriter.setInsertionPoint(nestingOp);
-      auto res =
-          success((... || succeeded(replaceNestLevelWithBranchWrapper<LevelTypes>(
-                              nestingOp, regionEntries, rewriter))));
+      auto res = success(
+          (... || succeeded(replaceNestLevelWithBranchWrapper<LevelTypes>(
+                      nestingOp, regionEntries, rewriter))));
       rewriter.restoreInsertionPoint(sip);
       if (failed(res))
-        return emitError(nestingOp->getLoc(), "Unable to inline the operation regions.");
+        return emitError(nestingOp->getLoc(),
+                         "Unable to inline the operation regions.");
       return success();
     }
 
     /// Take a nesting level defining op and inline it in the parent region.
     LogicalResult inlineBlocks(WasmLabelLevelInterface nestingOp,
-                      ConversionPatternRewriter &rewriter) {
+                               ConversionPatternRewriter &rewriter) {
       return inlineNestDispatcher<BlockOp, IfOp, LoopOp>(nestingOp, rewriter);
     }
 
@@ -461,22 +482,21 @@ struct WasmFuncOpConversion : OpConversionPattern<FuncOp> {
 
     inline void convertBranch(BranchIfOp brOp, Block *dest,
                               ConversionPatternRewriter &rewriter) {
-      auto flag =
-          getCompResultAsI1(brOp.getCondition(), rewriter);
+      auto flag = getCompResultAsI1(brOp.getCondition(), rewriter);
       rewriter.replaceOpWithNewOp<cf::CondBranchOp>(
           brOp, flag, dest, brOp.getInputs(), brOp.getElseSuccessor(),
           ValueRange{});
     }
 
     inline void convertBranch(BlockReturnOp brOp, Block *dest,
-                                       ConversionPatternRewriter &rewriter) {
+                              ConversionPatternRewriter &rewriter) {
       rewriter.replaceOpWithNewOp<cf::BranchOp>(brOp, dest, brOp.getInputs());
     }
 
     template <typename LevelInterfaceT>
     inline LogicalResult
     convertBranchWrapper(WasmLabelBranchingInterface branchOp, Block *dest,
-                           ConversionPatternRewriter &rewriter) {
+                         ConversionPatternRewriter &rewriter) {
       auto cast = dyn_cast<LevelInterfaceT>(branchOp.getOperation());
       if (!cast)
         return failure();
@@ -489,7 +509,7 @@ struct WasmFuncOpConversion : OpConversionPattern<FuncOp> {
 
     template <typename... BranchInterfaceT>
     LogicalResult convertBranchDispatch(WasmLabelBranchingInterface branchOp,
-                                       ConversionPatternRewriter &rewriter) {
+                                        ConversionPatternRewriter &rewriter) {
       auto dest = getBlockFor(branchOp);
       if (failed(dest))
         return failure();
@@ -504,11 +524,13 @@ struct WasmFuncOpConversion : OpConversionPattern<FuncOp> {
 
     LogicalResult convertBranch(WasmLabelBranchingInterface branchOp,
                                 ConversionPatternRewriter &rewriter) {
-      return convertBranchDispatch<BlockReturnOp, BranchIfOp>(branchOp, rewriter);
+      return convertBranchDispatch<BlockReturnOp, BranchIfOp>(branchOp,
+                                                              rewriter);
     }
 
     func::FuncOp func;
     branch_to_dest_t branchToDest;
+
   public:
     CFRewriterVisitor(func::FuncOp func) : func{func} {
       func.walk([this](WasmLabelBranchingInterface branchOp) {
@@ -572,7 +594,7 @@ struct WasmGlobalImportOpConverter : OpConversionPattern<GlobalImportOp> {
   }
 };
 
-template<typename CRTP, typename OriginOpType>
+template <typename CRTP, typename OriginOpType>
 struct GlobalOpConverter : OpConversionPattern<GlobalOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult
@@ -585,14 +607,15 @@ struct GlobalOpConverter : OpConversionPattern<GlobalOp> {
       return rewriter.notifyMatchFailure(
           globalOp, "GlobalOp initializer should return one value exactly");
 
-    auto initializerOp = dyn_cast<OriginOpType>(rop->getOperand(0).getDefiningOp());
+    auto initializerOp =
+        dyn_cast<OriginOpType>(rop->getOperand(0).getDefiningOp());
 
     if (!initializerOp)
       return rewriter.notifyMatchFailure(
           globalOp, "Invalid initializer op type for this pattern");
 
-    return static_cast<CRTP const *>(this)->handleInitializer(globalOp, rewriter,
-                                                       initializerOp);
+    return static_cast<CRTP const *>(this)->handleInitializer(
+        globalOp, rewriter, initializerOp);
   }
 };
 
@@ -640,8 +663,7 @@ struct WasmGlobalWithGetGlobalInitConversion
     auto srcGlobalPtr = rewriter.create<memref::GetGlobalOp>(
         loc, MemRefType::get({1}, constInit.getType()), constInit.getGlobal());
     auto destGlobalPtr = rewriter.create<memref::GetGlobalOp>(
-        loc, globalReplacement.getType(),
-        globalReplacement.getSymName());
+        loc, globalReplacement.getType(), globalReplacement.getSymName());
     auto idx = rewriter.create<arith::ConstantIndexOp>(loc, 0).getResult();
     auto loadSrc =
         rewriter.create<memref::LoadOp>(loc, srcGlobalPtr, ValueRange{idx});
@@ -660,7 +682,8 @@ struct WasmMemoryOpConversion : OpConversionPattern<MemOp> {
   matchAndRewrite(MemOp memOp, MemOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto loc = memOp.getLoc();
-    auto bufferType = MemRefType::get({ShapedType::kDynamic}, rewriter.getI8Type());
+    auto bufferType =
+        MemRefType::get({ShapedType::kDynamic}, rewriter.getI8Type());
     auto bufferPtrType = MemRefType::get({1}, bufferType);
     auto memPtr = rewriter.replaceOpWithNewOp<memref::GlobalOp>(
         memOp, memOp.getSymNameAttr(), memOp.getSymVisibilityAttr(),
@@ -679,10 +702,12 @@ struct WasmMemoryOpConversion : OpConversionPattern<MemOp> {
     auto alloc = rewriter.create<memref::AllocOp>(
         loc,
         MemRefType::get({memOp.getLimits().getMin()}, rewriter.getI8Type()));
-    auto castOp = rewriter.create<memref::CastOp>(loc, bufferType, alloc.getResult());
+    auto castOp =
+        rewriter.create<memref::CastOp>(loc, bufferType, alloc.getResult());
     auto idx = rewriter.create<arith::ConstantIndexOp>(loc, 0);
     rewriter.create<memref::StoreOp>(loc, castOp.getResult(),
-                                     memRefPtr.getResult(), ValueRange{idx.getResult()});
+                                     memRefPtr.getResult(),
+                                     ValueRange{idx.getResult()});
     rewriter.create<func::ReturnOp>(loc);
     rewriter.restoreInsertionPoint(sip);
     rewriter.create<func::CallOp>(loc, memInitializer);
@@ -706,9 +731,11 @@ struct WasmLocalConversion : OpConversionPattern<LocalOp> {
   matchAndRewrite(LocalOp localOp, LocalOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto alloca = rewriter.replaceOpWithNewOp<memref::AllocaOp>(
-        localOp, MemRefType::get({}, localOp.getResult().getType().getElementType()));
+        localOp,
+        MemRefType::get({}, localOp.getResult().getType().getElementType()));
     auto initializer = rewriter.create<arith::ConstantOp>(
-        localOp->getLoc(), getInitializerAttr(localOp.getResult().getType().getElementType()));
+        localOp->getLoc(),
+        getInitializerAttr(localOp.getResult().getType().getElementType()));
     rewriter.create<memref::StoreOp>(localOp->getLoc(), initializer.getResult(),
                                      alloca.getResult());
     return success();
@@ -720,10 +747,9 @@ struct WasmLocalGetConversion : OpConversionPattern<LocalGetOp> {
   LogicalResult
   matchAndRewrite(LocalGetOp localGetOp, LocalGetOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<memref::LoadOp>(localGetOp,
-                                                localGetOp.getResult().getType(),
-                                                adaptor.getLocalVar(),
-                                              ValueRange{});
+    rewriter.replaceOpWithNewOp<memref::LoadOp>(
+        localGetOp, localGetOp.getResult().getType(), adaptor.getLocalVar(),
+        ValueRange{});
     return success();
   }
 };
@@ -733,9 +759,8 @@ struct WasmLocalSetConversion : OpConversionPattern<LocalSetOp> {
   LogicalResult
   matchAndRewrite(LocalSetOp localSetOp, LocalSetOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<memref::StoreOp>(localSetOp, adaptor.getValue(),
-                                                 adaptor.getLocalVar(),
-                                                 ValueRange{});
+    rewriter.replaceOpWithNewOp<memref::StoreOp>(
+        localSetOp, adaptor.getValue(), adaptor.getLocalVar(), ValueRange{});
     return success();
   }
 };
@@ -746,7 +771,7 @@ struct WasmLocalTeeConversion : OpConversionPattern<LocalTeeOp> {
   matchAndRewrite(LocalTeeOp localTeeOp, LocalTeeOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     rewriter.create<memref::StoreOp>(localTeeOp->getLoc(), adaptor.getValue(),
-                                                 adaptor.getLocalVar());
+                                     adaptor.getLocalVar());
     rewriter.replaceOp(localTeeOp, adaptor.getValue());
     return success();
   }
@@ -758,13 +783,13 @@ struct WasmReturnOpConversion : OpConversionPattern<ReturnOp> {
   LogicalResult
   matchAndRewrite(ReturnOp returnOp, ReturnOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<func::ReturnOp>(returnOp, adaptor.getOperands());
+    rewriter.replaceOpWithNewOp<func::ReturnOp>(returnOp,
+                                                adaptor.getOperands());
     return success();
   }
 };
 
-struct RaiseWasmMLIRPass
-    : public impl::RaiseWasmMLIRBase<RaiseWasmMLIRPass> {
+struct RaiseWasmMLIRPass : public impl::RaiseWasmMLIRBase<RaiseWasmMLIRPass> {
   void runOnOperation() override {
     ConversionTarget target{getContext()};
     target.addIllegalDialect<WasmDialect>();
@@ -774,14 +799,17 @@ struct RaiseWasmMLIRPass
     RewritePatternSet patterns(&getContext());
     TypeConverter tc{};
     tc.addConversion([](Type type) -> std::optional<Type> { return type; });
-    tc.addConversion([](LocalRefType type)->std::optional<Type> {
+    tc.addConversion([](LocalRefType type) -> std::optional<Type> {
       return MemRefType::get({}, type.getElementType());
     });
-    tc.addTargetMaterialization([](OpBuilder& builder, MemRefType destType, ValueRange values, Location loc)->Value{
-      if (values.size() != 1 || values.front().getType() != destType.getElementType())
+    tc.addTargetMaterialization([](OpBuilder &builder, MemRefType destType,
+                                   ValueRange values, Location loc) -> Value {
+      if (values.size() != 1 ||
+          values.front().getType() != destType.getElementType())
         return {};
       auto localVar = builder.create<memref::AllocaOp>(loc, destType);
-      builder.create<memref::StoreOp>(loc, values.front(), localVar.getResult());
+      builder.create<memref::StoreOp>(loc, values.front(),
+                                      localVar.getResult());
       return localVar.getResult();
     });
     populateRaiseWasmMLIRConversionPatterns(tc, patterns);
