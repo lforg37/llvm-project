@@ -11,10 +11,19 @@
 #include "mlir/IR/BuiltinAttributeInterfaces.h"
 #include "mlir/Target/Wasm/WasmBinaryEncoding.h"
 #include "mlir/Target/Wasm/WasmImporter.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/LEB128.h"
 
+#include <variant>
+
 #define DEBUG_TYPE "wasm-translate"
+
+// Statistics.
+STATISTIC(numFunctionSectionItems, "Parsed functions");
+STATISTIC(numGlobalSectionItems, "Parsed globals");
+STATISTIC(numMemorySectionItems, "Parsed memories");
+STATISTIC(numTableSectionItems, "Parsed tables");
 
 static_assert(CHAR_BIT == 8, "This code expects std::byte to be exactly 8 bits");
 
@@ -69,8 +78,98 @@ APPLY_WASM_SEC_TRANSFORM
 constexpr bool sectionShouldBeUnique(WasmSectionType secType) {
   return secType != WasmSectionType::CUSTOM;
 }
+
+template <std::byte... Bytes>
+struct ByteSequence{};
+
+template <std::byte... Bytes1, std::byte... Bytes2>
+constexpr ByteSequence<Bytes1..., Bytes2...>
+operator+(ByteSequence<Bytes1...>, ByteSequence<Bytes2...>) {
+  return {};
+}
+
+/// Template class for representing a byte sequence of only one byte
+template<std::byte Byte>
+struct UniqueByte : ByteSequence<Byte> {};
+
+template <typename T, T... Values>
+constexpr ByteSequence<std::byte{Values}...>
+byteSeqFromIntSeq(std::integer_sequence<T, Values...>) {
+  return {};
+}
+
+constexpr auto allOpCodes =
+    byteSeqFromIntSeq(std::make_integer_sequence<int, 256>());
+
+constexpr ByteSequence<
+    WasmBinaryEncoding::Type::i32, WasmBinaryEncoding::Type::i64,
+    WasmBinaryEncoding::Type::f32, WasmBinaryEncoding::Type::f64,
+    WasmBinaryEncoding::Type::v128>
+    valueTypesEncodings{};
+
+template<std::byte... allowedFlags>
+constexpr bool isValueOneOf(std::byte value, ByteSequence<allowedFlags...> = {}) {
+  return  ((value == allowedFlags) | ... | false);
+}
+
+template<std::byte... flags>
+constexpr bool isNotIn(std::byte value, ByteSequence<flags...> = {}) {
+  return !isValueOneOf<flags...>(value);
+}
+
+struct GlobalTypeRecord {
+  Type type;
+  bool isMutable;
+};
+
+struct TypeIdxRecord {
+  size_t id;
+};
+
+struct SymbolRefContainer {
+  FlatSymbolRefAttr symbol;
+};
+
+struct GlobalSymbolRefContainer : SymbolRefContainer {
+  Type globalType;
+};
+
+struct FunctionSymbolRefContainer : SymbolRefContainer {
+  FunctionType functionType;
+};
+
+using ImportDesc = std::variant<TypeIdxRecord, TableType, LimitType, GlobalTypeRecord>;
+
 struct WasmModuleSymbolTables {
+  llvm::SmallVector<FunctionSymbolRefContainer> funcSymbols;
+  llvm::SmallVector<GlobalSymbolRefContainer> globalSymbols;
+  llvm::SmallVector<SymbolRefContainer> memSymbols;
+  llvm::SmallVector<SymbolRefContainer> tableSymbols;
   llvm::SmallVector<FunctionType> moduleFuncTypes;
+
+  std::string getNewSymbolName(llvm::StringRef prefix, size_t id) const {
+    return (prefix + llvm::Twine{id}).str();
+  }
+
+  std::string getNewFuncSymbolName() const {
+    auto id = funcSymbols.size();
+    return getNewSymbolName("func_", id);
+  }
+
+  std::string getNewGlobalSymbolName() const {
+    auto id = globalSymbols.size();
+    return getNewSymbolName("global_", id);
+  }
+
+  std::string getNewMemorySymbolName() const {
+    auto id = memSymbols.size();
+    return getNewSymbolName("mem_", id);
+  }
+
+  std::string getNewTableSymbolName() const {
+    auto id = tableSymbols.size();
+    return getNewSymbolName("table_", id);
+  }
 };
 class ParserHead {
 public:
@@ -137,6 +236,29 @@ public:
     return static_cast<WasmSectionType>(*id);
   }
 
+  llvm::FailureOr<LimitType> parseLimit(MLIRContext *ctx) {
+    using WasmLimits = WasmBinaryEncoding::LimitHeader;
+    auto limitLocation = getLocation();
+    auto limitHeader = consumeByte();
+    if (failed(limitHeader))
+      return failure();
+
+    if (isNotIn<WasmLimits::bothLimits, WasmLimits::lowLimitOnly>(*limitHeader))
+      return emitError(limitLocation, "Invalid limit header: ")
+             << static_cast<int>(*limitHeader);
+    auto minParse = parseUI32();
+    if (failed(minParse))
+      return failure();
+    std::optional<uint32_t> max{std::nullopt};
+    if (*limitHeader == WasmLimits::bothLimits) {
+      auto maxParse = parseUI32();
+      if (failed(maxParse))
+        return failure();
+      max = *maxParse;
+    }
+    return LimitType::get(ctx, *minParse, max);
+  }
+
   llvm::FailureOr<Type> parseValueType(MLIRContext *ctx) {
     auto typeLoc = getLocation();
     auto typeEncoding = consumeByte();
@@ -161,6 +283,21 @@ public:
       return emitError(typeLoc, "Invalid value type encoding: ")
              << static_cast<int>(*typeEncoding);
     }
+  }
+
+  llvm::FailureOr<GlobalTypeRecord> parseGlobalType(MLIRContext *ctx) {
+    using WasmGlobalMut = WasmBinaryEncoding::GlobalMutability;
+    auto typeParsed = parseValueType(ctx);
+    if (failed(typeParsed))
+      return failure();
+    auto mutLoc = getLocation();
+    auto mutSpec = consumeByte();
+    if (failed(mutSpec))
+      return failure();
+    if (isNotIn<WasmGlobalMut::isConst, WasmGlobalMut::isMutable>(*mutSpec))
+      return emitError(mutLoc, "Invalid global mutability specifier: ")
+             << static_cast<int>(*mutSpec);
+    return GlobalTypeRecord{*typeParsed, *mutSpec == WasmGlobalMut::isMutable};
   }
 
   llvm::FailureOr<TupleType> parseResultType(MLIRContext *ctx) {
@@ -198,6 +335,50 @@ public:
       return failure();
 
     return FunctionType::get(ctx, inputTypes->getTypes(), resTypes->getTypes());
+  }
+
+  llvm::FailureOr<TypeIdxRecord> parseTypeIndex() {
+    auto res = parseUI32();
+    if (failed(res))
+      return failure();
+    return TypeIdxRecord{*res};
+  }
+
+  llvm::FailureOr<TableType> parseTableType(MLIRContext *ctx) {
+    auto elmTypeParse = parseValueType(ctx);
+    if (failed(elmTypeParse))
+      return failure();
+    if (!isWasmRefType(*elmTypeParse))
+      return emitError(getLocation(), "Invalid element type for table");
+    auto limitParse = parseLimit(ctx);
+    if (failed(limitParse))
+      return failure();
+    return TableType::get(ctx, *elmTypeParse, *limitParse);
+  }
+
+  llvm::FailureOr<ImportDesc> parseImportDesc(MLIRContext *ctx) {
+    auto importLoc = getLocation();
+    auto importType = consumeByte();
+    auto packager = [](auto parseResult) -> llvm::FailureOr<ImportDesc> {
+      if (llvm::failed(parseResult))
+        return failure();
+      return {*parseResult};
+    };
+    if (failed(importType))
+      return failure();
+    switch (*importType) {
+    case WasmBinaryEncoding::Import::typeID:
+      return packager(parseTypeIndex());
+    case WasmBinaryEncoding::Import::tableType:
+      return packager(parseTableType(ctx));
+    case WasmBinaryEncoding::Import::memType:
+      return packager(parseLimit(ctx));
+    case WasmBinaryEncoding::Import::globalType:
+      return packager(parseGlobalType(ctx));
+    default:
+      return emitError(importLoc, "Invalid import type descriptor: ")
+             << static_cast<int>(*importType);
+    }
   }
   bool end() const { return curHead().empty(); }
 
@@ -418,6 +599,53 @@ private:
     return success();
   }
 
+  /// Handles the registration of a function import
+  LogicalResult visitImport(Location loc, llvm::StringRef moduleName,
+                            llvm::StringRef importName, TypeIdxRecord tid) {
+    using llvm::Twine;
+    if (tid.id >= symbols.moduleFuncTypes.size())
+      return emitError(loc, "Invalid type id: ")
+             << tid.id << ". Only " << symbols.moduleFuncTypes.size()
+             << " type registration.";
+    auto type = symbols.moduleFuncTypes[tid.id];
+    auto symbol = symbols.getNewFuncSymbolName();
+    auto funcOp = builder.create<FuncImportOp>(
+        loc, symbol, moduleName, importName, type);
+    symbols.funcSymbols.push_back({{FlatSymbolRefAttr::get(funcOp)}, type});
+    return funcOp.verify();
+  }
+
+  /// Handles the registration of a memory import
+  LogicalResult visitImport(Location loc, llvm::StringRef moduleName,
+                            llvm::StringRef importName, LimitType limitType) {
+    auto symbol = symbols.getNewMemorySymbolName();
+    auto memOp = builder.create<MemImportOp>(loc, symbol, moduleName,
+                                             importName, limitType);
+    symbols.memSymbols.push_back({FlatSymbolRefAttr::get(memOp)});
+    return memOp.verify();
+  }
+
+  /// Handles the registration of a table import
+  LogicalResult visitImport(Location loc, llvm::StringRef moduleName,
+                            llvm::StringRef importName, TableType tableType) {
+    auto symbol = symbols.getNewTableSymbolName();
+    auto tableOp = builder.create<TableImportOp>(loc, symbol, moduleName,
+                                                 importName, tableType);
+    symbols.tableSymbols.push_back({FlatSymbolRefAttr::get(tableOp)});
+    return tableOp.verify();
+  }
+
+  /// Handles the registration of a global variable import
+  LogicalResult visitImport(Location loc, llvm::StringRef moduleName,
+                            llvm::StringRef importName,
+                            GlobalTypeRecord globalType) {
+    auto symbol = symbols.getNewGlobalSymbolName();
+    auto giOp =
+        builder.create<GlobalImportOp>(loc, symbol, moduleName, importName,
+                                       globalType.type, globalType.isMutable);
+    symbols.globalSymbols.push_back({{FlatSymbolRefAttr::get(giOp)}, giOp.getType()});
+    return giOp.verify();
+  }
 
 public:
   WasmBinaryParser(llvm::SourceMgr &sourceMgr, MLIRContext *ctx)
@@ -462,6 +690,22 @@ public:
     if (failed(parsingTypes))
       return;
 
+    auto parsingImports = parseSection<WasmSectionType::IMPORT>();
+    if (failed(parsingImports))
+      return;
+
+    firstInternalFuncID = symbols.funcSymbols.size();
+
+    auto parsingFunctions = parseSection<WasmSectionType::FUNCTION>();
+    if (failed(parsingFunctions))
+      return;
+
+
+    // Copy over sizes of containers into statistics.
+    numFunctionSectionItems = symbols.funcSymbols.size();
+    numGlobalSectionItems = symbols.globalSymbols.size();
+    numMemorySectionItems = symbols.memSymbols.size();
+    numTableSectionItems = symbols.tableSymbols.size();
   }
 
   ModuleOp getModule() { return mOp; }
@@ -475,6 +719,54 @@ private:
   SectionRegistry registry;
   size_t firstInternalFuncID{0};
 };
+
+template <>
+LogicalResult
+WasmBinaryParser::parseSectionItem<WasmSectionType::IMPORT>(ParserHead &ph, size_t) {
+  auto importLoc = ph.getLocation();
+  auto moduleName = ph.parseName();
+  if (failed(moduleName))
+    return failure();
+
+  auto importName = ph.parseName();
+  if (failed(importName))
+    return failure();
+
+  auto import = ph.parseImportDesc(ctx);
+  if (failed(import))
+    return failure();
+
+  return std::visit(
+      [this, importLoc, &moduleName, &importName](auto import) {
+        return visitImport(importLoc, *moduleName, *importName, import);
+      },
+      *import);
+}
+
+template <>
+LogicalResult
+WasmBinaryParser::parseSectionItem<WasmSectionType::FUNCTION>(ParserHead &ph,
+                                                              size_t) {
+  auto opLoc = ph.getLocation();
+  auto typeIdxParsed = ph.parseLiteral<uint32_t>();
+  if (failed(typeIdxParsed))
+    return failure();
+  auto typeIdx = *typeIdxParsed;
+  if (typeIdx >= symbols.moduleFuncTypes.size())
+    return emitError(getLocation(), "Invalid type index: ") << typeIdx;
+  auto symbol = symbols.getNewFuncSymbolName();
+  auto funcOp =
+      builder.create<FuncOp>(opLoc, symbol, symbols.moduleFuncTypes[typeIdx]);
+  auto *block = funcOp.addEntryBlock();
+  auto ip = builder.saveInsertionPoint();
+  builder.setInsertionPointToEnd(block);
+  builder.create<ReturnOp>(opLoc);
+  builder.restoreInsertionPoint(ip);
+  symbols.funcSymbols.push_back(
+      {{FlatSymbolRefAttr::get(funcOp.getSymNameAttr())},
+       symbols.moduleFuncTypes[typeIdx]});
+  return funcOp.verify();
+}
 
 template <>
 LogicalResult

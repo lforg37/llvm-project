@@ -28,6 +28,27 @@ struct WasmBinaryEncoding {
     static constexpr std::byte i64{0x7E};
     static constexpr std::byte i32{0x7F};
   };
+
+  /// Byte encodings of WASM imports.
+  struct Import {
+    static constexpr std::byte typeID{0x00};
+    static constexpr std::byte tableType{0x01};
+    static constexpr std::byte memType{0x02};
+    static constexpr std::byte globalType{0x03};
+  };
+
+  /// Byte encodings for WASM limits.
+  struct LimitHeader {
+    static constexpr std::byte lowLimitOnly{0x00};
+    static constexpr std::byte bothLimits{0x01};
+  };
+
+  /// Byte encodings describing the mutability of globals.
+  struct GlobalMutability {
+    static constexpr std::byte isConst{0x00};
+    static constexpr std::byte isMutable{0x01};
+  };
+
 };
 } // namespace mlir
 
