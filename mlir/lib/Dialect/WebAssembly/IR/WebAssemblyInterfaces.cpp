@@ -20,7 +20,7 @@ namespace mlir {
 namespace wasm {
 #include "mlir/Dialect/WebAssembly/IR/WebAssemblyInterfaces.cpp.inc"
 
-namespace detail{
+namespace detail {
 LogicalResult verifyWasmLabelBranchingInterface(Operation *op) {
   auto branchInterface = dyn_cast<WasmLabelBranchingInterface>(op);
   auto res = WasmLabelBranchingInterface::getTargetOpFromBlock(
@@ -28,18 +28,19 @@ LogicalResult verifyWasmLabelBranchingInterface(Operation *op) {
   return success(succeeded(res));
 }
 
-LogicalResult
-verifyConstantExpressionInterface(Operation *op) {
+LogicalResult verifyConstantExpressionInterface(Operation *op) {
   Region &initializerRegion = op->getRegion(0);
-  auto resultState = initializerRegion.walk(
-      [&](Operation *currentOp) -> WalkResult {
+  auto resultState =
+      initializerRegion.walk([&](Operation *currentOp) -> WalkResult {
         if (isa<ReturnOp>(currentOp))
+          return WalkResult::advance();
+        if (auto interfaceOp =
+                dyn_cast<WasmConstantExprCheckInterface>(currentOp)) {
+          if (interfaceOp.isValidInConstantExpr().succeeded())
             return WalkResult::advance();
-        if (auto interfaceOp = dyn_cast<WasmConstantExprCheckInterface>(currentOp)){
-            if(interfaceOp.isValidInConstantExpr().succeeded())
-                return WalkResult::advance();
         }
-        op->emitError("Expected a constant initializer for this operator, got ") << currentOp;
+        op->emitError("Expected a constant initializer for this operator, got ")
+            << currentOp;
         return WalkResult::interrupt();
       });
   return success(!resultState.wasInterrupted());

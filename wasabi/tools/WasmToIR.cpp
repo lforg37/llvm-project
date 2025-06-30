@@ -1,5 +1,4 @@
-//===- WasmToIR.cpp - Wasabi pass pipeline -----------------------*- C++
-//-*-===//
+//===- WasmToIR.cpp - Wasabi pass pipeline  --------------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -11,11 +10,17 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Error.h"
+#include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/ToolOutputFile.h"
+#include "llvm/Support/raw_ostream.h"
 #include "mlir/CAPI/Registration.h"
 #include "mlir/Conversion/ConvertToLLVM/ToLLVMPass.h"
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
-#include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Conversion/RaiseWasm/RaiseWasmMLIR.h"
+#include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
@@ -40,12 +45,6 @@
 #include "mlir/Target/LLVMIR/Export.h"
 #include "mlir/Target/Wasm/WasmImporter.h"
 #include "mlir/Transforms/Passes.h"
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Error.h"
-#include "llvm/Support/SourceMgr.h"
-#include "llvm/Support/ToolOutputFile.h"
-#include "llvm/Support/raw_ostream.h"
 #include <memory>
 #include <string>
 
@@ -61,18 +60,23 @@ static llvm::cl::opt<std::string> inputFilename(llvm::cl::Positional,
 
 static llvm::cl::opt<std::string>
     outputFilename("o", llvm::cl::desc("Specify the output filename"),
-                   llvm::cl::value_desc("filename"), llvm::cl::init("wasabi.module.out"));
+                   llvm::cl::value_desc("filename"),
+                   llvm::cl::init("wasabi.module.out"));
 
-static llvm::cl::opt<std::string>
-    outputType("output-type", llvm::cl::desc("Step at which to stop for debug purpose: wasm-mlir or llvm-mlir"),
-               llvm::cl::value_desc("step name"));
+static llvm::cl::opt<std::string> outputType(
+    "output-type",
+    llvm::cl::desc(
+        "Step at which to stop for debug purpose: wasm-mlir or llvm-mlir"),
+    llvm::cl::value_desc("step name"));
 
 static llvm::cl::opt<std::string>
     inputType("input-type",
               llvm::cl::desc("Type of input to load: wasm OR wasm-mlir"),
               llvm::cl::init("wasm"));
 
-static llvm::cl::opt<bool> dumpResult("dump", llvm::cl::desc("Print the resulting module to stdout"), llvm::cl::init(false));
+static llvm::cl::opt<bool>
+    dumpResult("dump", llvm::cl::desc("Print the resulting module to stdout"),
+               llvm::cl::init(false));
 
 LogicalResult runPipelineToLLVMMLIR(OwningOpRef<ModuleOp> &module) {
 

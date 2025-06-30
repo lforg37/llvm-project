@@ -1,7 +1,7 @@
 #include "mlir-c/IR.h"
 #include "mlir/Dialect/WebAssembly/IR/WebAssembly.h"
 
-
+#include "llvm/Support/Casting.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -9,7 +9,6 @@
 #include "mlir/IR/Region.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/FunctionImplementation.h"
-#include "llvm/Support/Casting.h"
 
 //===----------------------------------------------------------------------===//
 // TableGen'd op method definitions
@@ -25,9 +24,10 @@
 using namespace mlir;
 using namespace mlir::wasm;
 
-
 namespace {
-inline LogicalResult inferTeeGetResType(ValueRange operands, ::llvm::SmallVectorImpl<Type> &inferredReturnTypes) {
+inline LogicalResult
+inferTeeGetResType(ValueRange operands,
+                   ::llvm::SmallVectorImpl<Type> &inferredReturnTypes) {
   if (operands.empty())
     return failure();
   auto opType = llvm::dyn_cast<LocalRefType>(operands.front().getType());
@@ -57,11 +57,11 @@ ParseResult parseImportOp(OpAsmParser &parser, OperationState &result) {
   std::string asStr;
   res = parser.parseKeywordOrString(&asStr);
   if (failed(res) || asStr != "as")
-    return failure ();
+    return failure();
 
   StringAttr symbolName;
-  res = parser.parseSymbolName(
-      symbolName, SymbolTable::getSymbolAttrName(), result.attributes);
+  res = parser.parseSymbolName(symbolName, SymbolTable::getSymbolAttrName(),
+                               result.attributes);
   return res;
 }
 } // namespace
@@ -70,17 +70,13 @@ ParseResult parseImportOp(OpAsmParser &parser, OperationState &result) {
 // BlockOp
 //===----------------------------------------------------------------------===//
 
-Block* BlockOp::getLabelTarget() {
-  return getTarget();
-}
+Block *BlockOp::getLabelTarget() { return getTarget(); }
 
 //===----------------------------------------------------------------------===//
 // BlockReturnOp
 //===----------------------------------------------------------------------===//
 
-std::size_t BlockReturnOp::getExitLevel() {
-  return 0;
-}
+std::size_t BlockReturnOp::getExitLevel() { return 0; }
 
 Block *BlockReturnOp::getTarget() {
   return cast<WasmLabelBranchingInterface>(getOperation())
@@ -94,7 +90,7 @@ Block *BlockReturnOp::getTarget() {
 //===----------------------------------------------------------------------===//
 
 ParseResult ExtendLowBitsSOp::parse(::mlir::OpAsmParser &parser,
-                                         ::mlir::OperationState &result) {
+                                    ::mlir::OperationState &result) {
   OpAsmParser::UnresolvedOperand operand;
   uint64_t nBits;
   auto parseRes = parser.parseInteger(nBits);
@@ -143,7 +139,7 @@ LogicalResult ExtendLowBitsSOp::verify() {
 // FuncOp
 //===----------------------------------------------------------------------===//
 
-Block* FuncOp::addEntryBlock() {
+Block *FuncOp::addEntryBlock() {
   if (!getBody().empty()) {
     emitError("Adding entry block to a FuncOp which already has one.");
     return &getBody().front();
@@ -155,33 +151,36 @@ Block* FuncOp::addEntryBlock() {
 }
 
 void FuncOp::build(::mlir::OpBuilder &odsBuilder,
-                               ::mlir::OperationState &odsState,
-                               llvm::StringRef symbol, FunctionType funcType) {
+                   ::mlir::OperationState &odsState, llvm::StringRef symbol,
+                   FunctionType funcType) {
   odsState.addAttribute("sym_name", odsBuilder.getStringAttr(symbol));
   odsState.addAttribute("sym_visibility", odsBuilder.getStringAttr("nested"));
   odsState.addAttribute("functionType", TypeAttr::get(funcType));
   odsState.addRegion();
 }
 
-ParseResult FuncOp::parse(::mlir::OpAsmParser &parser, ::mlir::OperationState &result) {
-  auto buildFuncType =
-      [&parser](Builder &builder, ArrayRef<Type> argTypes, ArrayRef<Type> results,
-         function_interface_impl::VariadicFlag,
-         std::string &) {
+ParseResult FuncOp::parse(::mlir::OpAsmParser &parser,
+                          ::mlir::OperationState &result) {
+  auto buildFuncType = [&parser](Builder &builder, ArrayRef<Type> argTypes,
+                                 ArrayRef<Type> results,
+                                 function_interface_impl::VariadicFlag,
+                                 std::string &) {
+    llvm::SmallVector<Type> argTypesWithoutLocal{};
+    argTypesWithoutLocal.reserve(argTypes.size());
+    llvm::for_each(argTypes, [&parser, &argTypesWithoutLocal](Type argType) {
+      auto refType = dyn_cast<LocalRefType>(argType);
+      auto loc = parser.getEncodedSourceLoc(parser.getCurrentLocation());
+      if (!refType) {
+        mlir::emitError(loc, "Invalid type for wasm.func argument. Expecting "
+                             "!wasm<local T>, got ")
+            << argType << ".";
+        return;
+      }
+      argTypesWithoutLocal.push_back(refType.getElementType());
+    });
 
-          llvm::SmallVector<Type> argTypesWithoutLocal{};
-          argTypesWithoutLocal.reserve(argTypes.size());
-          llvm::for_each(argTypes, [&parser, &argTypesWithoutLocal](Type argType){
-            auto refType = dyn_cast<LocalRefType>(argType);
-            auto loc = parser.getEncodedSourceLoc(parser.getCurrentLocation());
-            if (!refType) {
-              mlir::emitError(loc, "Invalid type for wasm.func argument. Expecting !wasm<local T>, got ") << argType << ".";
-              return;
-            }
-            argTypesWithoutLocal.push_back(refType.getElementType());
-          });
-
-          return builder.getFunctionType(argTypesWithoutLocal, results); };
+    return builder.getFunctionType(argTypesWithoutLocal, results);
+  };
 
   return function_interface_impl::parseFunctionOp(
       parser, result, /*allowVariadic=*/false,
@@ -199,7 +198,8 @@ LogicalResult FuncOp::verifyBody() {
            << getFunctionType().getNumInputs() << ", entry block has "
            << entry.getNumArguments() << ".";
 
-  for (auto [argNo, funcSignatureType, blockType] : llvm::enumerate(getFunctionType().getInputs(), entry.getArgumentTypes())) {
+  for (auto [argNo, funcSignatureType, blockType] : llvm::enumerate(
+           getFunctionType().getInputs(), entry.getArgumentTypes())) {
     auto blockLocalRefType = dyn_cast<LocalRefType>(blockType);
     if (!blockLocalRefType)
       return emitError("Entry block argument type should be LocalRefType, got ")
@@ -224,16 +224,15 @@ void FuncOp::print(OpAsmPrinter &p) {
 //===----------------------------------------------------------------------===//
 
 void FuncImportOp::build(::mlir::OpBuilder &odsBuilder,
-                                     ::mlir::OperationState &odsState,
-                                     StringRef symbol, StringRef moduleName,
-                                     StringRef importName, FunctionType type) {
+                         ::mlir::OperationState &odsState, StringRef symbol,
+                         StringRef moduleName, StringRef importName,
+                         FunctionType type) {
   odsState.addAttribute("sym_name", odsBuilder.getStringAttr(symbol));
   odsState.addAttribute("sym_visibility", odsBuilder.getStringAttr("nested"));
   odsState.addAttribute("moduleName", odsBuilder.getStringAttr(moduleName));
   odsState.addAttribute("importName", odsBuilder.getStringAttr(importName));
   odsState.addAttribute("type", TypeAttr::get(type));
 }
-
 
 //===----------------------------------------------------------------------===//
 // GlobalOp
@@ -297,14 +296,16 @@ void GlobalOp::print(OpAsmPrinter &printer) {
 // Custom interface overrides
 LogicalResult GlobalGetOp::verifyConstantExprValidity() {
   StringRef referencedSymbol = getGlobal();
-  Operation *symTableOp = getOperation()->getParentWithTrait<OpTrait::SymbolTable>();
-  Operation *definitionOp = SymbolTable::lookupSymbolIn(symTableOp, referencedSymbol);
+  Operation *symTableOp =
+      getOperation()->getParentWithTrait<OpTrait::SymbolTable>();
+  Operation *definitionOp =
+      SymbolTable::lookupSymbolIn(symTableOp, referencedSymbol);
   if (!definitionOp)
     return failure();
   auto definitionImport = llvm::dyn_cast<GlobalImportOp>(definitionOp);
   if (!definitionImport || definitionImport.getIsMutable()) {
-      return emitError("global.get op is considered constant if it's referring "
-                       "to a import.global symbol marked non-mutable.");
+    return emitError("global.get op is considered constant if it's referring "
+                     "to a import.global symbol marked non-mutable.");
   }
   return success();
 }
@@ -314,10 +315,9 @@ LogicalResult GlobalGetOp::verifyConstantExprValidity() {
 //===----------------------------------------------------------------------===//
 
 void GlobalImportOp::build(::mlir::OpBuilder &odsBuilder,
-                                       ::mlir::OperationState &odsState,
-                                       StringRef symbol, StringRef moduleName,
-                                       StringRef importName, Type type,
-                                       bool isMutable) {
+                           ::mlir::OperationState &odsState, StringRef symbol,
+                           StringRef moduleName, StringRef importName,
+                           Type type, bool isMutable) {
   odsState.addAttribute("sym_name", odsBuilder.getStringAttr(symbol));
   odsState.addAttribute("sym_visibility", odsBuilder.getStringAttr("nested"));
   odsState.addAttribute("moduleName", odsBuilder.getStringAttr(moduleName));
@@ -326,7 +326,6 @@ void GlobalImportOp::build(::mlir::OpBuilder &odsBuilder,
   if (isMutable)
     odsState.addAttribute("isMutable", odsBuilder.getUnitAttr());
 }
-
 
 ParseResult GlobalImportOp::parse(OpAsmParser &parser, OperationState &result) {
   auto *ctx = parser.getContext();
@@ -348,12 +347,14 @@ ParseResult GlobalImportOp::parse(OpAsmParser &parser, OperationState &result) {
   Type importedType;
   res = parser.parseType(importedType);
   if (res.succeeded())
-    result.addAttribute(getTypeAttrName(result.name), TypeAttr::get(importedType));
+    result.addAttribute(getTypeAttrName(result.name),
+                        TypeAttr::get(importedType));
   return res;
 }
 
 void GlobalImportOp::print(OpAsmPrinter &printer) {
-  printer << " \"" << getImportName() << "\" from \"" << getModuleName() << "\" as @" << getSymName();
+  printer << " \"" << getImportName() << "\" from \"" << getModuleName()
+          << "\" as @" << getSymName();
   if (getIsMutable())
     printer << " mutable";
   if (auto vis = getSymVisibility())
@@ -365,9 +366,7 @@ void GlobalImportOp::print(OpAsmPrinter &printer) {
 // IfOp
 //===----------------------------------------------------------------------===//
 
-Block* IfOp::getLabelTarget() {
-  return getTarget();
-}
+Block *IfOp::getLabelTarget() { return getTarget(); }
 
 //===----------------------------------------------------------------------===//
 // LocalOp
@@ -381,7 +380,7 @@ LogicalResult LocalOp::inferReturnTypes(
                                               regions};
   auto type = adaptor.getTypeAttr();
   if (!type)
-      return failure();
+    return failure();
   auto resType = LocalRefType::get(type.getContext(), type.getValue());
   inferredReturnTypes.push_back(resType);
   return success();
@@ -433,9 +432,7 @@ LogicalResult LocalTeeOp::verify() {
 // LoopOp
 //===----------------------------------------------------------------------===//
 
-Block* LoopOp::getLabelTarget() {
-  return &getBody().front();
-}
+Block *LoopOp::getLabelTarget() { return &getBody().front(); }
 
 //===----------------------------------------------------------------------===//
 // MemOp

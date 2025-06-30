@@ -5,6 +5,14 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/Statistic.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/LEB128.h"
+#include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/WebAssembly/IR/WebAssembly.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -16,14 +24,6 @@
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Target/Wasm/WasmBinaryEncoding.h"
 #include "mlir/Target/Wasm/WasmImporter.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/Statistic.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/FormatVariadic.h"
-#include "llvm/Support/LEB128.h"
-#include "llvm/Support/LogicalResult.h"
 
 #include <cstdint>
 #include <optional>
@@ -39,7 +39,8 @@ STATISTIC(numGlobalSectionItems, "Parsed globals");
 STATISTIC(numMemorySectionItems, "Parsed memories");
 STATISTIC(numTableSectionItems, "Parsed tables");
 
-static_assert(CHAR_BIT == 8, "This code expects std::byte to be exactly 8 bits");
+static_assert(CHAR_BIT == 8,
+              "This code expects std::byte to be exactly 8 bits");
 
 using namespace mlir;
 using namespace mlir::wasm;
@@ -63,7 +64,7 @@ enum struct WasmSectionType : section_id_t {
 };
 
 constexpr section_id_t highestWasmSectionID{
-  static_cast<section_id_t>(WasmSectionType::DATACOUNT)};
+    static_cast<section_id_t>(WasmSectionType::DATACOUNT)};
 
 #define APPLY_WASM_SEC_TRANSFORM                                               \
   WASM_SEC_TRANSFORM(CUSTOM)                                                   \
@@ -94,7 +95,7 @@ constexpr bool sectionShouldBeUnique(WasmSectionType secType) {
 }
 
 template <std::byte... Bytes>
-struct ByteSequence{};
+struct ByteSequence {};
 
 template <std::byte... Bytes1, std::byte... Bytes2>
 constexpr ByteSequence<Bytes1..., Bytes2...>
@@ -103,7 +104,7 @@ operator+(ByteSequence<Bytes1...>, ByteSequence<Bytes2...>) {
 }
 
 /// Template class for representing a byte sequence of only one byte
-template<std::byte Byte>
+template <std::byte Byte>
 struct UniqueByte : ByteSequence<Byte> {};
 
 template <typename T, T... Values>
@@ -121,12 +122,13 @@ constexpr ByteSequence<
     WasmBinaryEncoding::Type::v128>
     valueTypesEncodings{};
 
-template<std::byte... allowedFlags>
-constexpr bool isValueOneOf(std::byte value, ByteSequence<allowedFlags...> = {}) {
-  return  ((value == allowedFlags) | ... | false);
+template <std::byte... allowedFlags>
+constexpr bool isValueOneOf(std::byte value,
+                            ByteSequence<allowedFlags...> = {}) {
+  return ((value == allowedFlags) | ... | false);
 }
 
-template<std::byte... flags>
+template <std::byte... flags>
 constexpr bool isNotIn(std::byte value, ByteSequence<flags...> = {}) {
   return !isValueOneOf<flags...>(value);
 }
@@ -152,12 +154,14 @@ struct FunctionSymbolRefContainer : SymbolRefContainer {
   FunctionType functionType;
 };
 
-using ImportDesc = std::variant<TypeIdxRecord, TableType, LimitType, GlobalTypeRecord>;
+using ImportDesc =
+    std::variant<TypeIdxRecord, TableType, LimitType, GlobalTypeRecord>;
 
 using parsed_inst_t = llvm::FailureOr<llvm::SmallVector<Value>>;
 
-struct EmptyBlockMarker{};
-using BlockTypeParseResult = std::variant<EmptyBlockMarker, TypeIdxRecord, Type>;
+struct EmptyBlockMarker {};
+using BlockTypeParseResult =
+    std::variant<EmptyBlockMarker, TypeIdxRecord, Type>;
 
 struct WasmModuleSymbolTables {
   llvm::SmallVector<FunctionSymbolRefContainer> funcSymbols;
@@ -202,6 +206,7 @@ private:
     size_t stackIdx;
     WasmLabelLevelInterface levelOp;
   };
+
 public:
   bool empty() const { return values.empty(); }
 
@@ -289,10 +294,9 @@ private:
   /// \p outputType - The result type for the built instruction.
   ///
   /// \returns The parsed instruction result, or failure.
-  template <typename opType, typename inputType, typename outputType, typename... extraArgsT>
-  inline parsed_inst_t
-  buildConvertOp(OpBuilder &builder, extraArgsT...);
-
+  template <typename opType, typename inputType, typename outputType,
+            typename... extraArgsT>
+  inline parsed_inst_t buildConvertOp(OpBuilder &builder, extraArgsT...);
 
   /// This function generates a dispatch tree to associate an opcode with a
   /// parser. Parsers are registered by specialising the
@@ -316,8 +320,9 @@ private:
       constexpr std::byte nextHighBitPatternStem = highBitPattern << 1;
       constexpr size_t nextPatternBitSize = patternBitSize + 1;
       if ((opCode & bitSelect) != std::byte{0})
-        return dispatchToInstParser < nextPatternBitSize,
-               nextHighBitPatternStem | std::byte{1} > (opCode, builder);
+        return dispatchToInstParser<nextPatternBitSize,
+                                    nextHighBitPatternStem | std::byte{1}>(
+            opCode, builder);
       return dispatchToInstParser<nextPatternBitSize, nextHighBitPatternStem>(
           opCode, builder);
     } else {
@@ -352,19 +357,23 @@ private:
     valueStack.dropLabelLevel();
   }
 
-  llvm::FailureOr<FunctionType> getFuncTypeFor(OpBuilder & builder, EmptyBlockMarker) {
+  llvm::FailureOr<FunctionType> getFuncTypeFor(OpBuilder &builder,
+                                               EmptyBlockMarker) {
     return builder.getFunctionType({}, {});
   }
 
-  llvm::FailureOr<FunctionType> getFuncTypeFor(OpBuilder & builder, TypeIdxRecord type) {
+  llvm::FailureOr<FunctionType> getFuncTypeFor(OpBuilder &builder,
+                                               TypeIdxRecord type) {
     if (type.id > symbols.moduleFuncTypes.size())
-      return emitError(*currentOpLoc, "Type index references nonexistent type: ")
+      return emitError(*currentOpLoc,
+                       "Type index references nonexistent type: ")
              << type.id << ". Only " << symbols.moduleFuncTypes.size()
              << " types are registered.";
     return symbols.moduleFuncTypes[type.id];
   }
 
-  llvm::FailureOr<FunctionType> getFuncTypeFor(OpBuilder & builder, Type valType) {
+  llvm::FailureOr<FunctionType> getFuncTypeFor(OpBuilder &builder,
+                                               Type valType) {
     return builder.getFunctionType({}, {valType});
   }
 
@@ -376,7 +385,8 @@ private:
   }
 
   llvm::FailureOr<FunctionType>
-  getFuncTypeFor(OpBuilder &builder, llvm::FailureOr<BlockTypeParseResult> parseResult) {
+  getFuncTypeFor(OpBuilder &builder,
+                 llvm::FailureOr<BlockTypeParseResult> parseResult) {
     if (llvm::failed(parseResult))
       return failure();
     return getFuncTypeFor(builder, *parseResult);
@@ -384,7 +394,7 @@ private:
 
   llvm::FailureOr<FunctionType> parseBlockFuncType(OpBuilder &builder);
 
-    struct ParseResultWithInfo {
+  struct ParseResultWithInfo {
     llvm::SmallVector<Value> opResults;
     std::byte endingByte;
   };
@@ -418,9 +428,8 @@ private:
   }
 
 public:
-  template<std::byte ParseEndByte = WasmBinaryEncoding::endByte>
-  parsed_inst_t parse(OpBuilder &builder,
-                      UniqueByte<ParseEndByte> = {});
+  template <std::byte ParseEndByte = WasmBinaryEncoding::endByte>
+  parsed_inst_t parse(OpBuilder &builder, UniqueByte<ParseEndByte> = {});
 
   template <std::byte... ExpressionParseEnd>
   llvm::FailureOr<ParseResultWithInfo>
@@ -443,12 +452,13 @@ public:
   /// The local.set and local.tee operations behave similarly and only differ
   /// on their return value. This function factorizes the behavior of the two
   /// operations in one place.
-  template<typename OpToCreate>
+  template <typename OpToCreate>
   parsed_inst_t parseSetOrTee(OpBuilder &);
 
   /// Blocks and Loops have a similar format and differ only in how their exit
-  /// is handled which doesn´t matter at parsing time. Factorizes in one function.
-  template<typename OpToCreate>
+  /// is handled which doesn´t matter at parsing time. Factorizes in one
+  /// function.
+  template <typename OpToCreate>
   parsed_inst_t parseBlockLikeOp(OpBuilder &);
 
 private:
@@ -463,11 +473,11 @@ class ParserHead {
 public:
   ParserHead(llvm::StringRef src, StringAttr name) : head{src}, locName{name} {}
   ParserHead(ParserHead &&) = default;
+
 private:
   ParserHead(ParserHead const &other) = default;
 
 public:
-
   auto getLocation() const {
     return FileLineColLoc::get(locName, 0, anchorOffset + offset);
   }
@@ -612,8 +622,7 @@ public:
       return failure();
     if (*funcTypeHeader != WasmBinaryEncoding::Type::funcType)
       return emitError(typeLoc, "Invalid function type header byte. Expecting ")
-             << std::to_integer<unsigned>(
-                    WasmBinaryEncoding::Type::funcType)
+             << std::to_integer<unsigned>(WasmBinaryEncoding::Type::funcType)
              << " got " << std::to_integer<unsigned>(*funcTypeHeader);
     auto inputTypes = parseResultType(ctx);
     if (failed(inputTypes))
@@ -725,7 +734,7 @@ public:
       return failure();
     if (!cParser.end())
       return emitError(cParser.getLocation(),
-                "Unparsed garbage remaining at end of code block");
+                       "Unparsed garbage remaining at end of code block");
     builder.create<ReturnOp>(func->getLoc(), *res);
     returnOp->erase();
     return success();
@@ -756,9 +765,7 @@ public:
 
   bool end() const { return curHead().empty(); }
 
-  ParserHead copy() const {
-    return *this;
-  }
+  ParserHead copy() const { return *this; }
 
 private:
   llvm::StringRef curHead() const { return head.drop_front(offset); }
@@ -879,9 +886,9 @@ void ValueStack::dump() const {
   // Stack is pushed to via push_back. Therefore the top of the stack is the
   // end of the vector. Iterate in reverse so that the first thing we print
   // is the top of the stack.
-  auto indexGetter = [this](){
+  auto indexGetter = [this]() {
     size_t idx = labelLevel.size();
-    return [this, idx]() mutable-> std::optional<std::pair<size_t, size_t>> {
+    return [this, idx]() mutable -> std::optional<std::pair<size_t, size_t>> {
       llvm::dbgs() << "IDX: " << idx << '\n';
       if (idx == 0)
         return std::nullopt;
@@ -893,18 +900,19 @@ void ValueStack::dump() const {
   };
   auto getNextFrameIndex = indexGetter();
   auto nextFrameIdx = getNextFrameIndex();
-  for (size_t idx = 0 ; idx < size() ;) {
+  for (size_t idx = 0; idx < size();) {
     size_t actualIdx = size() - 1 - idx;
     while (nextFrameIdx && (nextFrameIdx->second > actualIdx)) {
-      llvm::dbgs() << "  --------------- Frame ("<< nextFrameIdx->first <<")\n";
+      llvm::dbgs() << "  --------------- Frame (" << nextFrameIdx->first
+                   << ")\n";
       nextFrameIdx = getNextFrameIndex();
     }
     llvm::dbgs() << "  ";
     values[actualIdx].dump();
   }
   while (nextFrameIdx) {
-    llvm::dbgs() << "  --------------- Frame ("<< nextFrameIdx->first <<")\n";
-      nextFrameIdx = getNextFrameIndex();
+    llvm::dbgs() << "  --------------- Frame (" << nextFrameIdx->first << ")\n";
+    nextFrameIdx = getNextFrameIndex();
   }
   llvm::dbgs() << "<Bottom>"
                << "\n";
@@ -929,8 +937,7 @@ parsed_inst_t ValueStack::popOperands(TypeRange operandTypes, Location *opLoc) {
     Value operand = values[i + stackIdxOffset];
     Type stackType = operand.getType();
     if (stackType != operandTypes[i])
-      return emitError(*opLoc,
-                       "Invalid operand type on stack. Expecting ")
+      return emitError(*opLoc, "Invalid operand type on stack. Expecting ")
              << operandTypes[i] << ", value on stack is of type " << stackType
              << ".";
     LLVM_DEBUG(llvm::dbgs() << "    POP: " << operand << "\n");
@@ -958,8 +965,9 @@ LogicalResult ValueStack::pushResults(ValueRange results, Location *opLoc) {
   return success();
 }
 
-template<std::byte EndParseByte>
-parsed_inst_t ExpressionParser::parse(OpBuilder &builder, UniqueByte<EndParseByte> endByte) {
+template <std::byte EndParseByte>
+parsed_inst_t ExpressionParser::parse(OpBuilder &builder,
+                                      UniqueByte<EndParseByte> endByte) {
   auto res = parse(builder, ByteSequence<EndParseByte>{});
   if (failed(res))
     return failure();
@@ -1000,7 +1008,6 @@ parsed_inst_t ExpressionParser::parseBlockLikeOp(OpBuilder &builder) {
   if (failed(funcType))
     return failure();
 
-
   auto inputTypes = funcType->getInputs();
   auto inputOps = popOperands(inputTypes);
   if (failed(inputOps))
@@ -1014,7 +1021,8 @@ parsed_inst_t ExpressionParser::parseBlockLikeOp(OpBuilder &builder) {
   auto *successor =
       builder.createBlock(curRegion, curRegion->end(), resTypes, locations);
   builder.setInsertionPointToEnd(curBlock);
-  auto blockOp = builder.create<OpToCreate>(*currentOpLoc, *inputOps, successor);
+  auto blockOp =
+      builder.create<OpToCreate>(*currentOpLoc, *inputOps, successor);
   auto *blockBody = blockOp.createBlock();
   if (failed(parseBlockContent(builder, blockBody, resTypes, *opLoc, blockOp)))
     return failure();
@@ -1072,9 +1080,7 @@ inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
   if (failed(parseIfRes))
     return failure();
   if (*parseIfRes == WasmBinaryEncoding::OpCode::elseOpCode) {
-    LLVM_DEBUG(
-        llvm::dbgs()
-        << "  else block is present.\n");
+    LLVM_DEBUG(llvm::dbgs() << "  else block is present.\n");
     Block *elseEntryBlock = ifOp.createElseBlock();
     auto parseElseRes =
         parseBlockContent(builder, elseEntryBlock, resTypes, *opLoc, ifOp);
@@ -1130,8 +1136,8 @@ ExpressionParser::parseSpecificInstruction<WasmBinaryEncoding::OpCode::call>(
   parsed_inst_t inOperands = popOperands(inTypes);
   if (failed(inOperands))
     return failure();
-  auto callOp = builder.create<FuncCallOp>(
-      loc, resTypes, callee.symbol, *inOperands);
+  auto callOp =
+      builder.create<FuncCallOp>(loc, resTypes, callee.symbol, *inOperands);
   return {callOp.getResults()};
 }
 
@@ -1157,9 +1163,11 @@ inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
     return failure();
   if (*id >= symbols.globalSymbols.size())
     return emitError(instLoc, "Invalid global index. Function has ")
-           << symbols.globalSymbols.size() << " accessible globals, received index " << *id;
+           << symbols.globalSymbols.size()
+           << " accessible globals, received index " << *id;
   auto globalVar = symbols.globalSymbols[*id];
-  auto globalOp = builder.create<GlobalGetOp>(instLoc, globalVar.globalType, globalVar.symbol);
+  auto globalOp = builder.create<GlobalGetOp>(instLoc, globalVar.globalType,
+                                              globalVar.symbol);
 
   return {{globalOp.getResult()}};
 }
@@ -1230,7 +1238,8 @@ inline Type buildLiteralType<double>(OpBuilder &builder) {
   return builder.getF64Type();
 }
 
-template<typename ValT, typename E = std::enable_if_t<std::is_arithmetic_v<ValT>>>
+template <typename ValT,
+          typename E = std::enable_if_t<std::is_arithmetic_v<ValT>>>
 struct AttrHolder;
 
 template <typename ValT>
@@ -1243,7 +1252,7 @@ struct AttrHolder<ValT, std::enable_if_t<std::is_floating_point_v<ValT>>> {
   using type = FloatAttr;
 };
 
-template<typename ValT>
+template <typename ValT>
 using attr_holder_t = typename AttrHolder<ValT>::type;
 
 template <typename ValT,
@@ -1413,27 +1422,28 @@ inline parsed_inst_t ExpressionParser::buildConvertOp(OpBuilder &builder,
 template <>
 inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
     WasmBinaryEncoding::OpCode::demoteF64ToF32>(OpBuilder &builder) {
-   return buildConvertOp<DemoteOp, double, float>(builder);
+  return buildConvertOp<DemoteOp, double, float>(builder);
 }
 
-template<>
-inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
-    WasmBinaryEncoding::OpCode::wrap>(OpBuilder & builder) {
+template <>
+inline parsed_inst_t
+ExpressionParser::parseSpecificInstruction<WasmBinaryEncoding::OpCode::wrap>(
+    OpBuilder &builder) {
   return buildConvertOp<WrapOp, int64_t, int32_t>(builder);
 }
 
-#define BUILD_CONVERSION_OP(IN_T, OUT_T, SOURCE_OP, TARGET_OP) \
-template <> \
-inline parsed_inst_t ExpressionParser::parseSpecificInstruction< \
-    WasmBinaryEncoding::OpCode::SOURCE_OP>(OpBuilder &builder) { \
-  return buildConvertOp<TARGET_OP, IN_T, OUT_T>(builder); \
-}
+#define BUILD_CONVERSION_OP(IN_T, OUT_T, SOURCE_OP, TARGET_OP)                 \
+  template <>                                                                  \
+  inline parsed_inst_t ExpressionParser::parseSpecificInstruction<             \
+      WasmBinaryEncoding::OpCode::SOURCE_OP>(OpBuilder & builder) {            \
+    return buildConvertOp<TARGET_OP, IN_T, OUT_T>(builder);                    \
+  }
 
-#define BUILD_CONVERT_OP_FOR(DEST_T, WIDTH) \
-BUILD_CONVERSION_OP(uint32_t, DEST_T, convertUI32F##WIDTH, ConvertUOp) \
-BUILD_CONVERSION_OP(int32_t, DEST_T, convertSI32F##WIDTH, ConvertSOp) \
-BUILD_CONVERSION_OP(uint64_t, DEST_T, convertUI64F##WIDTH, ConvertUOp) \
-BUILD_CONVERSION_OP(int64_t, DEST_T, convertSI64F##WIDTH, ConvertSOp)
+#define BUILD_CONVERT_OP_FOR(DEST_T, WIDTH)                                    \
+  BUILD_CONVERSION_OP(uint32_t, DEST_T, convertUI32F##WIDTH, ConvertUOp)       \
+  BUILD_CONVERSION_OP(int32_t, DEST_T, convertSI32F##WIDTH, ConvertSOp)        \
+  BUILD_CONVERSION_OP(uint64_t, DEST_T, convertUI64F##WIDTH, ConvertUOp)       \
+  BUILD_CONVERSION_OP(int64_t, DEST_T, convertSI64F##WIDTH, ConvertSOp)
 
 BUILD_CONVERT_OP_FOR(float, 32)
 BUILD_CONVERT_OP_FOR(double, 64)
@@ -1451,9 +1461,8 @@ BUILD_CONVERSION_OP(int32_t, int64_t, extendU, ExtendUI32Op)
       WasmBinaryEncoding::OpCode::extendI##IT_WIDTH##EXTRACT_WIDTH##S>(        \
       OpBuilder & builder) {                                                   \
     using inout_t = int##IT_WIDTH##_t;                                         \
-    auto attr = builder.getUI32IntegerAttr(EXTRACT_WIDTH);                      \
-    return buildConvertOp<ExtendLowBitsSOp, inout_t, inout_t>(builder,    \
-                                                                   attr);      \
+    auto attr = builder.getUI32IntegerAttr(EXTRACT_WIDTH);                     \
+    return buildConvertOp<ExtendLowBitsSOp, inout_t, inout_t>(builder, attr);  \
   }
 
 BUILD_SLICE_EXTEND_PARSER(32, 8)
@@ -1495,7 +1504,8 @@ private:
   struct SectionRegistry {
     using section_location_t = llvm::StringRef;
 
-    std::array<llvm::SmallVector<section_location_t>, highestWasmSectionID+1> registry;
+    std::array<llvm::SmallVector<section_location_t>, highestWasmSectionID + 1>
+        registry;
 
     template <WasmSectionType SecType>
     std::conditional_t<sectionShouldBeUnique(SecType),
@@ -1553,7 +1563,6 @@ private:
 
         if (failed(registration))
           return failure();
-
       }
       return success();
     }
@@ -1611,8 +1620,8 @@ private:
              << " type registration.";
     auto type = symbols.moduleFuncTypes[tid.id];
     auto symbol = symbols.getNewFuncSymbolName();
-    auto funcOp = builder.create<FuncImportOp>(
-        loc, symbol, moduleName, importName, type);
+    auto funcOp =
+        builder.create<FuncImportOp>(loc, symbol, moduleName, importName, type);
     symbols.funcSymbols.push_back({{FlatSymbolRefAttr::get(funcOp)}, type});
     return funcOp.verify();
   }
@@ -1645,7 +1654,8 @@ private:
     auto giOp =
         builder.create<GlobalImportOp>(loc, symbol, moduleName, importName,
                                        globalType.type, globalType.isMutable);
-    symbols.globalSymbols.push_back({{FlatSymbolRefAttr::get(giOp)}, giOp.getType()});
+    symbols.globalSymbols.push_back(
+        {{FlatSymbolRefAttr::get(giOp)}, giOp.getType()});
     return giOp.verify();
   }
 
@@ -1660,15 +1670,14 @@ public:
     auto sourceBufId = sourceMgr.getMainFileID();
     auto source = sourceMgr.getMemoryBuffer(sourceBufId)->getBuffer();
     srcName = StringAttr::get(
-      ctx, sourceMgr.getMemoryBuffer(sourceBufId)->getBufferIdentifier());
+        ctx, sourceMgr.getMemoryBuffer(sourceBufId)->getBufferIdentifier());
 
     auto parser = ParserHead{source, srcName};
     auto const wasmHeader = StringRef{"\0asm", 4};
     auto magicLoc = parser.getLocation();
     auto magic = parser.consumeNBytes(wasmHeader.size());
     if (failed(magic) || magic->compare(wasmHeader)) {
-      emitError(magicLoc,
-                "Source file does not contain valid Wasm header.");
+      emitError(magicLoc, "Source file does not contain valid Wasm header.");
       return;
     }
     auto const expectedVersionString = StringRef{"\1\0\0\0", 4};
@@ -1686,8 +1695,7 @@ public:
       return;
 
     mOp = builder.create<ModuleOp>(getLocation());
-    builder.setInsertionPointToStart(
-        &mOp.getBodyRegion().front());
+    builder.setInsertionPointToStart(&mOp.getBodyRegion().front());
     auto parsingTypes = parseSection<WasmSectionType::TYPE>();
     if (failed(parsingTypes))
       return;
@@ -1743,7 +1751,8 @@ private:
 
 template <>
 LogicalResult
-WasmBinaryParser::parseSectionItem<WasmSectionType::IMPORT>(ParserHead &ph, size_t) {
+WasmBinaryParser::parseSectionItem<WasmSectionType::IMPORT>(ParserHead &ph,
+                                                            size_t) {
   auto importLoc = ph.getLocation();
   auto moduleName = ph.parseName();
   if (failed(moduleName))
@@ -1836,7 +1845,8 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::EXPORT>(ParserHead &ph,
 
 template <>
 LogicalResult
-WasmBinaryParser::parseSectionItem<WasmSectionType::TABLE>(ParserHead &ph, size_t) {
+WasmBinaryParser::parseSectionItem<WasmSectionType::TABLE>(ParserHead &ph,
+                                                           size_t) {
   auto opLocation = ph.getLocation();
   auto tableType = ph.parseTableType(ctx);
   if (failed(tableType))
@@ -1844,7 +1854,8 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::TABLE>(ParserHead &ph, size_
   LLVM_DEBUG(llvm::dbgs() << "  Parsed table description: " << *tableType
                           << '\n');
   auto symbol = builder.getStringAttr(symbols.getNewTableSymbolName());
-  auto tableOp = builder.create<TableOp>(opLocation, symbol.strref(), *tableType);
+  auto tableOp =
+      builder.create<TableOp>(opLocation, symbol.strref(), *tableType);
   symbols.tableSymbols.push_back({SymbolRefAttr::get(tableOp)});
   return success();
 }
@@ -1888,7 +1899,8 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::TYPE>(ParserHead &ph,
 
 template <>
 LogicalResult
-WasmBinaryParser::parseSectionItem<WasmSectionType::MEMORY>(ParserHead &ph, size_t) {
+WasmBinaryParser::parseSectionItem<WasmSectionType::MEMORY>(ParserHead &ph,
+                                                            size_t) {
   auto opLocation = ph.getLocation();
   auto memory = ph.parseLimit(ctx);
   if (failed(memory))
