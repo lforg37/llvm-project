@@ -234,6 +234,12 @@ private:
   template <std::byte opCode>
   inline parsed_inst_t parseSpecificInstruction(OpBuilder &builder);
 
+  template <typename valueT>
+  parsed_inst_t
+  parseConstInst(OpBuilder &builder,
+                 std::enable_if_t<std::is_arithmetic_v<valueT>> * = nullptr);
+
+
   /// This function generates a dispatch tree to associate an opcode with a
   /// parser. Parsers are registered by specialising the
   /// `parseSpecificInstruction` function for the op code to handle.
@@ -745,6 +751,97 @@ ExpressionParser::parse(OpBuilder &builder,
     if (failed(pushResults(res)))
       return failure();
   }
+}
+
+
+template <typename T>
+inline Type buildLiteralType(OpBuilder &);
+
+template <>
+inline Type buildLiteralType<int32_t>(OpBuilder &builder) {
+  return builder.getI32Type();
+}
+
+template <>
+inline Type buildLiteralType<int64_t>(OpBuilder &builder) {
+  return builder.getI64Type();
+}
+
+template <>
+inline Type buildLiteralType<uint32_t>(OpBuilder &builder) {
+  return builder.getI32Type();
+}
+
+template <>
+inline Type buildLiteralType<uint64_t>(OpBuilder &builder) {
+  return builder.getI64Type();
+}
+
+template <>
+inline Type buildLiteralType<float>(OpBuilder &builder) {
+  return builder.getF32Type();
+}
+
+template <>
+inline Type buildLiteralType<double>(OpBuilder &builder) {
+  return builder.getF64Type();
+}
+
+template<typename ValT, typename E = std::enable_if_t<std::is_arithmetic_v<ValT>>>
+struct AttrHolder;
+
+template <typename ValT>
+struct AttrHolder<ValT, std::enable_if_t<std::is_integral_v<ValT>>> {
+  using type = IntegerAttr;
+};
+
+template <typename ValT>
+struct AttrHolder<ValT, std::enable_if_t<std::is_floating_point_v<ValT>>> {
+  using type = FloatAttr;
+};
+
+template<typename ValT>
+using attr_holder_t = typename AttrHolder<ValT>::type;
+
+template <typename ValT,
+          typename EnableT = std::enable_if_t<std::is_arithmetic_v<ValT>>>
+attr_holder_t<ValT> buildLiteralAttr(OpBuilder &builder, ValT val) {
+  return attr_holder_t<ValT>::get(buildLiteralType<ValT>(builder), val);
+}
+
+template <typename valueT>
+parsed_inst_t ExpressionParser::parseConstInst(
+    OpBuilder &builder, std::enable_if_t<std::is_arithmetic_v<valueT>> *) {
+  auto parsedConstant = parser.parseLiteral<valueT>();
+  if (failed(parsedConstant))
+    return failure();
+  auto constOp = builder.create<ConstOp>(
+      *currentOpLoc, buildLiteralAttr<valueT>(builder, *parsedConstant));
+  return {{constOp.getResult()}};
+}
+
+template <>
+inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
+    WasmBinaryEncoding::OpCode::constI32>(OpBuilder &builder) {
+  return parseConstInst<int32_t>(builder);
+}
+
+template <>
+inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
+    WasmBinaryEncoding::OpCode::constI64>(OpBuilder &builder) {
+  return parseConstInst<int64_t>(builder);
+}
+
+template <>
+inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
+    WasmBinaryEncoding::OpCode::constFP32>(OpBuilder &builder) {
+  return parseConstInst<float>(builder);
+}
+
+template <>
+inline parsed_inst_t ExpressionParser::parseSpecificInstruction<
+    WasmBinaryEncoding::OpCode::constFP64>(OpBuilder &builder) {
+  return parseConstInst<double>(builder);
 }
 
 
