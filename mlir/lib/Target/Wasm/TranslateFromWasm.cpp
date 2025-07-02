@@ -520,6 +520,61 @@ public:
     return eParser.parse(builder);
   }
 
+  llvm::LogicalResult parseCodeFor(FuncOp func,
+                                   WasmModuleSymbolTables const &symbols) {
+    llvm::SmallVector<local_val_t> locals{};
+    // Populating locals with function argument
+    auto &block = func.getBody().front();
+    // Delete temporary return argument which was only created for IR validity
+    assert(func.getBody().getBlocks().size() == 1 &&
+           "Function should only have its default created block at this point");
+    assert(block.getOperations().size() == 1 &&
+           "Only the placeholder return op should be present at this point");
+    auto returnOp = cast<ReturnOp>(&block.back());
+    assert(returnOp);
+
+    auto codeSizeInBytes = parseUI32();
+    if (failed(codeSizeInBytes))
+      return failure();
+    auto codeContent = consumeNBytes(*codeSizeInBytes);
+    if (failed(codeContent))
+      return failure();
+    auto name = StringAttr::get(func->getContext(),
+                                locName.str() + "::" + func.getSymName());
+    auto cParser = ParserHead{*codeContent, name};
+    auto localVecSize = cParser.parseVectorSize();
+    if (failed(localVecSize))
+      return failure();
+    OpBuilder builder{&func.getBody().front().back()};
+    for (auto arg : block.getArguments())
+      locals.push_back(cast<TypedValue<LocalRefType>>(arg));
+    // Declare the local ops
+    auto nVarVec = *localVecSize;
+    for (size_t i = 0; i < nVarVec; ++i) {
+      auto varLoc = cParser.getLocation();
+      auto nSubVar = cParser.parseUI32();
+      if (failed(nSubVar))
+        return failure();
+      auto varT = cParser.parseValueType(func->getContext());
+      if (failed(varT))
+        return failure();
+      for (size_t j = 0; j < *nSubVar; ++j) {
+        auto local = builder.create<LocalOp>(varLoc, *varT);
+        locals.push_back(local.getResult());
+      }
+    }
+    auto res = cParser.parseExpression(builder, symbols, locals);
+    if (failed(res))
+      return failure();
+    if (!cParser.end())
+      return emitError(cParser.getLocation(),
+                "Unparsed garbage remaining at end of code block");
+    builder.create<ReturnOp>(func->getLoc(), *res);
+    returnOp->erase();
+    return success();
+  }
+
+
   bool end() const { return curHead().empty(); }
 
   ParserHead copy() const {
@@ -1046,6 +1101,11 @@ public:
     auto parsingGlobals = parseSection<WasmSectionType::GLOBAL>();
     if (failed(parsingGlobals))
       return;
+
+    auto parsingCode = parseSection<WasmSectionType::CODE>();
+    if (failed(parsingCode))
+      return;
+
     auto parsingExports = parseSection<WasmSectionType::EXPORT>();
     if (failed(parsingExports))
       return;
@@ -1258,6 +1318,19 @@ WasmBinaryParser::parseSectionItem<WasmSectionType::GLOBAL>(ParserHead &ph,
         "initializer result type does not match global declaration type");
   builder.create<ReturnOp>(globalLocation, *expr);
   builder.restoreInsertionPoint(ip);
+  return success();
+}
+
+template <>
+LogicalResult WasmBinaryParser::parseSectionItem<WasmSectionType::CODE>(
+    ParserHead &ph, size_t innerFunctionId) {
+  auto funcId = innerFunctionId + firstInternalFuncID;
+  auto symRef = symbols.funcSymbols[funcId];
+  auto funcOp =
+      llvm::dyn_cast<FuncOp>(SymbolTable::lookupSymbolIn(mOp, symRef.symbol));
+  assert(funcOp);
+  if (failed(ph.parseCodeFor(funcOp, symbols)))
+    return failure();
   return success();
 }
 } // namespace
