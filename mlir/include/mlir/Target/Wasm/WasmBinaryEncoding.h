@@ -19,6 +19,10 @@ struct WasmBinaryEncoding {
   /// Byte encodings for WASM instructions.
   struct OpCode {
     // Locals, globals, constants.
+    static constexpr std::byte localGet{0x20};
+    static constexpr std::byte localSet{0x21};
+    static constexpr std::byte localTee{0x22};
+    static constexpr std::byte globalGet{0x23};
     static constexpr std::byte constI32{0x41};
     static constexpr std::byte constI64{0x42};
     static constexpr std::byte constFP32{0x43};
