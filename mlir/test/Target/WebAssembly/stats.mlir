@@ -14,6 +14,6 @@
 */
 
 // CHECK: 1 wasm-translate - Parsed functions
-// CHECK-NEXT: 0 wasm-translate - Parsed globals
+// CHECK-NEXT: 1 wasm-translate - Parsed globals
 // CHECK-NEXT: 1 wasm-translate - Parsed memories
 // CHECK-NEXT: 1 wasm-translate - Parsed tables

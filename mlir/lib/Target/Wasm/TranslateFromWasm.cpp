@@ -9,13 +9,25 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributeInterfaces.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/OwningOpRef.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/Target/Wasm/WasmBinaryEncoding.h"
 #include "mlir/Target/Wasm/WasmImporter.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/LEB128.h"
 
+#include <cstdint>
+#include <optional>
+#include <type_traits>
+#include <utility>
 #include <variant>
 
 #define DEBUG_TYPE "wasm-translate"
@@ -444,7 +456,7 @@ private:
   WasmModuleSymbolTables const &symbols;
   locals_t locals;
   ValueStack valueStack;
-  };
+};
 
 class ParserHead {
 public:

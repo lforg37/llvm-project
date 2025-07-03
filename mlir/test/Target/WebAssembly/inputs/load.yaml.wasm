@@ -1,0 +1,34 @@
+--- !WASM
+FileHeader:
+  Version:         0x1
+Sections:
+  - Type:            TYPE
+    Signatures:
+      - Index:           0
+        ParamTypes:
+          - I32
+          - I32
+        ReturnTypes:
+          - I32
+  - Type:            IMPORT
+    Imports:
+      - Module:          js
+        Field:           mem
+        Kind:            MEMORY
+        Memory:
+          Minimum:         0x1
+  - Type:            FUNCTION
+    FunctionTypes:   [ 0 ]
+  - Type:            EXPORT
+    Exports:
+      - Name:            load_from_mem
+        Kind:            FUNCTION
+        Index:           0
+  - Type:            CODE
+    Functions:
+      - Index:           0
+        Locals:
+          - Type:            I32
+            Count:           1
+        Body:            2000280200210220000B
+...
