@@ -1,0 +1,9 @@
+cmake_minimum_required(VERSION 3.20.0)
+set(LLVM_SUBPROJECT_TITLE "Wasabi")
+set(WASABI_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+set(WASABI_TOOLS_DIR  ${CMAKE_CURRENT_BINARY_DIR})
+set(WASABI_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/bin")
+set(WASABI_TEST_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/test")
+
+add_subdirectory(tools)
+add_subdirectory(test)
