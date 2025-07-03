@@ -40,6 +40,91 @@ using namespace mlir::wasm;
 
 namespace {
 
+template <typename SourceOp, typename TargetIntOp, typename TargetFPOp>
+struct IntFPDispatchMappingConversion : OpConversionPattern<SourceOp> {
+  using OpConversionPattern<SourceOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(SourceOp srcOp, typename SourceOp::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    Type type = srcOp.getRhs().getType();
+    if (type.isInteger()) {
+      rewriter.replaceOpWithNewOp<TargetIntOp>(srcOp, srcOp->getResultTypes(),
+                                               adaptor.getOperands());
+      return success();
+    }
+    if (!type.isFloat())
+      return failure();
+    rewriter.replaceOpWithNewOp<TargetFPOp>(srcOp, srcOp->getResultTypes(),
+                                            adaptor.getOperands());
+    return success();
+  }
+};
+
+using WasmAddOpConversion =
+    IntFPDispatchMappingConversion<AddOp, arith::AddIOp, arith::AddFOp>;
+using WasmMulOpConversion =
+    IntFPDispatchMappingConversion<MulOp, arith::MulIOp, arith::MulFOp>;
+using WasmSubOpConversion =
+    IntFPDispatchMappingConversion<SubOp, arith::SubIOp, arith::SubFOp>;
+
+/// Convert a k-ary source operation \p SourceOp into an operation \p TargetOp.
+/// Both \p SourceOp and \p TargetOp must have the same number of operands.
+template <typename SourceOp, typename TargetOp>
+struct OpMappingConversion : OpConversionPattern<SourceOp> {
+  using OpConversionPattern<SourceOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(SourceOp srcOp, typename SourceOp::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<TargetOp>(srcOp, srcOp->getResultTypes(),
+                                          adaptor.getOperands());
+    return success();
+  }
+};
+
+using WasmAndOpConversion = OpMappingConversion<AndOp, arith::AndIOp>;
+using WasmCeilOpConversion = OpMappingConversion<CeilOp, math::CeilOp>;
+/// TODO: SIToFP and UIToFP don't allow specification of the floating point
+/// rounding mode
+using WasmConvertSOpConversion =
+    OpMappingConversion<ConvertSOp, arith::SIToFPOp>;
+using WasmConvertUOpConversion =
+    OpMappingConversion<ConvertUOp, arith::UIToFPOp>;
+using WasmDemoteOpConversion = OpMappingConversion<DemoteOp, arith::TruncFOp>;
+using WasmDivFPOpConversion = OpMappingConversion<DivOp, arith::DivFOp>;
+using WasmDivSIOpConversion = OpMappingConversion<DivSIOp, arith::DivSIOp>;
+using WasmDivUIOpConversion = OpMappingConversion<DivUIOp, arith::DivUIOp>;
+using WasmExtendSOpConversion =
+    OpMappingConversion<ExtendSI32Op, arith::ExtSIOp>;
+using WasmExtendUOpConversion =
+    OpMappingConversion<ExtendUI32Op, arith::ExtUIOp>;
+using WasmFloorOpConversion = OpMappingConversion<FloorOp, math::FloorOp>;
+using WasmMaxOpConversion = OpMappingConversion<MaxOp, arith::MaximumFOp>;
+using WasmMinOpConversion = OpMappingConversion<MinOp, arith::MinimumFOp>;
+using WasmOrOpConversion = OpMappingConversion<OrOp, arith::OrIOp>;
+using WasmPromoteOpConversion = OpMappingConversion<PromoteOp, arith::ExtFOp>;
+using WasmRemSIOpConversion = OpMappingConversion<RemSIOp, arith::RemSIOp>;
+using WasmRemUIOpConversion = OpMappingConversion<RemUIOp, arith::RemUIOp>;
+using WasmReinterpretOpConversion =
+    OpMappingConversion<ReinterpretOp, arith::BitcastOp>;
+using WasmShLOpConversion = OpMappingConversion<ShLOp, arith::ShLIOp>;
+using WasmShRSOpConversion = OpMappingConversion<ShRSOp, arith::ShRSIOp>;
+using WasmShRUOpConversion = OpMappingConversion<ShRUOp, arith::ShRUIOp>;
+using WasmXOrOpConversion = OpMappingConversion<XOrOp, arith::XOrIOp>;
+using WasmNegOpConversion = OpMappingConversion<NegOp, arith::NegFOp>;
+using WasmCopySignOpConversion =
+    OpMappingConversion<CopySignOp, math::CopySignOp>;
+using WasmClzOpConversion =
+    OpMappingConversion<ClzOp, math::CountLeadingZerosOp>;
+using WasmCtzOpConversion =
+    OpMappingConversion<CtzOp, math::CountTrailingZerosOp>;
+using WasmPopCntOpConversion = OpMappingConversion<PopCntOp, math::CtPopOp>;
+using WasmAbsOpConversion = OpMappingConversion<AbsOp, math::AbsFOp>;
+using WasmTruncOpConversion = OpMappingConversion<TruncOp, math::TruncOp>;
+using WasmSqrtOpConversion = OpMappingConversion<SqrtOp, math::SqrtOp>;
+using WasmWrapOpConversion = OpMappingConversion<WrapOp, arith::TruncIOp>;
+
 struct WasmCallOpConversion : OpConversionPattern<FuncCallOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -327,8 +412,24 @@ void mlir::populateRaiseWasmMLIRConversionPatterns(
   // clang-format off
   patternSet
       .add<
+           WasmAbsOpConversion,
+           WasmAddOpConversion,
+           WasmAndOpConversion,
            WasmCallOpConversion,
+           WasmCeilOpConversion,
+           WasmClzOpConversion,
            WasmConstOpConversion,
+           WasmConvertSOpConversion,
+           WasmConvertUOpConversion,
+           WasmCopySignOpConversion,
+           WasmCtzOpConversion,
+           WasmDemoteOpConversion,
+           WasmDivFPOpConversion,
+           WasmDivSIOpConversion,
+           WasmDivUIOpConversion,
+           WasmExtendSOpConversion,
+           WasmExtendUOpConversion,
+           WasmFloorOpConversion,
            WasmFuncImportOpConversion,
            WasmFuncOpConversion,
            WasmGlobalImportOpConverter,
@@ -338,7 +439,25 @@ void mlir::populateRaiseWasmMLIRConversionPatterns(
            WasmLocalGetConversion,
            WasmLocalSetConversion,
            WasmLocalTeeConversion,
-           WasmReturnOpConversion
+           WasmMaxOpConversion,
+           WasmMinOpConversion,
+           WasmMulOpConversion,
+           WasmNegOpConversion,
+           WasmOrOpConversion,
+           WasmPopCntOpConversion,
+           WasmPromoteOpConversion,
+           WasmReinterpretOpConversion,
+           WasmRemSIOpConversion,
+           WasmRemUIOpConversion,
+           WasmReturnOpConversion,
+           WasmShLOpConversion,
+           WasmShRSOpConversion,
+           WasmShRUOpConversion,
+           WasmSqrtOpConversion,
+           WasmSubOpConversion,
+           WasmTruncOpConversion,
+           WasmWrapOpConversion,
+           WasmXOrOpConversion
            >(tc, ctx);
   // clang-format on
 }
