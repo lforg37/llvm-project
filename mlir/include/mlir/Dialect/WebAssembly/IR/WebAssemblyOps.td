@@ -364,44 +364,39 @@ class Wasm_BinaryNumericalOp<string mnemonic, string summaryStr,
   let assemblyFormat = "$lhs $rhs `:` type($lhs) attr-dict";
 }
 
-class Wasm_TrappableBinaryNumericalOp<string mnemonic, string summaryStr,
-                       list<Type> validOpTypes> :
-  Wasm_BinaryNumericalOp<mnemonic, summaryStr, validOpTypes, [WasmTrappableOpInterface]> {
-}
-
-def Wasm_AddOp : Wasm_TrappableBinaryNumericalOp<"add",
+def Wasm_AddOp : Wasm_BinaryNumericalOp<"add",
     "Sum two values from the stack and push the result",
-    [Wasm_NumericType]>{}
+    [Wasm_NumericType],[DeclareOpInterfaceMethods<WasmContextuallyTrappableOpInterface>]>{}
 
 def Wasm_AndOp : Wasm_BinaryNumericalOp<"and",
     [{Consume two integers from the stack, compute the bitwise AND, and push the
     result.}],
     [Wasm_NumericType]>{}
 
-def Wasm_DivOp : Wasm_TrappableBinaryNumericalOp<"div",
+def Wasm_DivOp : Wasm_BinaryNumericalOp<"div",
     "Divide floating point values from the stack and push the result",
     [Wasm_FPType]>{}
 
-def Wasm_DivUIOp : Wasm_TrappableBinaryNumericalOp<"div_ui",
+def Wasm_DivUIOp : Wasm_BinaryNumericalOp<"div_ui",
     "Divide values interpreted as unsigned int from the stack and push the result",
-    [Wasm_IntegerType]>{}
+    [Wasm_IntegerType], [DeclareOpInterfaceMethods<WasmTrappableOpInterface>]>{}
 
-def Wasm_DivSIOp : Wasm_TrappableBinaryNumericalOp<"div_si",
+def Wasm_DivSIOp : Wasm_BinaryNumericalOp<"div_si",
     "Divide values interpreted as signed int from the stack and push the result",
-    [Wasm_IntegerType]>{}
+    [Wasm_IntegerType], [DeclareOpInterfaceMethods<WasmTrappableOpInterface>]>{}
 
-def Wasm_MulOp : Wasm_TrappableBinaryNumericalOp<"mul",
+def Wasm_MulOp : Wasm_BinaryNumericalOp<"mul",
     "Multiply two values from the stack and push the result",
-    [Wasm_NumericType]>{}
+    [Wasm_NumericType], [DeclareOpInterfaceMethods<WasmContextuallyTrappableOpInterface>]>{}
 
 def Wasm_OrOp : Wasm_BinaryNumericalOp<"or",
     [{Consume two integers from the stack, compute the bitwise OR, and push the
     result.}],
     [Wasm_NumericType]>{}
 
-def Wasm_SubOp : Wasm_TrappableBinaryNumericalOp<"sub",
+def Wasm_SubOp : Wasm_BinaryNumericalOp<"sub",
     "Subtract two values from the stack and push the result",
-    [Wasm_NumericType]>{}
+    [Wasm_NumericType], [DeclareOpInterfaceMethods<WasmContextuallyTrappableOpInterface>]>{}
 
 def Wasm_RemUIOp : Wasm_BinaryNumericalOp<"rem_ui",
     [{Calculate the remainder of dividing two integer values from the stack as
