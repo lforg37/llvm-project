@@ -15,7 +15,11 @@
 #include "mlir/Conversion/ConvertToLLVM/ToLLVMPass.h"
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
+<<<<<<< HEAD
 #include "mlir/Conversion/RaiseWasm/RaiseWasmMLIR.h"
+=======
+#include "mlir/Conversion/WasmMLIRToEmbedder/WasmMLIRToEmbedder.h"
+>>>>>>> 73680b761ce4 ([mlir][wasm] Add draft example of support for trappable operation)
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
@@ -78,6 +82,7 @@ LogicalResult runPipelineToLLVMMLIR(OwningOpRef<ModuleOp> &module) {
 
   auto pm = mlir::PassManager(&currentCtx);
   pm.addPass(mlir::createRaiseWasmMLIRPass());
+  pm.addPass(mlir::createWasmMLIRToEmbedderPass());
   pm.addPass(mlir::memref::createExpandOpsPass());
   pm.addPass(mlir::arith::createArithExpandOpsPass());
   pm.addPass(mlir::createFinalizeMemRefToLLVMConversionPass());

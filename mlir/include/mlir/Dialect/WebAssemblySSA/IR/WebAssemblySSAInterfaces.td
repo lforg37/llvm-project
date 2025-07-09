@@ -183,4 +183,9 @@ def WasmSSAConstantExprInterface :
   ];
 }
 
+// Trait to mark operators that can trigger a trap. Examples: Integer overflow, division
+// by zero, failed conversion...
+def WasmTrappableOpInterface :
+          OpInterface<"WasmTrappableOpInterface"> {}
+
 #endif // WEBASSEMBLYSSA_INTERFACES

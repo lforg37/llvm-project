@@ -1508,4 +1508,15 @@ def RaiseWasmMLIR : Pass<"raise-wasm-mlir"> {
   ];
 }
 
+//===----------------------------------------------------------------------===//
+// WasmMLIRToEmbedder
+//===----------------------------------------------------------------------===//
+
+def WasmMLIRToEmbedder : Pass<"wasm-mlir-to-embedder"> {
+  let summary = "Convert Wasm operations that needs to interact with an embedder to embedder specific constructs.";
+  let dependentDialects = [
+    "func::FuncDialect", "wasm::WasmDialect",
+  ];
+}
+
 #endif // MLIR_CONVERSION_PASSES

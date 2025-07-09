@@ -356,15 +356,20 @@ def WasmSSA_ReturnOp : WasmSSA_Op<"return", [Terminator]> {
 // ---- Numeric ops
 
 class WasmSSA_BinaryNumericalOp<string mnemonic, string summaryStr,
-                       list<Type> validOpTypes> :
-  WasmSSA_Op<mnemonic, [AllTypesMatch<["lhs", "rhs", "result"]>]> {
+                       list<Type> validOpTypes, list<Trait> traits = []> :
+  WasmSSA_Op<mnemonic, !listconcat([AllTypesMatch<["lhs", "rhs", "result"]>], traits)> {
   let summary = summaryStr;
   let arguments = (ins AnyTypeOf<validOpTypes>:$lhs, AnyTypeOf<validOpTypes>:$rhs);
   let results = (outs AnyTypeOf<validOpTypes>:$result);
   let assemblyFormat = "$lhs $rhs `:` type($lhs) attr-dict";
 }
 
-def WasmSSA_AddOp : WasmSSA_BinaryNumericalOp<"add",
+class WasmSSA_TrappableBinaryNumericalOp<string mnemonic, string summaryStr,
+                       list<Type> validOpTypes> :
+  WasmSSA_BinaryNumericalOp<mnemonic, summaryStr, validOpTypes, [WasmTrappableOpInterface]> {
+}
+
+def WasmSSA_AddOp : WasmSSA_TrappableBinaryNumericalOp<"add",
     "Sum two values from the stack and push the result",
     [WasmSSA_NumericType]>{}
 
@@ -373,19 +378,19 @@ def WasmSSA_AndOp : WasmSSA_BinaryNumericalOp<"and",
     result.}],
     [WasmSSA_NumericType]>{}
 
-def WasmSSA_DivOp : WasmSSA_BinaryNumericalOp<"div",
+def Wasm_DivOp : WasmSSA_TrappableBinaryNumericalOp<"div",
     "Divide floating point values from the stack and push the result",
     [WasmSSA_FPType]>{}
 
-def WasmSSA_DivUIOp : WasmSSA_BinaryNumericalOp<"div_ui",
+def WasmSSA_DivUIOp : WasmSSA_TrappableBinaryNumericalOp<"div_ui",
     "Divide values interpreted as unsigned int from the stack and push the result",
     [WasmSSA_IntegerType]>{}
 
-def WasmSSA_DivSIOp : WasmSSA_BinaryNumericalOp<"div_si",
+def WasmSSA_DivSIOp : WasmSSA_TrappableBinaryNumericalOp<"div_si",
     "Divide values interpreted as signed int from the stack and push the result",
     [WasmSSA_IntegerType]>{}
 
-def WasmSSA_MulOp : WasmSSA_BinaryNumericalOp<"mul",
+def WasmSSA_MulOp : WasmSSA_TrappableBinaryNumericalOp<"mul",
     "Multiply two values from the stack and push the result",
     [WasmSSA_NumericType]>{}
 
@@ -394,7 +399,7 @@ def WasmSSA_OrOp : WasmSSA_BinaryNumericalOp<"or",
     result.}],
     [WasmSSA_NumericType]>{}
 
-def WasmSSA_SubOp : WasmSSA_BinaryNumericalOp<"sub",
+def WasmSSA_SubOp : WasmSSA_TrappableBinaryNumericalOp<"sub",
     "Subtract two values from the stack and push the result",
     [WasmSSA_NumericType]>{}
 
