@@ -1,5 +1,5 @@
-// RUN: mlir-opt --split-input-file %s --raise-wasmssa.mlir -o - | FileCheck %s
-// RUN: mlir-opt --split-input-file %s --raise-wasmssa.mlir --canonicalize -o - | FileCheck --check-prefix=CHECK-CANONICAL %s
+// RUN: mlir-opt --split-input-file %s --raise-wasm-mlir -o - | FileCheck %s
+// RUN: mlir-opt --split-input-file %s --raise-wasm-mlir --canonicalize -o - | FileCheck --check-prefix=CHECK-CANONICAL %s
 
 module {
   wasmssa.sa.func nested @func_0() {

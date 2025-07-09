@@ -364,44 +364,39 @@ class WasmSSA_BinaryNumericalOp<string mnemonic, string summaryStr,
   let assemblyFormat = "$lhs $rhs `:` type($lhs) attr-dict";
 }
 
-class WasmSSA_TrappableBinaryNumericalOp<string mnemonic, string summaryStr,
-                       list<Type> validOpTypes> :
-  WasmSSA_BinaryNumericalOp<mnemonic, summaryStr, validOpTypes, [WasmTrappableOpInterface]> {
-}
-
-def WasmSSA_AddOp : WasmSSA_TrappableBinaryNumericalOp<"add",
+def WasmSSA_AddOp : WasmSSA_BinaryNumericalOp<"add",
     "Sum two values from the stack and push the result",
-    [WasmSSA_NumericType]>{}
+    [WasmSSA_NumericType],[DeclareOpInterfaceMethods<WasmContextuallyTrappableOpInterface>]>{}
 
 def WasmSSA_AndOp : WasmSSA_BinaryNumericalOp<"and",
     [{Consume two integers from the stack, compute the bitwise AND, and push the
     result.}],
     [WasmSSA_NumericType]>{}
 
-def Wasm_DivOp : WasmSSA_TrappableBinaryNumericalOp<"div",
+def WasmSSA_DivOp : WasmSSA_BinaryNumericalOp<"div",
     "Divide floating point values from the stack and push the result",
     [WasmSSA_FPType]>{}
 
-def WasmSSA_DivUIOp : WasmSSA_TrappableBinaryNumericalOp<"div_ui",
+def WasmSSA_DivUIOp : WasmSSA_BinaryNumericalOp<"div_ui",
     "Divide values interpreted as unsigned int from the stack and push the result",
-    [WasmSSA_IntegerType]>{}
+    [WasmSSA_IntegerType], [DeclareOpInterfaceMethods<WasmTrappableOpInterface>]>{}
 
-def WasmSSA_DivSIOp : WasmSSA_TrappableBinaryNumericalOp<"div_si",
+def WasmSSA_DivSIOp : WasmSSA_BinaryNumericalOp<"div_si",
     "Divide values interpreted as signed int from the stack and push the result",
-    [WasmSSA_IntegerType]>{}
+    [WasmSSA_IntegerType], [DeclareOpInterfaceMethods<WasmTrappableOpInterface>]>{}
 
-def WasmSSA_MulOp : WasmSSA_TrappableBinaryNumericalOp<"mul",
+def WasmSSA_MulOp : WasmSSA_BinaryNumericalOp<"mul",
     "Multiply two values from the stack and push the result",
-    [WasmSSA_NumericType]>{}
+    [WasmSSA_NumericType], [DeclareOpInterfaceMethods<WasmContextuallyTrappableOpInterface>]>{}
 
 def WasmSSA_OrOp : WasmSSA_BinaryNumericalOp<"or",
     [{Consume two integers from the stack, compute the bitwise OR, and push the
     result.}],
     [WasmSSA_NumericType]>{}
 
-def WasmSSA_SubOp : WasmSSA_TrappableBinaryNumericalOp<"sub",
+def WasmSSA_SubOp : WasmSSA_BinaryNumericalOp<"sub",
     "Subtract two values from the stack and push the result",
-    [WasmSSA_NumericType]>{}
+    [WasmSSA_NumericType], [DeclareOpInterfaceMethods<WasmContextuallyTrappableOpInterface>]>{}
 
 def WasmSSA_RemUIOp : WasmSSA_BinaryNumericalOp<"rem_ui",
     [{Calculate the remainder of dividing two integer values from the stack as

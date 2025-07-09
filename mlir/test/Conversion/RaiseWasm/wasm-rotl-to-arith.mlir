@@ -1,4 +1,4 @@
-// RUN: mlir-opt --split-input-file %s --raise-wasmssa.mlir -o - | FileCheck %s
+// RUN: mlir-opt --split-input-file %s --raise-wasm-mlir -o - | FileCheck %s
 
 // Given:
 // %res = wasmssa.sa.rotl %val by %bits bits : i32

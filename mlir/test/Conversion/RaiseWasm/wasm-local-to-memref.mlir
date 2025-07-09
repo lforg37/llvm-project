@@ -1,4 +1,4 @@
-// RUN: mlir-opt %s --raise-wasmssa.mlir | FileCheck %s
+// RUN: mlir-opt %s --raise-wasm-mlir | FileCheck %s
 
 wasmssa.func nested @func_0() -> i32 {
   %0 = wasmssa.local of type f32

@@ -41,6 +41,40 @@ using namespace mlir::wasmssa;
 
 namespace {
 
+template <typename SourceOp, typename TargetIntOp, typename TargetFPOp>
+struct IntFPDispatchMappingConversion : OpConversionPattern<SourceOp> {
+  using OpConversionPattern<SourceOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(SourceOp srcOp, typename SourceOp::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+
+    // If the op is trappable, do not lower it here. Leave it to the WasmMLIRToEmbedder
+    // pass to insert an intrinsic or an embedder specific call instead.
+    auto interfaceOp = llvm::dyn_cast_or_null<WasmTrappableCheckOpInterface>(srcOp.getOperation());
+    if (interfaceOp && llvm::succeeded(interfaceOp.shouldCreateTrap()))
+      return failure();
+    Type type = srcOp.getRhs().getType();
+    if (type.isInteger()) {
+      rewriter.replaceOpWithNewOp<TargetIntOp>(srcOp, srcOp->getResultTypes(),
+                                               adaptor.getOperands());
+      return success();
+    }
+    if (!type.isFloat())
+      return failure();
+    rewriter.replaceOpWithNewOp<TargetFPOp>(srcOp, srcOp->getResultTypes(),
+                                            adaptor.getOperands());
+    return success();
+  }
+};
+
+using WasmAddOpConversion =
+    IntFPDispatchMappingConversion<AddOp, arith::AddIOp, arith::AddFOp>;
+using WasmMulOpConversion =
+    IntFPDispatchMappingConversion<MulOp, arith::MulIOp, arith::MulFOp>;
+using WasmSubOpConversion =
+    IntFPDispatchMappingConversion<SubOp, arith::SubIOp, arith::SubFOp>;
+
 /// Convert a k-ary source operation \p SourceOp into an operation \p TargetOp.
 /// Both \p SourceOp and \p TargetOp must have the same number of operands.
 template <typename SourceOp, typename TargetOp>
@@ -58,6 +92,7 @@ struct OpMappingConversion : OpConversionPattern<SourceOp> {
 
 using WasmAndOpConversion = OpMappingConversion<AndOp, arith::AndIOp>;
 using WasmCeilOpConversion = OpMappingConversion<CeilOp, math::CeilOp>;
+using WasmDivFPOpConversion = OpMappingConversion<DivOp, arith::DivFOp>;
 /// TODO: SIToFP and UIToFP don't allow specification of the floating point
 /// rounding mode
 using WasmConvertSOpConversion =
@@ -762,15 +797,12 @@ struct WasmReturnOpConversion : OpConversionPattern<ReturnOp> {
 struct RaiseWasmMLIRPass : public impl::RaiseWasmMLIRBase<RaiseWasmMLIRPass> {
   void runOnOperation() override {
     ConversionTarget target{getContext()};
-<<<<<<< HEAD
-    target.addIllegalDialect<WasmSSADialect>();
-=======
->>>>>>> 73680b761ce4 ([mlir][wasm] Add draft example of support for trappable operation)
     target.addLegalDialect<arith::ArithDialect, BuiltinDialect,
                            cf::ControlFlowDialect, func::FuncDialect,
                            memref::MemRefDialect, math::MathDialect>();
-    target.markUnknownOpDynamicallyLegal([](mlir::Operation *op) {
-      return mlir::isa<WasmTrappableOpInterface>(op);
+    target.addDynamicallyLegalDialect<WasmSSADialect>([](mlir::Operation *op) {
+      auto interfaceOp = llvm::dyn_cast_or_null<WasmTrappableCheckOpInterface>(op);
+      return interfaceOp && succeeded(interfaceOp.shouldCreateTrap());
     });
     RewritePatternSet patterns(&getContext());
     TypeConverter tc{};
@@ -819,6 +851,7 @@ void mlir::populateRaiseWasmMLIRConversionPatterns(
   patternSet
       .add<
            WasmAbsOpConversion,
+           WasmAddOpConversion,
            WasmAndOpConversion,
            WasmCallOpConversion,
            WasmCeilOpConversion,
@@ -829,6 +862,7 @@ void mlir::populateRaiseWasmMLIRConversionPatterns(
            WasmCopySignOpConversion,
            WasmCtzOpConversion,
            WasmDemoteOpConversion,
+           WasmDivFPOpConversion,
            WasmEqOpConversion,
            WasmEqzOpConversion,
            WasmExtendLowBitsOpConversion,
@@ -859,6 +893,7 @@ void mlir::populateRaiseWasmMLIRConversionPatterns(
            WasmMaxOpConversion,
            WasmMemoryOpConversion,
            WasmMinOpConversion,
+           WasmMulOpConversion,
            WasmNeOpConversion,
            WasmNegOpConversion,
            WasmOrOpConversion,
@@ -874,6 +909,7 @@ void mlir::populateRaiseWasmMLIRConversionPatterns(
            WasmShRSOpConversion,
            WasmShRUOpConversion,
            WasmSqrtOpConversion,
+           WasmSubOpConversion,
            WasmTruncOpConversion,
            WasmWrapOpConversion,
            WasmXOrOpConversion

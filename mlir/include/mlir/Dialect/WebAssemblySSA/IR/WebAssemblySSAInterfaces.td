@@ -183,9 +183,57 @@ def WasmSSAConstantExprInterface :
   ];
 }
 
-// Trait to mark operators that can trigger a trap. Examples: Integer overflow, division
-// by zero, failed conversion...
-def WasmTrappableOpInterface :
-          OpInterface<"WasmTrappableOpInterface"> {}
+def WasmTrappableCheckOpInterface :
+          OpInterface<"WasmTrappableCheckOpInterface"> {
+  let description = [{
+    Base interface for operations that may need the insertion of trap operation.
+  }];
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/   [{ Return whether the operation should trigger a trap}],
+      /*returnType=*/ "::mlir::LogicalResult",
+      /*methodName=*/ "shouldCreateTrap",
+      /*args=*/ (ins),
+      /*methodBody=*/ [{
+        return $_op.verifyNeedToInsertTrapOp();
+      }]
+    >
+  ];
 
-#endif // WEBASSEMBLYSSA_INTERFACES
+}
+
+def WasmContextuallyTrappableOpInterface :
+          OpInterface<"WasmContextuallyTrappableOpInterface", [WasmTrappableCheckOpInterface]> {
+  let description = [{
+    Interface for operations where some variants can require the insertion of a trap.
+    The method shouldCreateTrap must be overriden to specify in which cases the check for a trap should be
+    inserted.
+  }];
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/   [{ Return whether the operation should trigger a trap}],
+      /*returnType=*/ "::mlir::LogicalResult",
+      /*methodName=*/ "verifyNeedToInsertTrapOp",
+      /*args=*/ (ins)
+    >
+  ];
+}
+
+def WasmTrappableOpInterface :
+          OpInterface<"WasmTrappableOpInterface", [WasmTrappableCheckOpInterface]> {
+  let description = [{
+    Interface for operation where all the variants need the insertion of a trap.
+  }];
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/   [{ Return whether the operation should trigger a trap}],
+      /*returnType=*/ "::mlir::LogicalResult",
+      /*methodName=*/ "verifyNeedToInsertTrapOp",
+      /*args=*/ (ins),
+      /*methodBody=*/ [{}],
+      /*DefaultImplementation=*/ [{ return success(); }]
+    >
+  ];
+}
+
+#endif // WEBASSEMBLY_INTERFACES

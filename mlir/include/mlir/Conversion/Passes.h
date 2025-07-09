@@ -81,7 +81,7 @@
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Conversion/VectorToSPIRV/VectorToSPIRVPass.h"
 #include "mlir/Conversion/VectorToXeGPU/VectorToXeGPU.h"
-#include "mlir/Conversion/WasmMLIRToEmbedder/WasmMLIRToEmbedder.h"
+#include "mlir/Conversion/WasmSSAMLIRToEmbedder/WasmSSAMLIRToEmbedder.h"
 
 namespace mlir {
 
