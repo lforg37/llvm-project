@@ -19,9 +19,6 @@ class RewritePatternSet;
 #define GEN_PASS_DECL_WASMMLIRTOEMBEDDER
 #include "mlir/Conversion/Passes.h.inc"
 
-/// Collect a set of patterns to convert from the Wasm dialect to embedder constructs.
-void populateWasmMLIRToEmbedderConversionPatterns(TypeConverter&, RewritePatternSet &);
-
 /// Create a pass to convert ops from WasmDialect to embedder specific constructs
 std::unique_ptr<Pass> createWasmMLIRToEmbedderPass();
 
