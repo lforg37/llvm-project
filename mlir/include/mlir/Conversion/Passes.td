@@ -1515,7 +1515,7 @@ def RaiseWasmMLIR : Pass<"raise-wasm-mlir"> {
 def WasmSSAMLIRToEmbedder : Pass<"wasm-mlir-to-embedder"> {
   let summary = "Convert Wasm operations that needs to interact with an embedder to embedder specific constructs.";
   let dependentDialects = [
-    "func::FuncDialect", "wasmssa::WasmSSADialect",
+    "func::FuncDialect", "LLVM::LLVMDialect", "wasmssa::WasmSSADialect",
   ];
 }
 

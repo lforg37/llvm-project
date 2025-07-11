@@ -1,9 +1,6 @@
 // RUN: mlir-opt --split-input-file %s --raise-wasm-mlir --wasm-mlir-to-embedder | FileCheck %s
 
-// CHECK-LABEL:   func.func private @wasm.div_ui_i64(i64, i64) -> i64
-// CHECK:         func.func private @wasm.div_ui_i32(i32, i32) -> i32
-// CHECK:         func.func private @wasm.div_si_i64(i64, i64) -> i64
-// CHECK:         func.func private @wasm.div_si_i32(i32, i32) -> i32
+// CHECK-LABEL:   func.func private @wasm.trap()
 
 wasm.func nested @div_i32_si(%arg0: !wasm<local ref to i32>, %arg1: !wasm<local ref to i32>) -> i32 {
     %v0 = wasm.local_get %arg0 : ref to i32
@@ -21,8 +18,15 @@ wasm.func nested @div_i32_si(%arg0: !wasm<local ref to i32>, %arg1: !wasm<local 
 // CHECK:           memref.store %[[ARG0]], %[[VAL_1]][] : memref<i32>
 // CHECK:           %[[VAL_2:.*]] = memref.load %[[VAL_1]][] : memref<i32>
 // CHECK:           %[[VAL_3:.*]] = memref.load %[[VAL_0]][] : memref<i32>
-// CHECK:           %[[VAL_4:.*]] = call @wasm.div_si_i32(%[[VAL_2]], %[[VAL_3]]) : (i32, i32) -> i32
-// CHECK:           return %[[VAL_4]] : i32
+// CHECK:           %[[VAL_4:.*]] = arith.constant 0 : i32
+// CHECK:           %[[VAL_5:.*]] = arith.cmpi eq, %[[VAL_3]], %[[VAL_4]] : i32
+// CHECK:           cf.cond_br %[[VAL_5]], ^bb1, ^bb2
+// CHECK:         ^bb1:
+// CHECK:           call @wasm.trap() : () -> ()
+// CHECK:           cf.br ^bb2
+// CHECK:         ^bb2:
+// CHECK:           %[[VAL_6:.*]] = arith.divsi %[[VAL_2]], %[[VAL_3]] : i32
+// CHECK:           return %[[VAL_6]] : i32
 
 wasm.func nested @div_i64_si(%arg0: !wasm<local ref to i64>, %arg1: !wasm<local ref to i64>) -> i64 {
     %v0 = wasm.local_get %arg0 : ref to i64
@@ -40,8 +44,15 @@ wasm.func nested @div_i64_si(%arg0: !wasm<local ref to i64>, %arg1: !wasm<local 
 // CHECK:           memref.store %[[ARG0]], %[[VAL_1]][] : memref<i64>
 // CHECK:           %[[VAL_2:.*]] = memref.load %[[VAL_1]][] : memref<i64>
 // CHECK:           %[[VAL_3:.*]] = memref.load %[[VAL_0]][] : memref<i64>
-// CHECK:           %[[VAL_4:.*]] = call @wasm.div_si_i64(%[[VAL_2]], %[[VAL_3]]) : (i64, i64) -> i64
-// CHECK:           return %[[VAL_4]] : i64
+// CHECK:           %[[VAL_4:.*]] = arith.constant 0 : i64
+// CHECK:           %[[VAL_5:.*]] = arith.cmpi eq, %[[VAL_3]], %[[VAL_4]] : i64
+// CHECK:           cf.cond_br %[[VAL_5]], ^bb1, ^bb2
+// CHECK:         ^bb1:
+// CHECK:           call @wasm.trap() : () -> ()
+// CHECK:           cf.br ^bb2
+// CHECK:         ^bb2:
+// CHECK:           %[[VAL_6:.*]] = arith.divsi %[[VAL_2]], %[[VAL_3]] : i64
+// CHECK:           return %[[VAL_6]] : i64
 
 wasm.func nested @div_i32_ui(%arg0: !wasm<local ref to i32>, %arg1: !wasm<local ref to i32>) -> i32 {
     %v0 = wasm.local_get %arg0 : ref to i32
@@ -59,8 +70,15 @@ wasm.func nested @div_i32_ui(%arg0: !wasm<local ref to i32>, %arg1: !wasm<local 
 // CHECK:           memref.store %[[ARG0]], %[[VAL_1]][] : memref<i32>
 // CHECK:           %[[VAL_2:.*]] = memref.load %[[VAL_1]][] : memref<i32>
 // CHECK:           %[[VAL_3:.*]] = memref.load %[[VAL_0]][] : memref<i32>
-// CHECK:           %[[VAL_4:.*]] = call @wasm.div_ui_i32(%[[VAL_2]], %[[VAL_3]]) : (i32, i32) -> i32
-// CHECK:           return %[[VAL_4]] : i32
+// CHECK:           %[[VAL_4:.*]] = arith.constant 0 : i32
+// CHECK:           %[[VAL_5:.*]] = arith.cmpi eq, %[[VAL_3]], %[[VAL_4]] : i32
+// CHECK:           cf.cond_br %[[VAL_5]], ^bb1, ^bb2
+// CHECK:         ^bb1:
+// CHECK:           call @wasm.trap() : () -> ()
+// CHECK:           cf.br ^bb2
+// CHECK:         ^bb2:
+// CHECK:           %[[VAL_6:.*]] = arith.divui %[[VAL_2]], %[[VAL_3]] : i32
+// CHECK:           return %[[VAL_6]] : i32
 
 wasm.func nested @div_i64_ui(%arg0: !wasm<local ref to i64>, %arg1: !wasm<local ref to i64>) -> i64 {
     %v0 = wasm.local_get %arg0 : ref to i64
@@ -78,5 +96,12 @@ wasm.func nested @div_i64_ui(%arg0: !wasm<local ref to i64>, %arg1: !wasm<local 
 // CHECK:           memref.store %[[ARG0]], %[[VAL_1]][] : memref<i64>
 // CHECK:           %[[VAL_2:.*]] = memref.load %[[VAL_1]][] : memref<i64>
 // CHECK:           %[[VAL_3:.*]] = memref.load %[[VAL_0]][] : memref<i64>
-// CHECK:           %[[VAL_4:.*]] = call @wasm.div_ui_i64(%[[VAL_2]], %[[VAL_3]]) : (i64, i64) -> i64
-// CHECK:           return %[[VAL_4]] : i64
+// CHECK:           %[[VAL_4:.*]] = arith.constant 0 : i64
+// CHECK:           %[[VAL_5:.*]] = arith.cmpi eq, %[[VAL_3]], %[[VAL_4]] : i64
+// CHECK:           cf.cond_br %[[VAL_5]], ^bb1, ^bb2
+// CHECK:         ^bb1:
+// CHECK:           call @wasm.trap() : () -> ()
+// CHECK:           cf.br ^bb2
+// CHECK:         ^bb2:
+// CHECK:           %[[VAL_6:.*]] = arith.divui %[[VAL_2]], %[[VAL_3]] : i64
+// CHECK:           return %[[VAL_6]] : i64
