@@ -58,7 +58,7 @@ wasmssa.func nested @func_1() -> i32 {
 // CHECK:           return %[[VAL_8]] : i32
 // CHECK:         }
 
-wasmssa.func nested @func_2(%arg0: !wasmssa.local ref to i32>) -> i32 {
+wasmssa.func nested @func_2(%arg0: !wasmssa<local ref to i32>) -> i32 {
   %1 = wasmssa.const 3 : i32
   wasmssa.local_set %arg0 : ref to i32 to %1 : i32
   %2 = wasmssa.local_get %arg0 : ref to i32

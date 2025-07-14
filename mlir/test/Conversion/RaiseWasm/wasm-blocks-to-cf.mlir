@@ -141,8 +141,11 @@ wasmssa.func nested @func_2() -> i32 {
   wasmssa.block(%0) : i32 : {
   ^bb0(%arg0: i32):
     %2 = wasmssa.const 1 : i32
-    %3 = wasmssa.ge_ui %arg0 %2 : i32
+    %3 = wasmssa.ge_ui %arg0 %2 : i32 -> i32
     wasmssa.block_return %3 : i32
+  }> ^bb1
+^bb1(%arg0: i32):
+  wasmssa.return %arg0 : i32
 }
 
 // CHECK-LABEL:   func.func @func_2() -> i32 {
@@ -190,7 +193,7 @@ wasmssa.func nested @branch_if_taken() -> i32 {
     wasmssa.branch_if %2 to level 0 with args(%1 : i32) else ^bb1
   ^bb1:  // pred: ^bb0
     %3 = wasmssa.const 16 : i32
-    %4 = wasmssa.add %1 %3 : i32
+    %4 = wasmssa.ge_ui %1 %3 : i32 -> i32
     wasmssa.block_return %4 : i32
   }> ^bb1
 ^bb1(%0: i32):  // pred: ^bb0
@@ -222,7 +225,7 @@ wasmssa.func nested @branch_if_continue() -> i32 {
     wasmssa.branch_if %2 to level 0 with args(%1 : i32) else ^bb1
   ^bb1:  // pred: ^bb0
     %3 = wasmssa.const 16 : i32
-    %4 = wasmssa.ge_ui %1 %3 : i32
+    %4 = wasmssa.ge_ui %1 %3 : i32 -> i32
     wasmssa.block_return %4 : i32
   }> ^bb1
 ^bb1(%0: i32):  // pred: ^bb0
@@ -282,21 +285,35 @@ wasmssa.func nested @if(%arg0: !wasmssa<local ref to i32>) -> i32 {
 // CHECK:           %[[VAL_3:.*]] = arith.andi %[[VAL_1]], %[[VAL_2]] : i32
 // CHECK:           %[[VAL_4:.*]] = arith.constant 0 : i32
 // CHECK:           %[[VAL_5:.*]] = arith.cmpi ne, %[[VAL_3]], %[[VAL_4]] : i32
-// CHECK:           cf.cond_br %[[VAL_5]], ^bb1, ^bb2
+// CHECK:           cf.cond_br %[[VAL_5]], ^bb1, ^bb6
 // CHECK:         ^bb1:
 // CHECK:           %[[VAL_6:.*]] = memref.load %[[VAL_0]][] : memref<i32>
 // CHECK:           %[[VAL_7:.*]] = arith.constant 3 : i32
-// CHECK:           %[[VAL_8:.*]] = arith.cmpi uge, %[[VAL_6]], %[[VAL_7]] : i32
-// CHECK:           %[[VAL_9:.*]] = arith.extui %[[VAL_8]] : i1 to i32
-// CHECK:           cf.br ^bb3(%[[VAL_9]] : i32)
+// CHECK:           %[[VAL_8:.*]] = "llvm.intr.umul.with.overflow"(%[[VAL_6]], %[[VAL_7]]) : (i32, i32) -> !llvm.struct<(i32, i1)>
+// CHECK:           %[[VAL_9:.*]] = llvm.extractvalue %[[VAL_8]][0] : !llvm.struct<(i32, i1)>
+// CHECK:           %[[VAL_10:.*]] = llvm.extractvalue %[[VAL_8]][1] : !llvm.struct<(i32, i1)>
+// CHECK:           cf.cond_br %[[VAL_10]], ^bb2, ^bb3
 // CHECK:         ^bb2:
-// CHECK:           %[[VAL_10:.*]] = memref.load %[[VAL_0]][] : memref<i32>
+// CHECK:           wasmssa.trap
+// CHECK:           cf.br ^bb3
+// CHECK:         ^bb3:
 // CHECK:           %[[VAL_11:.*]] = arith.constant 1 : i32
-// CHECK:           %[[VAL_12:.*]] = arith.shrui %[[VAL_10]], %[[VAL_11]] : i32
-// CHECK:           cf.br ^bb3(%[[VAL_12]] : i32)
-// CHECK:         ^bb3(%[[VAL_13:.*]]: i32):
-// CHECK:           return %[[VAL_13]] : i32
-// CHECK:         }
+// CHECK:           %[[VAL_12:.*]] = "llvm.intr.uadd.with.overflow"(%[[VAL_9]], %[[VAL_11]]) : (i32, i32) -> !llvm.struct<(i32, i1)>
+// CHECK:           %[[VAL_13:.*]] = llvm.extractvalue %[[VAL_12]][0] : !llvm.struct<(i32, i1)>
+// CHECK:           %[[VAL_14:.*]] = llvm.extractvalue %[[VAL_12]][1] : !llvm.struct<(i32, i1)>
+// CHECK:           cf.cond_br %[[VAL_14]], ^bb4, ^bb5
+// CHECK:         ^bb4:
+// CHECK:           wasmssa.trap
+// CHECK:           cf.br ^bb5
+// CHECK:         ^bb5:
+// CHECK:           cf.br ^bb7(%[[VAL_13]] : i32)
+// CHECK:         ^bb6:
+// CHECK:           %[[VAL_15:.*]] = memref.load %[[VAL_0]][] : memref<i32>
+// CHECK:           %[[VAL_16:.*]] = arith.constant 1 : i32
+// CHECK:           %[[VAL_17:.*]] = arith.shrui %[[VAL_15]], %[[VAL_16]] : i32
+// CHECK:           cf.br ^bb7(%[[VAL_17]] : i32)
+// CHECK:         ^bb7(%[[VAL_18:.*]]: i32):
+// CHECK:           return %[[VAL_18]] : i32
 
 // -----
 
@@ -308,7 +325,7 @@ wasmssa.func nested @if_else(%arg0: !wasmssa<local ref to i32>) -> i32 {
   "wasmssa.if"(%4, %1)[^bb1] ({
   ^bb0(%arg1: i32):
     %6 = wasmssa.const 1 : i32
-    %7 = wasmssa.add %arg1 %6 : i32
+    %7 = wasmssa.ge_ui %arg1 %6 : i32 -> i32
     wasmssa.block_return %7 : i32
   }, {
   }) : (i32, i32) -> ()
@@ -349,7 +366,7 @@ wasmssa.func nested @if_if(%arg0: !wasmssa<local ref to i32>) -> i32 {
     "wasmssa.if"(%8, %4)[^bb1] ({
     ^bb0(%arg1: i32):
       %10 = wasmssa.const 2 : i32
-      %11 = wasmssa.add %arg1 %10 : i32
+      %11 = wasmssa.ge_ui %arg1 %10 : i32 -> i32
       wasmssa.block_return %11 : i32
     }, {
     }) : (i32, i32) -> ()
@@ -361,7 +378,6 @@ wasmssa.func nested @if_if(%arg0: !wasmssa<local ref to i32>) -> i32 {
   }) : (i32) -> ()
 ^bb1(%3: i32):  // pred: ^bb0
   wasmssa.return %3 : i32
-}
 }
 
 // CHECK-LABEL:   func.func @if_if(

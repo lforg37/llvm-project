@@ -21,6 +21,8 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/LLVMIR/LLVMTypes.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/WebAssemblySSA/IR/WebAssemblySSA.h"
 #include "mlir/IR/BuiltinDialect.h"
@@ -41,39 +43,117 @@ using namespace mlir::wasmssa;
 
 namespace {
 
-template <typename SourceOp, typename TargetIntOp, typename TargetFPOp>
-struct IntFPDispatchMappingConversion : OpConversionPattern<SourceOp> {
+template <typename SourceOp, typename TargetOp>
+struct FpArithBinaryOpConversion : OpConversionPattern<SourceOp> {
   using OpConversionPattern<SourceOp>::OpConversionPattern;
 
   LogicalResult
   matchAndRewrite(SourceOp srcOp, typename SourceOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
 
-    // If the op is trappable, do not lower it here. Leave it to the WasmMLIRToEmbedder
-    // pass to insert an intrinsic or an embedder specific call instead.
-    auto interfaceOp = llvm::dyn_cast_or_null<WasmTrappableCheckOpInterface>(srcOp.getOperation());
-    if (interfaceOp && llvm::succeeded(interfaceOp.shouldCreateTrap()))
-      return failure();
-    Type type = srcOp.getRhs().getType();
-    if (type.isInteger()) {
-      rewriter.replaceOpWithNewOp<TargetIntOp>(srcOp, srcOp->getResultTypes(),
-                                               adaptor.getOperands());
-      return success();
-    }
-    if (!type.isFloat())
-      return failure();
-    rewriter.replaceOpWithNewOp<TargetFPOp>(srcOp, srcOp->getResultTypes(),
+    // If Add / Sub / Mul are using their integer variant, it can generate
+    // an integer overflow trap. Special handling for those cases is necessary.
+    if (!srcOp.getRhs().getType().isFloat())
+      return rewriter.notifyMatchFailure(
+          srcOp->getLoc(),
+          "This pattern only handles operations on integer operands");
+    rewriter.replaceOpWithNewOp<TargetOp>(srcOp, srcOp->getResultTypes(),
                                             adaptor.getOperands());
     return success();
   }
 };
 
-using WasmAddOpConversion =
-    IntFPDispatchMappingConversion<AddOp, arith::AddIOp, arith::AddFOp>;
-using WasmMulOpConversion =
-    IntFPDispatchMappingConversion<MulOp, arith::MulIOp, arith::MulFOp>;
-using WasmSubOpConversion =
-    IntFPDispatchMappingConversion<SubOp, arith::SubIOp, arith::SubFOp>;
+using WasmAddFPOpConversion =
+    FpArithBinaryOpConversion<AddOp, arith::AddFOp>;
+using WasmMulFpOpConversion =
+    FpArithBinaryOpConversion<MulOp, arith::MulFOp>;
+using WasmSubFpOpConversion =
+    FpArithBinaryOpConversion<SubOp, arith::SubFOp>;
+
+template <typename SourceOp, typename IntrinsicOp>
+struct TrapIntArithOpConversion : OpConversionPattern<SourceOp> {
+  using OpConversionPattern<SourceOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(SourceOp wasmOp, typename SourceOp::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (!wasmOp.getRhs().getType().isInteger())
+      return rewriter.notifyMatchFailure(
+          wasmOp->getLoc(),
+          "This pattern only handles operations on integer operands");
+    auto loc = wasmOp.getLoc();
+    auto addResType = wasmOp.getResult().getType();
+    auto overflowMarkerType = rewriter.getIntegerType(1);
+    auto intrinsicResType = LLVM::LLVMStructType::getLiteral(
+        this->getContext(), {addResType, overflowMarkerType});
+    auto intrinsicCall = rewriter.create<IntrinsicOp>(
+        loc, intrinsicResType, wasmOp.getLhs(), wasmOp.getRhs());
+    auto result =
+        cast<TypedValue<LLVM::LLVMStructType>>(intrinsicCall.getResult());
+    auto addResult = rewriter.create<LLVM::ExtractValueOp>(
+        loc, addResType, result,
+        rewriter.getDenseI64ArrayAttr({0}));
+    auto overflowMarker = rewriter.create<LLVM::ExtractValueOp>(
+        loc, overflowMarkerType, result,
+        rewriter.getDenseI64ArrayAttr({1}));
+    auto *curBlock = wasmOp->getBlock();
+    auto callTrap = rewriter.create<TrapOp>(loc);
+    Block *trapBlock =
+        rewriter.splitBlock(curBlock, Block::iterator(callTrap.getOperation()));
+    Block *normalBlock =
+        rewriter.splitBlock(trapBlock, ++Block::iterator{callTrap});
+    rewriter.setInsertionPointAfter(callTrap);
+    rewriter.create<cf::BranchOp>(loc, normalBlock);
+    rewriter.setInsertionPointAfter(overflowMarker);
+    rewriter.create<cf::CondBranchOp>(loc, overflowMarker.getRes(),
+                                      trapBlock, ValueRange{}, normalBlock,
+                                      ValueRange{});
+    rewriter.replaceOp(wasmOp, addResult.getRes());
+    return success();
+  };
+};
+
+using WasmAddIOpConversion =
+   TrapIntArithOpConversion<AddOp, LLVM::UAddWithOverflowOp>;
+using WasmMulIOpConversion =
+   TrapIntArithOpConversion<MulOp, LLVM::UMulWithOverflowOp>;
+using WasmSubIOpConversion =
+   TrapIntArithOpConversion<SubOp, LLVM::USubWithOverflowOp>;
+
+template<typename WasmOpType, typename ArithOpName>
+struct DivOpConversion : OpConversionPattern<WasmOpType> {
+  using OpConversionPattern<WasmOpType>::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(WasmOpType divOp, typename WasmOpType::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto loc = divOp.getLoc();
+    auto addResType = divOp.getResult().getType();
+    auto divByZeroMarkerType = rewriter.getIntegerType(1);
+    auto zero = rewriter.create<arith::ConstantOp>(
+        loc, rewriter.getIntegerAttr(addResType, 0));
+    auto isDividerZero = rewriter.create<arith::CmpIOp>(
+        loc, divByZeroMarkerType, arith::CmpIPredicate::eq,
+        adaptor.getRhs(), zero.getResult());
+    auto *curBlock = divOp->getBlock();
+    auto callTrap = rewriter.create<TrapOp>(loc);
+    Block *trapBlock =
+        rewriter.splitBlock(curBlock, Block::iterator(callTrap.getOperation()));
+    Block *normalBlock =
+        rewriter.splitBlock(trapBlock, ++Block::iterator{callTrap});
+    rewriter.setInsertionPointAfter(callTrap);
+    rewriter.create<cf::BranchOp>(loc, normalBlock);
+    rewriter.setInsertionPointAfter(isDividerZero);
+    rewriter.create<cf::CondBranchOp>(loc, isDividerZero.getResult(),
+                                      trapBlock, ValueRange{}, normalBlock,
+                                      ValueRange{});
+    rewriter.setInsertionPointToStart(normalBlock);
+    rewriter.replaceOpWithNewOp<ArithOpName>(divOp, adaptor.getLhs(), adaptor.getRhs());
+    return success();
+  };
+};
+
+using WasmDivSIConversion = DivOpConversion<DivSIOp, arith::DivSIOp>;
+using WasmDivUIConversion = DivOpConversion<DivUIOp, arith::DivUIOp>;
 
 /// Convert a k-ary source operation \p SourceOp into an operation \p TargetOp.
 /// Both \p SourceOp and \p TargetOp must have the same number of operands.
@@ -799,11 +879,9 @@ struct RaiseWasmMLIRPass : public impl::RaiseWasmMLIRBase<RaiseWasmMLIRPass> {
     ConversionTarget target{getContext()};
     target.addLegalDialect<arith::ArithDialect, BuiltinDialect,
                            cf::ControlFlowDialect, func::FuncDialect,
-                           memref::MemRefDialect, math::MathDialect>();
-    target.addDynamicallyLegalDialect<WasmSSADialect>([](mlir::Operation *op) {
-      auto interfaceOp = llvm::dyn_cast_or_null<WasmTrappableCheckOpInterface>(op);
-      return interfaceOp && succeeded(interfaceOp.shouldCreateTrap());
-    });
+                           memref::MemRefDialect, LLVM::LLVMDialect,
+                           math::MathDialect>();
+    target.addLegalOp<TrapOp>();
     RewritePatternSet patterns(&getContext());
     TypeConverter tc{};
     tc.addConversion([](Type type) -> std::optional<Type> { return type; });
@@ -851,7 +929,8 @@ void mlir::populateRaiseWasmMLIRConversionPatterns(
   patternSet
       .add<
            WasmAbsOpConversion,
-           WasmAddOpConversion,
+           WasmAddFPOpConversion,
+           WasmAddIOpConversion,
            WasmAndOpConversion,
            WasmCallOpConversion,
            WasmCeilOpConversion,
@@ -863,6 +942,8 @@ void mlir::populateRaiseWasmMLIRConversionPatterns(
            WasmCtzOpConversion,
            WasmDemoteOpConversion,
            WasmDivFPOpConversion,
+           WasmDivSIConversion,
+           WasmDivUIConversion,
            WasmEqOpConversion,
            WasmEqzOpConversion,
            WasmExtendLowBitsOpConversion,
@@ -893,7 +974,8 @@ void mlir::populateRaiseWasmMLIRConversionPatterns(
            WasmMaxOpConversion,
            WasmMemoryOpConversion,
            WasmMinOpConversion,
-           WasmMulOpConversion,
+           WasmMulFpOpConversion,
+           WasmMulIOpConversion,
            WasmNeOpConversion,
            WasmNegOpConversion,
            WasmOrOpConversion,
@@ -909,7 +991,8 @@ void mlir::populateRaiseWasmMLIRConversionPatterns(
            WasmShRSOpConversion,
            WasmShRUOpConversion,
            WasmSqrtOpConversion,
-           WasmSubOpConversion,
+           WasmSubFpOpConversion,
+           WasmSubIOpConversion,
            WasmTruncOpConversion,
            WasmWrapOpConversion,
            WasmXOrOpConversion

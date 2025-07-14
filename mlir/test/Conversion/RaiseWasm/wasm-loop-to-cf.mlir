@@ -2,12 +2,12 @@
 // RUN: mlir-opt --split-input-file %s --raise-wasm-mlir --canonicalize -o - | FileCheck --check-prefix=CHECK-CANONICAL %s
 
 module {
-  wasmssa.sa.func nested @func_0() {
-    wasmssa.sa.loop : {
-      wasmssa.sa.block_return
+  wasmssa.func nested @func_0() {
+    wasmssa.loop : {
+      wasmssa.block_return
     }> ^bb1
   ^bb1:  // pred: ^bb0
-    wasmssa.sa.return
+    wasmssa.return
   }
 }
 
@@ -27,16 +27,16 @@ module {
 // -----
 
 module {
-  wasmssa.sa.func nested @func_0() -> i32 {
-    %0 = wasmssa.sa.local of type i32
-    wasmssa.sa.loop : {
-      %1 = wasmssa.sa.local_get %0 : ref to i32
-      %2 = wasmssa.sa.const 10 : i32
-      %3 = wasmssa.sa.lt_si %1 %2 : i32 -> i32
-      wasmssa.sa.block_return %3 : i32
+  wasmssa.func nested @func_0() -> i32 {
+    %0 = wasmssa.local of type i32
+    wasmssa.loop : {
+      %1 = wasmssa.local_get %0 : ref to i32
+      %2 = wasmssa.const 10 : i32
+      %3 = wasmssa.lt_si %1 %2 : i32 -> i32
+      wasmssa.block_return %3 : i32
     }> ^bb1
   ^bb1(%1: i32):  // pred: ^bb0
-    wasmssa.sa.return %1 : i32
+    wasmssa.return %1 : i32
   }
 }
 // CHECK-LABEL:   func.func @func_0() -> i32 {
@@ -67,18 +67,18 @@ module {
 // -----
 
 module {
-  wasmssa.sa.func nested @func_0() {
-    %0 = wasmssa.sa.local of type i32
-    wasmssa.sa.loop : {
-      %1 = wasmssa.sa.local_get %0 : ref to i32
-      %2 = wasmssa.sa.const 10 : i32
-      %3 = wasmssa.sa.lt_si %1 %2 : i32 -> i32
-      wasmssa.sa.branch_if %3 to level 0 else ^bb1
+  wasmssa.func nested @func_0() {
+    %0 = wasmssa.local of type i32
+    wasmssa.loop : {
+      %1 = wasmssa.local_get %0 : ref to i32
+      %2 = wasmssa.const 10 : i32
+      %3 = wasmssa.lt_si %1 %2 : i32 -> i32
+      wasmssa.branch_if %3 to level 0 else ^bb1
     ^bb1:  // pred: ^bb0
-      wasmssa.sa.block_return
+      wasmssa.block_return
     }> ^bb1
   ^bb1:  // pred: ^bb0
-    wasmssa.sa.return
+    wasmssa.return
   }
 }
 
@@ -131,17 +131,17 @@ module {
         %10 = wasmssa.gt_si %8 %9 : i32 -> i32
         wasmssa.branch_if %10 to level 0 else ^bb1
       ^bb1:  // pred: ^bb0
-        wasmssa.sa.block_return %8 : i32
+        wasmssa.block_return %8 : i32
       }> ^bb1
     ^bb1(%5: i32):  // pred: ^bb0
-      %6 = wasmssa.sa.const 10 : i32
-      %7 = wasmssa.sa.lt_si %5 %6 : i32 -> i32
-      wasmssa.sa.branch_if %7 to level 0 else ^bb2
+      %6 = wasmssa.const 10 : i32
+      %7 = wasmssa.lt_si %5 %6 : i32 -> i32
+      wasmssa.branch_if %7 to level 0 else ^bb2
     ^bb2:  // pred: ^bb1
-      wasmssa.sa.block_return
+      wasmssa.block_return
     }> ^bb1
   ^bb1:  // pred: ^bb0
-    wasmssa.sa.return
+    wasmssa.return
   }
 }
 
