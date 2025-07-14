@@ -344,6 +344,11 @@ def Wasm_TableImportOp : Wasm_Op<"import_table", [Symbol, WasmImportOpInterface]
       "wasm::TableType":$type)>];
 }
 
+def Wasm_TrapOp : Wasm_Op<"trap", []> {
+  let summary = "Trap placeholder operation";
+  let assemblyFormat = "attr-dict";
+}
+
 def Wasm_ReturnOp : Wasm_Op<"return", [Terminator]> {
   let summary = "Return from the current function frame";
   let arguments = (ins Variadic<Wasm_ValType>:  $operands);
@@ -366,7 +371,7 @@ class Wasm_BinaryNumericalOp<string mnemonic, string summaryStr,
 
 def Wasm_AddOp : Wasm_BinaryNumericalOp<"add",
     "Sum two values from the stack and push the result",
-    [Wasm_NumericType],[DeclareOpInterfaceMethods<WasmContextuallyTrappableOpInterface>]>{}
+    [Wasm_NumericType]>{}
 
 def Wasm_AndOp : Wasm_BinaryNumericalOp<"and",
     [{Consume two integers from the stack, compute the bitwise AND, and push the
@@ -379,15 +384,15 @@ def Wasm_DivOp : Wasm_BinaryNumericalOp<"div",
 
 def Wasm_DivUIOp : Wasm_BinaryNumericalOp<"div_ui",
     "Divide values interpreted as unsigned int from the stack and push the result",
-    [Wasm_IntegerType], [DeclareOpInterfaceMethods<WasmTrappableOpInterface>]>{}
+    [Wasm_IntegerType]>{}
 
 def Wasm_DivSIOp : Wasm_BinaryNumericalOp<"div_si",
     "Divide values interpreted as signed int from the stack and push the result",
-    [Wasm_IntegerType], [DeclareOpInterfaceMethods<WasmTrappableOpInterface>]>{}
+    [Wasm_IntegerType]>{}
 
 def Wasm_MulOp : Wasm_BinaryNumericalOp<"mul",
     "Multiply two values from the stack and push the result",
-    [Wasm_NumericType], [DeclareOpInterfaceMethods<WasmContextuallyTrappableOpInterface>]>{}
+    [Wasm_NumericType]>{}
 
 def Wasm_OrOp : Wasm_BinaryNumericalOp<"or",
     [{Consume two integers from the stack, compute the bitwise OR, and push the
@@ -396,7 +401,7 @@ def Wasm_OrOp : Wasm_BinaryNumericalOp<"or",
 
 def Wasm_SubOp : Wasm_BinaryNumericalOp<"sub",
     "Subtract two values from the stack and push the result",
-    [Wasm_NumericType], [DeclareOpInterfaceMethods<WasmContextuallyTrappableOpInterface>]>{}
+    [Wasm_NumericType]>{}
 
 def Wasm_RemUIOp : Wasm_BinaryNumericalOp<"rem_ui",
     [{Calculate the remainder of dividing two integer values from the stack as

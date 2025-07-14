@@ -25,11 +25,18 @@
 
 // (val >> (-bits & 31))
 // CHECK:           %[[VAL_7:.*]] = arith.constant 0 : i32
-// CHECK:           %[[VAL_8:.*]] = wasm.sub %[[VAL_7]] %[[VAL_3]] : i32
-// CHECK:           %[[VAL_9:.*]] = arith.andi %[[VAL_8]], %[[VAL_4]] : i32
-// CHECK:           %[[VAL_10:.*]] = arith.shrui %[[VAL_2]], %[[VAL_9]] : i32
-// CHECK:           %[[VAL_11:.*]] = arith.ori %[[VAL_6]], %[[VAL_10]] : i32
-// CHECK:           return %[[VAL_11]] : i32
+// CHECK:           %[[VAL_8:.*]] = "llvm.intr.usub.with.overflow"(%[[VAL_7]], %[[VAL_3]]) : (i32, i32) -> !llvm.struct<(i32, i1)>
+// CHECK:           %[[VAL_9:.*]] = llvm.extractvalue %[[VAL_8]][0] : !llvm.struct<(i32, i1)>
+// CHECK:           %[[VAL_10:.*]] = llvm.extractvalue %[[VAL_8]][1] : !llvm.struct<(i32, i1)>
+// CHECK:           cf.cond_br %[[VAL_10]], ^bb1, ^bb2
+// CHECK:         ^bb1:
+// CHECK:           wasm.trap
+// CHECK:           cf.br ^bb2
+// CHECK:         ^bb2:
+// CHECK:           %[[VAL_11:.*]] = arith.andi %[[VAL_9]], %[[VAL_4]] : i32
+// CHECK:           %[[VAL_12:.*]] = arith.shrui %[[VAL_2]], %[[VAL_11]] : i32
+// CHECK:           %[[VAL_13:.*]] = arith.ori %[[VAL_6]], %[[VAL_12]] : i32
+// CHECK:           return %[[VAL_13]] : i32
 
 wasm.func nested @rotl_i32(%arg0: !wasm<local ref to i32>, %arg1: !wasm<local ref to i32>) -> i32 {
     %v0 = wasm.local_get %arg0 : ref to i32
@@ -59,13 +66,21 @@ wasm.func nested @rotl_i32(%arg0: !wasm<local ref to i32>, %arg1: !wasm<local re
 
 // (val >> (-bits & 63))
 // CHECK:           %[[VAL_7:.*]] = arith.constant 0 : i64
-// CHECK:           %[[VAL_8:.*]] = wasm.sub %[[VAL_7]] %[[VAL_3]] : i64
-// CHECK:           %[[VAL_9:.*]] = arith.andi %[[VAL_8]], %[[VAL_4]] : i64
+// CHECK:           %[[VAL_8:.*]] = "llvm.intr.usub.with.overflow"(%[[VAL_7]], %[[VAL_3]]) : (i64, i64) -> !llvm.struct<(i64, i1)>
+// CHECK:           %[[VAL_9:.*]] = llvm.extractvalue %[[VAL_8]][0] : !llvm.struct<(i64, i1)>
+// CHECK:           %[[VAL_10:.*]] = llvm.extractvalue %[[VAL_8]][1] : !llvm.struct<(i64, i1)>
+// CHECK:           cf.cond_br %[[VAL_10]], ^bb1, ^bb2
+// CHECK:         ^bb1:
+// CHECK:           wasm.trap
+// CHECK:           cf.br ^bb2
+// CHECK:         ^bb2:
+// CHECK:           %[[VAL_11:.*]] = arith.andi %[[VAL_9]], %[[VAL_4]] : i64
 
 // Form final result.
-// CHECK:           %[[VAL_10:.*]] = arith.shrui %[[VAL_2]], %[[VAL_9]] : i64
-// CHECK:           %[[VAL_11:.*]] = arith.ori %[[VAL_6]], %[[VAL_10]] : i64
-// CHECK:           return %[[VAL_11]] : i64
+// CHECK:           %[[VAL_12:.*]] = arith.shrui %[[VAL_2]], %[[VAL_11]] : i64
+// CHECK:           %[[VAL_13:.*]] = arith.ori %[[VAL_6]], %[[VAL_12]] : i64
+// CHECK:           return %[[VAL_13]] : i64
+// CHECK:         }
 
 wasm.func nested @rotl_i64(%arg0: !wasm<local ref to i64>, %arg1: !wasm<local ref to i64>) -> i64 {
     %v0 = wasm.local_get %arg0 : ref to i64

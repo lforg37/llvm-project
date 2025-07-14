@@ -67,14 +67,6 @@ ParseResult parseImportOp(OpAsmParser &parser, OperationState &result) {
 } // namespace
 
 //===----------------------------------------------------------------------===//
-// AddOp
-//===----------------------------------------------------------------------===//
-
-LogicalResult AddOp::verifyNeedToInsertTrapOp() {
-   return success(!this->getResult().getType().isFloat());
-};
-
-//===----------------------------------------------------------------------===//
 // BlockOp
 //===----------------------------------------------------------------------===//
 
@@ -470,14 +462,6 @@ void MemImportOp::build(mlir::OpBuilder &odsBuilder,
 }
 
 //===----------------------------------------------------------------------===//
-// MulOp
-//===----------------------------------------------------------------------===//
-
-LogicalResult MulOp::verifyNeedToInsertTrapOp() {
-   return success(!this->getResult().getType().isFloat());
-};
-
-//===----------------------------------------------------------------------===//
 // ReinterpretOp
 //===----------------------------------------------------------------------===//
 
@@ -498,14 +482,6 @@ LogicalResult ReinterpretOp::verify() {
 
 void ReturnOp::build(::mlir::OpBuilder &odsBuilder,
                      ::mlir::OperationState &odsState) {}
-
-//===----------------------------------------------------------------------===//
-// SubOp
-//===----------------------------------------------------------------------===//
-
-LogicalResult SubOp::verifyNeedToInsertTrapOp() {
-   return success(!this->getResult().getType().isFloat());
-};
 
 //===----------------------------------------------------------------------===//
 // TableOp
