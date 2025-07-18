@@ -344,6 +344,11 @@ def WasmSSA_TableImportOp : WasmSSA_Op<"import_table", [Symbol, WasmSSAImportOpI
       "wasmssa::TableType":$type)>];
 }
 
+def WasmSSA_TrapOp : WasmSSA_Op<"trap", []> {
+  let summary = "Trap placeholder operation";
+  let assemblyFormat = "attr-dict";
+}
+
 def WasmSSA_ReturnOp : WasmSSA_Op<"return", [Terminator]> {
   let summary = "Return from the current function frame";
   let arguments = (ins Variadic<WasmSSA_ValType>:  $operands);
@@ -356,8 +361,8 @@ def WasmSSA_ReturnOp : WasmSSA_Op<"return", [Terminator]> {
 // ---- Numeric ops
 
 class WasmSSA_BinaryNumericalOp<string mnemonic, string summaryStr,
-                       list<Type> validOpTypes> :
-  WasmSSA_Op<mnemonic, [AllTypesMatch<["lhs", "rhs", "result"]>]> {
+                       list<Type> validOpTypes, list<Trait> traits = []> :
+  WasmSSA_Op<mnemonic, !listconcat([AllTypesMatch<["lhs", "rhs", "result"]>], traits)> {
   let summary = summaryStr;
   let arguments = (ins AnyTypeOf<validOpTypes>:$lhs, AnyTypeOf<validOpTypes>:$rhs);
   let results = (outs AnyTypeOf<validOpTypes>:$result);

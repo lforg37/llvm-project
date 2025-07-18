@@ -1503,8 +1503,19 @@ def RaiseWasmMLIR : Pass<"raise-wasm-mlir"> {
   let summary = "Convert Wasm dialect to a group of dialect as a bridge to LLVM MLIR conversion";
   let dependentDialects = [
     "func::FuncDialect", "arith::ArithDialect", "cf::ControlFlowDialect",
-    "memref::MemRefDialect", "vector::VectorDialect", "wasmssa::WasmSSADialect",
-    "math::MathDialect"
+    "LLVM::LLVMDialect", "math::MathDialect", "memref::MemRefDialect",
+    "vector::VectorDialect", "wasmssa::WasmSSADialect"
+  ];
+}
+
+//===----------------------------------------------------------------------===//
+// WasmSSAMLIRToEmbedder
+//===----------------------------------------------------------------------===//
+
+def WasmSSAMLIRToEmbedder : Pass<"wasm-mlir-to-embedder"> {
+  let summary = "Convert Wasm operations that needs to interact with an embedder to embedder specific constructs.";
+  let dependentDialects = [
+    "func::FuncDialect", "LLVM::LLVMDialect", "wasmssa::WasmSSADialect",
   ];
 }
 
