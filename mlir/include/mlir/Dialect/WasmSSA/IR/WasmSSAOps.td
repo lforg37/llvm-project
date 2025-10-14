@@ -141,7 +141,7 @@ def WasmSSA_FuncOp : WasmSSA_Op<"func", [
                      WasmSSA_FuncTypeAttr: $functionType,
                      OptionalAttr<DictArrayAttr>:$arg_attrs,
                      OptionalAttr<DictArrayAttr>:$res_attrs,
-                     DefaultValuedAttr<StrAttr, "\"nested\"">:$sym_visibility);
+                     UnitAttr: $exported);
   let regions = (region AnyRegion: $body);
   let extraClassDeclaration = [{
 
@@ -162,6 +162,12 @@ def WasmSSA_FuncOp : WasmSSA_Op<"func", [
 
     /// Returns the result types of this function.
     ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
+
+    ::mlir::SymbolTable::Visibility getVisibility() {
+      return getExported() ?
+        ::mlir::SymbolTable::Visibility::Public :
+        ::mlir::SymbolTable::Visibility::Nested;
+    };
   }];
 
   let builders = [
@@ -207,8 +213,7 @@ def WasmSSA_FuncImportOp : WasmSSA_Op<"import_func", [
                      StrAttr: $importName,
                      WasmSSA_FuncTypeAttr: $type,
                      OptionalAttr<DictArrayAttr>:$arg_attrs,
-                     OptionalAttr<DictArrayAttr>:$res_attrs,
-                     OptionalAttr<StrAttr>:$sym_visibility);
+                     OptionalAttr<DictArrayAttr>:$res_attrs);
   let extraClassDeclaration = [{
     bool isDeclaration() const { return true; }
 
@@ -221,6 +226,10 @@ def WasmSSA_FuncImportOp : WasmSSA_Op<"import_func", [
     ::llvm::ArrayRef<Type> getResultTypes() {
       return getType().getResults();
     }
+
+    ::mlir::SymbolTable::Visibility getVisibility() {
+      return ::mlir::SymbolTable::Visibility::Nested;
+    };
   }];
   let builders = [
     OpBuilder<(ins "StringRef":$symbol,
@@ -238,7 +247,7 @@ def WasmSSA_GlobalOp : WasmSSA_Op<"global", [
   let arguments = (ins SymbolNameAttr: $sym_name,
                      WasmSSA_ValTypeAttr: $type,
                      UnitAttr: $isMutable,
-                     OptionalAttr<StrAttr>:$sym_visibility);
+                     UnitAttr: $exported);
   let description = [{
     WebAssembly global variable.
     Body contains the initialization instructions for the variable value.
@@ -257,11 +266,13 @@ def WasmSSA_GlobalOp : WasmSSA_Op<"global", [
   }];
   let regions = (region AnyRegion: $initializer);
 
-  let builders = [
-    OpBuilder<(ins "StringRef":$symbol,
-                   "Type": $type,
-                   "bool": $isMutable)>
-  ];
+  let extraClassDeclaration = [{
+    ::mlir::SymbolTable::Visibility getVisibility() {
+      return getExported() ?
+        ::mlir::SymbolTable::Visibility::Public :
+        ::mlir::SymbolTable::Visibility::Nested;
+    };
+  }];
   let hasCustomAssemblyFormat = 1;
 }
 
@@ -283,18 +294,14 @@ def WasmSSA_GlobalImportOp : WasmSSA_Op<"import_global", [
                      StrAttr: $moduleName,
                      StrAttr: $importName,
                      WasmSSA_ValTypeAttr: $type,
-                     UnitAttr: $isMutable,
-                     OptionalAttr<StrAttr>:$sym_visibility);
+                     UnitAttr: $isMutable);
   let extraClassDeclaration = [{
     bool isDeclaration() const { return true; }
+
+    ::mlir::SymbolTable::Visibility getVisibility() {
+      return ::mlir::SymbolTable::Visibility::Nested;
+    };
   }];
-  let builders = [
-    OpBuilder<(ins "StringRef":$symbol,
-                   "StringRef":$moduleName,
-                   "StringRef":$importName,
-                   "Type": $type,
-                   "bool": $isMutable)>
-  ];
   let hasCustomAssemblyFormat = 1;
 }
 
@@ -451,14 +458,17 @@ def WasmSSA_MemOp : WasmSSA_Op<"memory", [Symbol]> {
     }];
   let arguments = (ins SymbolNameAttr: $sym_name,
                      WasmSSA_LimitTypeAttr: $limits,
-                     OptionalAttr<StrAttr>:$sym_visibility);
-  let builders = [
-    OpBuilder<(ins
-    "::llvm::StringRef":$symbol,
-    "wasmssa::LimitType":$limit)>
-  ];
+                     UnitAttr: $exported);
 
-  let assemblyFormat = "$sym_name custom<WasmVisibility>($sym_visibility) $limits attr-dict";
+  let extraClassDeclaration = [{
+    ::mlir::SymbolTable::Visibility getVisibility() {
+      return getExported() ?
+        ::mlir::SymbolTable::Visibility::Public :
+        ::mlir::SymbolTable::Visibility::Nested;
+    };
+  }];
+
+  let assemblyFormat = "(`exported` $exported^)? $sym_name $limits attr-dict";
 }
 
 def WasmSSA_MemImportOp : WasmSSA_Op<"import_mem", [Symbol, ImportOpInterface]> {
@@ -476,16 +486,13 @@ def WasmSSA_MemImportOp : WasmSSA_Op<"import_mem", [Symbol, ImportOpInterface]> 
   let arguments = (ins SymbolNameAttr: $sym_name,
                      StrAttr: $moduleName,
                      StrAttr: $importName,
-                     WasmSSA_LimitTypeAttr: $limits,
-                     OptionalAttr<StrAttr>:$sym_visibility);
+                     WasmSSA_LimitTypeAttr: $limits);
   let extraClassDeclaration = [{
-     bool isDeclaration() const { return true; }
+      bool isDeclaration() const { return true; }
+      ::mlir::SymbolTable::Visibility getVisibility() {
+       return ::mlir::SymbolTable::Visibility::Nested;
+      };
    }];
-  let builders = [OpBuilder<(ins
-    "::llvm::StringRef":$symbol,
-    "::llvm::StringRef":$moduleName,
-    "::llvm::StringRef":$importName,
-    "wasmssa::LimitType":$limits)>];
   let assemblyFormat = "$importName `from` $moduleName `as` $sym_name attr-dict";
 }
 
@@ -493,11 +500,15 @@ def WasmSSA_TableOp : WasmSSA_Op<"table", [Symbol]> {
   let summary= "WebAssembly table value";
   let arguments = (ins SymbolNameAttr: $sym_name,
                      WasmSSA_TableTypeAttr: $type,
-                     OptionalAttr<StrAttr>:$sym_visibility);
-  let builders = [OpBuilder<(ins
-      "::llvm::StringRef":$symbol,
-      "wasmssa::TableType":$type)>];
-  let assemblyFormat = "$sym_name custom<WasmVisibility>($sym_visibility) $type attr-dict";
+                     UnitAttr: $exported);
+  let extraClassDeclaration = [{
+    ::mlir::SymbolTable::Visibility getVisibility() {
+      return getExported() ?
+        ::mlir::SymbolTable::Visibility::Public :
+        ::mlir::SymbolTable::Visibility::Nested;
+    };
+  }];
+  let assemblyFormat = "(`exported` $exported^)? $sym_name $type attr-dict";
 }
 
 def WasmSSA_TableImportOp : WasmSSA_Op<"import_table", [Symbol, ImportOpInterface]> {
@@ -515,17 +526,14 @@ def WasmSSA_TableImportOp : WasmSSA_Op<"import_table", [Symbol, ImportOpInterfac
   let arguments = (ins SymbolNameAttr: $sym_name,
                      StrAttr: $moduleName,
                      StrAttr: $importName,
-                     WasmSSA_TableTypeAttr: $type,
-                     OptionalAttr<StrAttr>:$sym_visibility);
+                     WasmSSA_TableTypeAttr: $type);
   let extraClassDeclaration = [{
     bool isDeclaration() const { return true; }
+    ::mlir::SymbolTable::Visibility getVisibility() {
+       return ::mlir::SymbolTable::Visibility::Nested;
+    };
   }];
   let assemblyFormat = "$importName `from` $moduleName `as` $sym_name attr-dict";
-  let builders = [OpBuilder<(ins
-      "::llvm::StringRef":$symbol,
-      "::llvm::StringRef":$moduleName,
-      "::llvm::StringRef":$importName,
-      "wasmssa::TableType":$type)>];
 }
 
 def WasmSSA_ReturnOp : WasmSSA_Op<"return", [Terminator]> {
