@@ -30,3 +30,13 @@ module {
     wasmssa.return %0 : i32
   }
 }
+
+// -----
+
+module {
+  // expected-error@+1 {{expecting either `exported` or symbol name. got exproted}}
+  wasmssa.global exproted @global_1 i32 : {
+    %0 = wasmssa.const 17 : i32
+    wasmssa.return %0 : i32
+  }
+}
