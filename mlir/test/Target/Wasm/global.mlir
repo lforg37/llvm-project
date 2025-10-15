@@ -31,7 +31,7 @@ i32.add
 
 // CHECK-LABEL:   wasmssa.import_global "from_js" from "env" as @global_0 : i32
 
-// CHECK-LABEL:   wasmssa.func exported @func_0() -> i32 {
+// CHECK-LABEL:   wasmssa.func @func_0() -> i32 {
 // CHECK:           %[[VAL_0:.*]] = wasmssa.global_get @global_0 : i32
 // CHECK:           %[[VAL_1:.*]] = wasmssa.global_get @global_1 : i32
 // CHECK:           %[[VAL_2:.*]] = wasmssa.add %[[VAL_0]] %[[VAL_1]] : i32

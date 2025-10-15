@@ -146,7 +146,7 @@ Block *FuncOp::addEntryBlock() {
 
 void FuncOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                    StringRef symbol, FunctionType funcType) {
-  FuncOp::build(odsBuilder, odsState, symbol, funcType, {}, {}, "nested");
+  FuncOp::build(odsBuilder, odsState, symbol, funcType, {}, {});
 }
 
 ParseResult FuncOp::parse(OpAsmParser &parser, OperationState &result) {

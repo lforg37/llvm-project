@@ -8,7 +8,7 @@ i32.const 42)
 call $forty_two))
 */
 
-// CHECK-LABEL:   wasmssa.func exported @func_0() -> i32 {
+// CHECK-LABEL:   wasmssa.func @func_0() -> i32 {
 // CHECK:           %[[VAL_0:.*]] = wasmssa.const 42 : i32
 // CHECK:           wasmssa.return %[[VAL_0]] : i32
 
